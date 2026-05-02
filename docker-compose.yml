@@ -1,0 +1,23 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      # Override DATABASE_URL to use the mounted data directory
+      # This prevents the host from shadowing the prisma schema directory
+      - DATABASE_URL=file:/app/data/dev.db
+      - EMAIL_HOST=mailpit
+      - EMAIL_PORT=1025
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - mailpit
+
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"

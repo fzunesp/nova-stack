@@ -1,0 +1,74 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id                   String    @id @default(cuid())
+  name                 String?
+  displayName          String?
+  companyName          String?
+  email                String    @unique
+  onboardingCompleted  Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  contacts             Contact[]
+  deals                Deal[]
+  tasks                Task[]
+  invoices             Invoice[]
+}
+
+model Contact {
+  id          String   @id @default(cuid())
+  name        String
+  email       String?
+  phone       String?
+  companyName String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  deals       Deal[]
+}
+
+model Deal {
+  id                String   @id @default(cuid())
+  title             String
+  value             Float?
+  stage             String   @default("lead")
+  expectedCloseDate DateTime?
+  createdAt         DateTime @default(now())
+  contactId         String
+  contact           Contact   @relation(fields: [contactId], references: [id])
+  userId            String
+  user              User      @relation(fields: [userId], references: [id])
+  invoices          Invoice[]
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  status      String    @default("todo")
+  dueDate     DateTime?
+  createdAt   DateTime  @default(now())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+}
+
+model Invoice {
+  id          String    @id @default(cuid())
+  title       String
+  amount      Float
+  status      String    @default("draft")
+  issuedDate  DateTime  @default(now())
+  dueDate     DateTime?
+  paidAt      DateTime?
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  dealId      String?
+  deal        Deal?     @relation(fields: [dealId], references: [id])
+}
