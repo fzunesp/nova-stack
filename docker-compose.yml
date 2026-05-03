@@ -3,14 +3,12 @@ services:
     build: .
     ports:
       - "3000:3000"
-    env_file:
-      - .env
     environment:
-      # Override DATABASE_URL to use the mounted data directory
-      # This prevents the host from shadowing the prisma schema directory
+      - NODE_ENV=development
       - DATABASE_URL=file:/app/data/dev.db
       - EMAIL_HOST=mailpit
       - EMAIL_PORT=1025
+      - SESSION_SECRET=nova-stack-dev-secret-change-in-production
     volumes:
       - ./data:/app/data
     depends_on:

@@ -1,31 +1,27 @@
 'use server';
 
-import { getInvoiceById, updateInvoice } from '@/modules/invoices/invoice.service';
+import { getInvoiceById, updateInvoice, validateInvoiceTransition } from '@/modules/invoices/invoice.service';
 import { generateInvoicePDF } from '@/modules/invoices/invoice.pdf';
 import { sendEmail } from '@/lib/email';
 import { revalidatePath } from 'next/cache';
 
 export async function sendInvoiceEmailAction(invoiceId: string) {
   try {
-    // 1. Fetch invoice using service layer (enforces userId)
     const invoice = await getInvoiceById(invoiceId);
 
     if (!invoice) {
       return { error: 'Invoice not found or unauthorized' } as const;
     }
 
-    // 2. Extract contact email
     const contactEmail = invoice.deal?.contact?.email;
     
     if (!contactEmail) {
       return { error: 'Cannot send: Invoice is not linked to a deal with a valid contact email.' } as const;
     }
 
-    // 3. Generate PDF
     const pdfBytes = await generateInvoicePDF(invoice);
     const pdfBuffer = Buffer.from(pdfBytes);
 
-    // 4. Call sendEmail
     await sendEmail({
       to: contactEmail,
       subject: `Invoice: ${invoice.title}`,
@@ -51,22 +47,30 @@ export async function markInvoicePaidAction(id: string) {
   try {
     const invoice = await getInvoiceById(id);
     if (!invoice) return { error: 'Not found' };
-    
-    // Idempotency check
-    if (invoice.paidAt) return { success: true };
-    
+
+    if (invoice.status === 'cancelled') {
+      return { error: 'Cannot mark a cancelled invoice as paid' };
+    }
+
+    if (invoice.status === 'paid') return { success: true };
+
+    const transition = validateInvoiceTransition(invoice.status, 'paid');
+    if (!transition.valid) {
+      return { error: transition.error };
+    }
+
     await updateInvoice(id, {
       status: 'paid',
       paidAt: new Date()
     });
-    
+
     revalidatePath('/invoices');
     revalidatePath('/crm');
     if (invoice.dealId) {
       revalidatePath(`/crm/deals/${invoice.dealId}`);
     }
     revalidatePath('/');
-    
+
     return { success: true };
   } catch (error) {
     console.error('Error marking invoice paid:', error);
@@ -74,24 +78,68 @@ export async function markInvoicePaidAction(id: string) {
   }
 }
 
-export async function markInvoiceSentAction(id: string) {
+export async function cancelInvoiceAction(id: string) {
   try {
     const invoice = await getInvoiceById(id);
     if (!invoice) return { error: 'Not found' };
-    
-    if (invoice.status === 'sent' || invoice.status === 'paid') return { success: true };
-    
+
+    if (invoice.status === 'paid') {
+      return { error: 'Cannot cancel a paid invoice' };
+    }
+
+    if (invoice.status === 'cancelled') return { success: true };
+
+    const transition = validateInvoiceTransition(invoice.status, 'cancelled');
+    if (!transition.valid) {
+      return { error: transition.error };
+    }
+
     await updateInvoice(id, {
-      status: 'sent'
+      status: 'cancelled',
+      paidAt: null
     });
-    
+
     revalidatePath('/invoices');
     revalidatePath('/crm');
     if (invoice.dealId) {
       revalidatePath(`/crm/deals/${invoice.dealId}`);
     }
     revalidatePath('/');
-    
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error cancelling invoice:', error);
+    return { error: 'Failed to cancel invoice' };
+  }
+}
+
+export async function markInvoiceSentAction(id: string) {
+  try {
+    const invoice = await getInvoiceById(id);
+    if (!invoice) return { error: 'Not found' };
+
+    if (invoice.status === 'cancelled') {
+      return { error: 'Cannot mark a cancelled invoice as sent' };
+    }
+
+    if (invoice.status === 'sent' || invoice.status === 'paid') return { success: true };
+
+    const transition = validateInvoiceTransition(invoice.status, 'sent');
+    if (!transition.valid) {
+      return { error: transition.error };
+    }
+
+    await updateInvoice(id, {
+      status: 'sent'
+    });
+
+    revalidatePath('/invoices');
+    revalidatePath('/crm');
+    if (invoice.dealId) {
+      revalidatePath(`/crm/deals/${invoice.dealId}`);
+    }
+    revalidatePath('/');
+
     return { success: true };
   } catch (error) {
     console.error('Error marking invoice sent:', error);

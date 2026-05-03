@@ -36,13 +36,13 @@ export default async function InvoicesPage() {
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
       {/* Header */}
-      <div className="sm:flex sm:items-center sm:justify-between mb-8">
+      <div className="sm:flex sm:items-center sm:justify-between mb-2">
         <div>
           <h1 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:tracking-tight">
             Invoices
           </h1>
           <p className="mt-2 text-sm text-gray-500">
-            Manage your billing and track payments.
+            Invoices are typically created from Deals.
           </p>
         </div>
         <div className="mt-4 sm:mt-0">
@@ -64,19 +64,19 @@ export default async function InvoicesPage() {
             </svg>
           </div>
           <h3 className="text-sm font-semibold text-gray-900">No invoices yet</h3>
-          <p className="mt-1 text-sm text-gray-500">Create from Deals to track revenue.</p>
+          <p className="mt-1 text-sm text-gray-500">Create one from a Deal to start tracking revenue.</p>
           <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
-              href="/invoices/new"
+              href="/crm/deals"
               className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500"
             >
-              Create your first invoice
+              Go to Deals
             </Link>
             <Link
-              href="/crm/deals"
+              href="/invoices/new"
               className="text-sm font-medium text-blue-600 hover:text-blue-500"
             >
-              Generate from a deal &rarr;
+              Create manually &rarr;
             </Link>
           </div>
         </div>
@@ -86,6 +86,7 @@ export default async function InvoicesPage() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="py-4 pl-4 pr-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sm:pl-6">Title</th>
+                <th className="px-3 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deal</th>
                 <th className="px-3 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
                 <th className="px-3 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-3 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issued Date</th>
@@ -96,7 +97,11 @@ export default async function InvoicesPage() {
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
               {invoices.map((invoice) => (
-                <tr key={invoice.id} className={`transition-colors ${invoice.status === 'paid' ? 'bg-gray-50/50 opacity-75' : 'hover:bg-gray-50'}`}>
+                <tr key={invoice.id} className={`transition-colors ${
+                  invoice.status === 'paid' ? 'bg-gray-50/50 opacity-75' :
+                  invoice.status === 'cancelled' ? 'bg-red-50/30 opacity-60' :
+                  'hover:bg-gray-50'
+                }`}>
                   <td className="py-4 pl-4 pr-3 text-sm sm:pl-6">
                     <div className="flex items-center gap-2">
                       {invoice.status === 'paid' && (
@@ -106,6 +111,15 @@ export default async function InvoicesPage() {
                       )}
                       <span className="font-medium text-gray-900">{invoice.title}</span>
                     </div>
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-600">
+                    {invoice.deal ? (
+                      <Link href={`/crm/deals/${invoice.dealId}`} className="text-blue-600 hover:text-blue-900">
+                        {invoice.deal.title}
+                      </Link>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
                   </td>
                   <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-900 font-medium">
                     {formatCurrency(invoice.amount)}

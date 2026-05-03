@@ -21,8 +21,10 @@ export async function createInvoiceAction(formData: FormData) {
   const amount = parseFloat(amountStr);
   const dueDate = dueDateStr ? new Date(dueDateStr) : undefined;
 
+  let invoiceId = '';
+
   try {
-    await createInvoice({
+    const invoice = await createInvoice({
       title,
       amount,
       status,
@@ -30,11 +32,13 @@ export async function createInvoiceAction(formData: FormData) {
       dealId: null, // Note: minimal implementation as requested
     });
 
+    invoiceId = invoice.id;
+
     revalidatePath('/invoices');
   } catch (error) {
     console.error('Failed to create invoice:', error);
     return { error: error instanceof Error ? error.message : String(error) } as const;
   }
-  
-  redirect('/invoices');
+
+  redirect(`/invoices/${invoiceId}`);
 }

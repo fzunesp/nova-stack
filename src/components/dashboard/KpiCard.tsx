@@ -18,16 +18,16 @@ const ACCENT_STYLES = {
 export default function KpiCard({ label, value, subLabel, icon, accent }: KpiCardProps) {
   const styles = ACCENT_STYLES[accent];
   return (
-    <div className={`rounded-xl p-6 ${styles.wrapper} shadow-sm ring-1 ring-black ring-opacity-5`}>
+    <div className={`rounded-lg p-4 ${styles.wrapper} shadow-sm ring-1 ring-black ring-opacity-5`}>
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">{label}</p>
-          <p className={`text-3xl font-bold truncate ${styles.value}`}>{value}</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">{label}</p>
+          <p className={`text-2xl font-bold truncate ${styles.value}`}>{value}</p>
           {subLabel && (
-            <p className="mt-1 text-xs text-gray-500">{subLabel}</p>
+            <p className="mt-0.5 text-xs text-gray-400">{subLabel}</p>
           )}
         </div>
-        <div className={`ml-4 flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-xl ${styles.icon}`}>
+        <div className={`ml-3 flex-shrink-0 flex items-center justify-center h-9 w-9 rounded-lg ${styles.icon}`}>
           {icon}
         </div>
       </div>

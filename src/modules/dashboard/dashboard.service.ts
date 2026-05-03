@@ -126,3 +126,273 @@ export async function getRecentActivity(): Promise<ActivityItem[]> {
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
     .slice(0, 15);
 }
+
+export interface RadarItem {
+  id: string;
+  title: string;
+  context: string;
+  link: string;
+  level: 'task' | 'deal' | 'invoice' | 'contact';
+}
+
+interface RadarItemInternal extends RadarItem {
+  sortKey: number;
+}
+
+export interface RadarData {
+  urgent: RadarItem[];
+  attention: RadarItem[];
+  opportunities: RadarItem[];
+}
+
+function daysBetween(a: Date, b: Date): number {
+  return Math.ceil(Math.abs(a.getTime() - b.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+export async function getRadarItems(): Promise<RadarData> {
+  const userId = await requireUserId();
+  const now = new Date();
+
+  const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+  const [tasks, deals, invoices, contacts] = await Promise.all([
+    prisma.task.findMany({
+      where: { userId },
+    }),
+    prisma.deal.findMany({
+      where: { userId },
+      include: { invoices: { select: { id: true } }, contact: { select: { name: true } } },
+    }),
+    prisma.invoice.findMany({
+      where: { userId },
+    }),
+    prisma.contact.findMany({
+      where: { userId, createdAt: { gte: thirtyDaysAgo } },
+      include: { deals: { select: { id: true } } },
+    }),
+  ]);
+
+  const urgent: RadarItemInternal[] = [];
+  const attention: RadarItemInternal[] = [];
+  const opportunities: RadarItemInternal[] = [];
+
+  // === URGENT ===
+
+  for (const t of tasks) {
+    if (t.dueDate && t.dueDate < now && t.status !== 'done') {
+      const daysOverdue = daysBetween(t.dueDate, now);
+      urgent.push({
+        id: t.id,
+        title: t.title,
+        context: `Overdue by ${daysOverdue} day${daysOverdue !== 1 ? 's' : ''} — complete it`,
+        link: `/tasks/${t.id}/edit`,
+        level: 'task',
+        sortKey: daysOverdue,
+      });
+    }
+  }
+
+  for (const d of deals) {
+    if (d.expectedCloseDate && d.expectedCloseDate < now && d.stage !== 'won' && d.stage !== 'lost') {
+      const daysOverdue = daysBetween(d.expectedCloseDate, now);
+      urgent.push({
+        id: d.id,
+        title: d.title,
+        context: `Past expected close by ${daysOverdue} day${daysOverdue !== 1 ? 's' : ''} — update stage`,
+        link: `/crm/deals/${d.id}`,
+        level: 'deal',
+        sortKey: daysOverdue,
+      });
+    }
+  }
+
+  for (const i of invoices) {
+    if (i.status === 'sent' && i.issuedDate < sevenDaysAgo) {
+      const daysAgo = daysBetween(i.issuedDate, now);
+      urgent.push({
+        id: i.id,
+        title: i.title,
+        context: `Sent ${daysAgo} days ago — follow up`,
+        link: `/invoices/${i.id}`,
+        level: 'invoice',
+        sortKey: daysAgo,
+      });
+    }
+  }
+
+  // === ATTENTION ===
+
+  for (const t of tasks) {
+    if (t.dueDate && t.dueDate >= now && t.dueDate <= threeDaysFromNow && t.status !== 'done') {
+      const msPerDay = 1000 * 60 * 60 * 24;
+      const diffMs = t.dueDate.getTime() - now.getTime();
+      const daysLeft = Math.ceil(diffMs / msPerDay);
+
+      if (daysLeft <= 0) {
+        attention.push({
+          id: t.id,
+          title: t.title,
+          context: 'Due today — start working',
+          link: `/tasks/${t.id}/edit`,
+          level: 'task',
+          sortKey: 0,
+        });
+      } else {
+        attention.push({
+          id: t.id,
+          title: t.title,
+          context: `Due in ${daysLeft} day${daysLeft !== 1 ? 's' : ''} — plan ahead`,
+          link: `/tasks/${t.id}/edit`,
+          level: 'task',
+          sortKey: daysLeft,
+        });
+      }
+    }
+  }
+
+  for (const d of deals) {
+    if ((d.stage === 'contacted' || d.stage === 'quoted') && d.createdAt < fourteenDaysAgo) {
+      const daysInStage = daysBetween(d.createdAt, now);
+      attention.push({
+        id: d.id,
+        title: d.title,
+        context: `In ${d.stage} for ${daysInStage} days — follow up`,
+        link: `/crm/deals/${d.id}`,
+        level: 'deal',
+        sortKey: daysInStage,
+      });
+    }
+  }
+
+  for (const i of invoices) {
+    if (i.status === 'sent' && i.issuedDate >= sevenDaysAgo) {
+      const daysAgo = daysBetween(i.issuedDate, now);
+      attention.push({
+        id: i.id,
+        title: i.title,
+        context: `Sent ${daysAgo} days ago — awaiting payment`,
+        link: `/invoices/${i.id}`,
+        level: 'invoice',
+        sortKey: daysAgo,
+      });
+    }
+  }
+
+  // === OPPORTUNITIES ===
+
+  for (const d of deals) {
+    if (d.value && d.value > 0 && d.invoices.length === 0 && d.stage !== 'won' && d.stage !== 'lost') {
+      const contactSuffix = d.contact?.name ? ` with ${d.contact.name}` : '';
+      opportunities.push({
+        id: d.id,
+        title: d.title,
+        context: `Valued at $${d.value.toLocaleString()}${contactSuffix} — create invoice`,
+        link: `/crm/deals/${d.id}`,
+        level: 'deal',
+        sortKey: -d.value,
+      });
+    }
+  }
+
+  for (const i of invoices) {
+    if (i.status === 'draft') {
+      opportunities.push({
+        id: i.id,
+        title: i.title,
+        context: 'Draft — send to client',
+        link: `/invoices/${i.id}`,
+        level: 'invoice',
+        sortKey: 0,
+      });
+    }
+  }
+
+  for (const c of contacts) {
+    if (c.deals.length === 0) {
+      opportunities.push({
+        id: c.id,
+        title: c.name,
+        context: 'New contact — create a deal',
+        link: `/crm/${c.id}`,
+        level: 'contact',
+        sortKey: -c.createdAt.getTime(),
+      });
+    }
+  }
+
+  return {
+    urgent: urgent.sort((a, b) => b.sortKey - a.sortKey).slice(0, 5),
+    attention: attention.sort((a, b) => a.sortKey - b.sortKey).slice(0, 5),
+    opportunities: opportunities.sort((a, b) => a.sortKey - b.sortKey).slice(0, 5),
+  };
+}
+
+export interface TodaySummary {
+  dueTasks: number;
+  overdueInvoices: number;
+  dealsNeedingAttention: number;
+}
+
+export async function getTodaySummary(): Promise<TodaySummary> {
+  const userId = await requireUserId();
+  const now = new Date();
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+  const [dueTasks, overdueInvoices, staleDeals] = await Promise.all([
+    prisma.task.count({
+      where: { userId, dueDate: { lte: now }, status: { not: 'done' } },
+    }),
+    prisma.invoice.count({
+      where: { userId, status: 'sent', issuedDate: { lt: sevenDaysAgo } },
+    }),
+    prisma.deal.count({
+      where: {
+        userId,
+        stage: { in: ['contacted', 'quoted'] },
+        createdAt: { lt: fourteenDaysAgo },
+      },
+    }),
+  ]);
+
+  return { dueTasks, overdueInvoices, dealsNeedingAttention: staleDeals };
+}
+
+export interface MoneyAtRisk {
+  overdueInvoicesTotal: number;
+  openDealsValue: number;
+  totalAtRisk: number;
+}
+
+export async function getMoneyAtRisk(): Promise<MoneyAtRisk> {
+  const userId = await requireUserId();
+  const now = new Date();
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  const [overdueInvoices, openDeals] = await Promise.all([
+    prisma.invoice.findMany({
+      where: { userId, status: 'sent', issuedDate: { lt: sevenDaysAgo } },
+      select: { amount: true },
+    }),
+    prisma.deal.findMany({
+      where: {
+        userId,
+        stage: { notIn: ['won', 'lost'] },
+        value: { gt: 0 },
+      },
+      select: { value: true },
+    }),
+  ]);
+
+  const overdueInvoicesTotal = overdueInvoices.reduce((sum, i) => sum + i.amount, 0);
+  const openDealsValue = openDeals.reduce((sum, d) => sum + (d.value || 0), 0);
+
+  return {
+    overdueInvoicesTotal,
+    openDealsValue,
+    totalAtRisk: overdueInvoicesTotal + openDealsValue,
+  };
+}

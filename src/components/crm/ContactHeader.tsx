@@ -43,19 +43,22 @@ export default function ContactHeader({ contact }: ContactHeaderProps) {
             </div>
           )}
         </div>
-        <div className="mt-4 sm:ml-16 sm:mt-0 sm:flex-none flex items-center gap-3">
-          <Link
-            href={`/crm/${contact.id}/edit`}
-            className="block rounded-md bg-white px-3 py-2 text-center text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
-          >
-            Edit Contact
-          </Link>
-          <Link
-            href={`/crm/deals/new?contactId=${contact.id}`}
-            className="block rounded-md bg-blue-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-          >
-            Add Deal
-          </Link>
+        <div className="mt-4 sm:ml-16 sm:mt-0 sm:flex-none flex flex-col items-end gap-1">
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/crm/${contact.id}/edit`}
+              className="block rounded-md bg-white px-3 py-2 text-center text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+            >
+              Edit Contact
+            </Link>
+            <Link
+              href={`/crm/deals/new?contactId=${contact.id}`}
+              className="block rounded-md bg-blue-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+            >
+              Add Deal
+            </Link>
+          </div>
+          <span className="text-xs text-gray-400">Deals track opportunities with this contact</span>
         </div>
       </div>
     </div>

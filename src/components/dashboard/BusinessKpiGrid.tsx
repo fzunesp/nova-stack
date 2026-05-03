@@ -13,7 +13,7 @@ const fmtPct = (n: number) => `${n.toFixed(1)}%`;
 
 export default function BusinessKpiGrid({ metrics }: BusinessKpiGridProps) {
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-5 mb-8">
+    <div className="grid grid-cols-3 gap-3 lg:grid-cols-5 mb-8">
       <KpiCard
         label="Total Revenue"
         value={fmtCurrency(metrics.totalRevenue)}

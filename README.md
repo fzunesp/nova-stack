@@ -43,24 +43,42 @@ Nova Stack is designed to be easily runnable locally. Follow these steps to get 
 
 ### Option 2: Run with Docker (Recommended)
 
-1. Build and start the containers:
-   ```bash
-   docker compose up --build
-   ```
-2. Run database migrations (only needed on first run):
-   ```bash
-   docker compose exec app npx prisma db push
-   ```
-3. Open the application: [http://localhost:3000](http://localhost:3000)
-4. Login using: `admin@nova-stack.local`
+One command — everything is automatic:
+
+```bash
+docker compose up
+```
+
+That's it. The container will:
+1. Generate Prisma Client
+2. Apply database migrations
+3. Seed sample data (contacts, deals, tasks, invoices)
+4. Start the application
+
+Then open:
+- **App:** [http://localhost:3000](http://localhost:3000)
+- **Mailpit (email testing):** [http://localhost:8025](http://localhost:8025)
+
+**Default Login:**
+- **Email:** `admin@nova-stack.local`
+- **Role:** Admin User
+
+*Data is auto-seeded on first run. No manual setup required.*
 
 **Included Services:**
 - App runs on port 3000
-- Mailpit UI (Email Testing) runs on: [http://localhost:8025](http://localhost:8025)
+- Mailpit UI (Email Testing) runs on port 8025
 
-**Seeding the Database (Docker):**
+**Stopping:**
 ```bash
-docker compose exec app npm run seed
+docker compose down
+```
+
+**Reset everything (fresh start):**
+```bash
+docker compose down -v
+rm -rf data/
+docker compose up
 ```
 
 ## Default Login Instructions

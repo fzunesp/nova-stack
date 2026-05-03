@@ -3,3 +3,5 @@ node_modules
 prisma/*.db
 prisma/*.db-journal
 data
+.env
+.git

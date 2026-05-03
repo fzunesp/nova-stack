@@ -2,11 +2,31 @@ import prisma from '@/lib/db';
 import { requireUserId } from '@/lib/auth';
 import type { Invoice } from '@/generated/prisma/client';
 
+export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'cancelled';
+
 export type CreateInvoiceInput = Omit<Invoice, 'id' | 'issuedDate' | 'userId' | 'paidAt'> & {
   issuedDate?: Date;
   paidAt?: Date | null;
 };
 export type UpdateInvoiceInput = Partial<CreateInvoiceInput>;
+
+const VALID_TRANSITIONS: Record<InvoiceStatus, InvoiceStatus[]> = {
+  draft: ['sent', 'paid', 'cancelled'],
+  sent: ['paid', 'cancelled'],
+  paid: [],
+  cancelled: [],
+};
+
+export function validateInvoiceTransition(currentStatus: string, newStatus: string): { valid: boolean; error?: string } {
+  const allowed = VALID_TRANSITIONS[currentStatus as InvoiceStatus];
+  if (!allowed) {
+    return { valid: false, error: `Unknown invoice status: ${currentStatus}` };
+  }
+  if (!allowed.includes(newStatus as InvoiceStatus)) {
+    return { valid: false, error: `Cannot transition from "${currentStatus}" to "${newStatus}"` };
+  }
+  return { valid: true };
+}
 
 export async function getAllInvoices() {
   try {

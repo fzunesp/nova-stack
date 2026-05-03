@@ -5,6 +5,7 @@ import { sendInvoiceEmailAction } from '@/app/(dashboard)/invoices/actions';
 
 import MarkPaidButton from './MarkPaidButton';
 import MarkSentButton from './MarkSentButton';
+import CancelInvoiceButton from './CancelInvoiceButton';
 
 interface InvoiceActionButtonsProps {
   invoiceId: string;
@@ -14,6 +15,8 @@ interface InvoiceActionButtonsProps {
 
 export default function InvoiceActionButtons({ invoiceId, hasContactEmail, status }: InvoiceActionButtonsProps) {
   const [isPending, startTransition] = useTransition();
+
+  const isTerminal = status === 'paid' || status === 'cancelled';
 
   const handleSendEmail = () => {
     if (!hasContactEmail) {
@@ -31,10 +34,15 @@ export default function InvoiceActionButtons({ invoiceId, hasContactEmail, statu
     });
   };
 
+  if (isTerminal) {
+    return null;
+  }
+
   return (
     <div className="flex items-center justify-end gap-3">
       {status === 'draft' && <MarkSentButton invoiceId={invoiceId} />}
-      {status !== 'paid' && status !== 'cancelled' && <MarkPaidButton invoiceId={invoiceId} />}
+      <MarkPaidButton invoiceId={invoiceId} status={status} />
+      <CancelInvoiceButton invoiceId={invoiceId} />
       <button
         onClick={handleSendEmail}
         disabled={isPending || !hasContactEmail}

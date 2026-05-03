@@ -19,6 +19,7 @@ model User {
   deals                Deal[]
   tasks                Task[]
   invoices             Invoice[]
+  intakeSubmissions    IntakeSubmission[]
 }
 
 model Contact {
@@ -71,4 +72,16 @@ model Invoice {
   user        User      @relation(fields: [userId], references: [id])
   dealId      String?
   deal        Deal?     @relation(fields: [dealId], references: [id])
+}
+
+model IntakeSubmission {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  message   String
+  source    String   @default("external")
+  status    String   @default("new")
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
 }

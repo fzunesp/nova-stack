@@ -55,6 +55,6 @@ export async function createInvoiceFromDealAction(dealId: string) {
   revalidatePath(`/crm/deals/${dealId}`);
   revalidatePath('/invoices');
 
-  // Redirect user to the invoices list (must be outside try/catch)
-  redirect('/invoices');
+  // Redirect user to the created invoice detail page (must be outside try/catch)
+  redirect(`/invoices/${invoiceId}`);
 }
