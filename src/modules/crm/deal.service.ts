@@ -46,11 +46,27 @@ export async function createDeal(data: CreateDealInput): Promise<Deal> {
   try {
     const userId = await requireUserId();
     return await prisma.deal.create({
-      data: { ...data, userId }
+      data: { ...data, userId, assignedToId: userId }
     });
   } catch (error) {
     console.error('Error creating deal:', error);
     throw new Error('Failed to create deal');
+  }
+}
+
+export async function updateDealAssignee(id: string, assigneeId: string): Promise<Deal> {
+  try {
+    const userId = await requireUserId();
+    const existing = await prisma.deal.findFirst({ where: { id, userId } });
+    if (!existing) throw new Error('Not found or unauthorized');
+
+    return await prisma.deal.update({
+      where: { id },
+      data: { assignedToId: assigneeId },
+    });
+  } catch (error) {
+    console.error(`Error updating deal assignee ${id}:`, error);
+    throw new Error('Failed to update deal assignee');
   }
 }
 

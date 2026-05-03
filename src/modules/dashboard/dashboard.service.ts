@@ -1,5 +1,5 @@
 import prisma from '@/lib/db';
-import { requireUserId } from '@/lib/auth';
+import { requireUserId, getSessionUserId } from '@/lib/auth';
 
 export interface BusinessMetrics {
   totalRevenue: number;
@@ -395,4 +395,75 @@ export async function getMoneyAtRisk(): Promise<MoneyAtRisk> {
     openDealsValue,
     totalAtRisk: overdueInvoicesTotal + openDealsValue,
   };
+}
+
+export interface SignalItem {
+  id: string;
+  type: 'task' | 'intake' | 'deal';
+  title: string;
+  status: string;
+  link: string;
+  timestamp: Date;
+  isNew: boolean;
+}
+
+export async function getMySignals(): Promise<SignalItem[]> {
+  const userId = await getSessionUserId();
+  if (!userId) return [];
+
+  const [tasks, intakes, deals] = await Promise.all([
+    prisma.task.findMany({
+      where: { assignedToId: userId, status: { not: 'done' } },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+    }),
+    prisma.intakeSubmission.findMany({
+      where: {
+        assignedToId: userId,
+        status: { notIn: ['approved', 'rejected', 'converted'] },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+    }),
+    prisma.deal.findMany({
+      where: {
+        assignedToId: userId,
+        stage: { notIn: ['won', 'lost'] },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 3,
+    }),
+  ]);
+
+  const items: SignalItem[] = [
+    ...tasks.map(t => ({
+      id: t.id,
+      type: 'task' as const,
+      title: t.title,
+      status: t.status,
+      link: `/tasks/${t.id}/edit`,
+      timestamp: t.createdAt,
+      isNew: t.status === 'todo',
+    })),
+    ...intakes.map(i => ({
+      id: i.id,
+      type: 'intake' as const,
+      title: i.name,
+      status: i.status,
+      link: `/intake`,
+      timestamp: i.createdAt,
+      isNew: i.status === 'new',
+    })),
+    ...deals.map(d => ({
+      id: d.id,
+      type: 'deal' as const,
+      title: d.title,
+      status: d.stage,
+      link: `/crm/deals/${d.id}`,
+      timestamp: d.createdAt,
+      isNew: d.stage === 'lead',
+    })),
+  ];
+
+  return items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 }

@@ -1,10 +1,11 @@
 import React from 'react';
 import Link from 'next/link';
-import { getBusinessMetrics, getRadarItems, getTodaySummary, getMoneyAtRisk } from '@/modules/dashboard/dashboard.service';
+import { getBusinessMetrics, getRadarItems, getTodaySummary, getMoneyAtRisk, getMySignals } from '@/modules/dashboard/dashboard.service';
 import BusinessKpiGrid from '@/components/dashboard/BusinessKpiGrid';
 import RadarPanel from '@/components/dashboard/RadarPanel';
 import TodayStrip from '@/components/dashboard/TodayStrip';
 import MoneyAtRiskStrip from '@/components/dashboard/MoneyAtRiskStrip';
+import MySignalsPanel from '@/components/dashboard/MySignalsPanel';
 
 export const metadata = {
   title: 'Command Center | Nova Stack',
@@ -13,11 +14,12 @@ export const metadata = {
 export const dynamic = 'force-dynamic';
 
 export default async function CommandCenterPage() {
-  const [metrics, radar, today, moneyAtRisk] = await Promise.all([
+  const [metrics, radar, today, moneyAtRisk, mySignals] = await Promise.all([
     getBusinessMetrics(),
     getRadarItems(),
     getTodaySummary(),
     getMoneyAtRisk(),
+    getMySignals(),
   ]);
 
   return (
@@ -72,13 +74,16 @@ export default async function CommandCenterPage() {
       {/* 1. Today — summary strip */}
       <TodayStrip summary={today} />
 
-      {/* 2. Money at Risk */}
+      {/* 2. My Signals — items assigned to you */}
+      <MySignalsPanel items={mySignals} />
+
+      {/* 3. Money at Risk */}
       <MoneyAtRiskStrip data={moneyAtRisk} />
 
-      {/* 3. Radar — attention system */}
+      {/* 4. Radar — attention system */}
       <RadarPanel data={radar} />
 
-      {/* 4. KPI Grid — compact */}
+      {/* 5. KPI Grid — compact */}
       <BusinessKpiGrid metrics={metrics} />
 
     </div>

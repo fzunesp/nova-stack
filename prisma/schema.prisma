@@ -20,6 +20,9 @@ model User {
   tasks                Task[]
   invoices             Invoice[]
   intakeSubmissions    IntakeSubmission[]
+  assignedTasks        Task[]              @relation("AssignedTasks")
+  assignedIntake       IntakeSubmission[]  @relation("AssignedIntake")
+  assignedDeals        Deal[]              @relation("AssignedDeals")
 }
 
 model Contact {
@@ -46,18 +49,22 @@ model Deal {
   contact           Contact   @relation(fields: [contactId], references: [id])
   userId            String
   user              User      @relation(fields: [userId], references: [id])
+  assignedToId      String?
+  assignedUser      User?     @relation("AssignedDeals", fields: [assignedToId], references: [id])
   invoices          Invoice[]
 }
 
 model Task {
-  id          String    @id @default(cuid())
-  title       String
-  description String?
-  status      String    @default("todo")
-  dueDate     DateTime?
-  createdAt   DateTime  @default(now())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id])
+  id           String    @id @default(cuid())
+  title        String
+  description  String?
+  status       String    @default("todo")
+  dueDate      DateTime?
+  createdAt    DateTime  @default(now())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id])
+  assignedToId String?
+  assignedUser User?     @relation("AssignedTasks", fields: [assignedToId], references: [id])
 }
 
 model Invoice {
@@ -75,13 +82,20 @@ model Invoice {
 }
 
 model IntakeSubmission {
-  id        String   @id @default(cuid())
-  name      String
-  email     String
-  message   String
-  source    String   @default("external")
-  status    String   @default("new")
-  createdAt DateTime @default(now())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
+  id           String   @id @default(cuid())
+  name         String
+  email        String
+  message      String
+  type         String   @default("general")
+  source       String   @default("external")
+  status       String   @default("new")
+  reference    String   @unique
+  data         Json?
+  decisionNote String?
+  decidedAt    DateTime?
+  assignedToId String?
+  assignedUser User?    @relation("AssignedIntake", fields: [assignedToId], references: [id])
+  createdAt    DateTime @default(now())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
 }
