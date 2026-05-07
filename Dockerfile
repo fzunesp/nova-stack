@@ -2,8 +2,8 @@ FROM node:22-alpine
 
 WORKDIR /app
 
-# Install dependencies needed for SQLite and shell scripts
-RUN apk add --no-cache openssl bash
+# Install bash for startup script
+RUN apk add --no-cache bash
 
 COPY package.json package-lock.json ./
 RUN npm ci

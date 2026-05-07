@@ -85,6 +85,7 @@ async function main() {
         createdAt: faker.date.past({ years: 0.5 }),
         contactId: contact.id,
         userId: user.id,
+        assignedToId: user.id,
       }
     });
     userDeals.push(deal);
@@ -145,6 +146,7 @@ async function main() {
         dueDate: isFuture ? faker.date.future({ years: 0.2 }) : faker.date.past({ years: 0.1 }),
         createdAt: faker.date.past({ years: 0.2 }),
         userId: user.id,
+        assignedToId: user.id,
       }
     });
     totalTasks++;

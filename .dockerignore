@@ -1,7 +1,5 @@
 node_modules
 .next
-prisma/*.db
-prisma/*.db-journal
 data
 .env
 .git

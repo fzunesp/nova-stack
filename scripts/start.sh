@@ -5,8 +5,13 @@ echo "========================================="
 echo "  Nova Stack - Starting up..."
 echo "========================================="
 
-# Ensure data directory exists
-mkdir -p /app/data
+# Wait for PostgreSQL to be ready
+echo "[0/3] Waiting for PostgreSQL..."
+until echo "SELECT 1" | npx prisma db execute --stdin 2>/dev/null; do
+  echo "       Waiting for database..."
+  sleep 2
+done
+echo "       PostgreSQL ready."
 
 # Generate Prisma Client
 echo "[1/3] Generating Prisma Client..."
@@ -16,7 +21,7 @@ echo "       Prisma Client ready."
 # Run migrations
 echo "[2/3] Applying database migrations..."
 npx prisma migrate deploy
-echo "       Database ready."
+echo "       Migrations applied."
 
 # Seed database in development mode
 if [ "$NODE_ENV" = "development" ]; then
