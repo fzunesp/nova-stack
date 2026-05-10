@@ -1,42 +1,20 @@
 services:
-  app:
-    build: .
+  pocketbase:
+    image: ghcr.io/muchobien/pocketbase:latest
     ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=development
-      - AUTH_BYPASS=true
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/novastack
-      - EMAIL_HOST=mailpit
-      - EMAIL_PORT=1025
-      - SESSION_SECRET=nova-stack-dev-secret-change-in-production
-    depends_on:
-      db:
-        condition: service_healthy
-      mailpit:
-        condition: service_started
-
-  db:
-    image: postgres:15
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=novastack
-    ports:
-    - "5432:5432"  
+      - '8090:8090'
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 2s
-      timeout: 5s
-      retries: 10
+      - ./pocketbase/pb_data:/pb_data
+      - ./pocketbase/pb_migrations:/pb_migrations
+      - ./pocketbase/pb_hooks:/pb_hooks
+    restart: unless-stopped
+    environment:
+      - PB_ADMIN_EMAIL=admin@novastack.local
+      - PB_ADMIN_PASSWORD=novastack123
 
   mailpit:
-    image: axllent/mailpit
+    image: axllent/mailpit:latest
     ports:
-      - "1025:1025"
-      - "8025:8025"
-
-volumes:
-  postgres_data:
+      - '1025:1025'
+      - '8025:8025'
+    restart: unless-stopped
