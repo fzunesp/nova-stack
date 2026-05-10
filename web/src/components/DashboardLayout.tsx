@@ -2,7 +2,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router'
 import { useAuth } from '@/hooks/useAuth'
 import {
   LayoutDashboard, CheckSquare, FileText, Inbox, Settings,
-  LogOut, Menu, X, Users, Search, Bell, Plus,
+  LogOut, Menu, X, Users, Search, Bell, Plus, HelpCircle,
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -21,6 +21,7 @@ const navSections = [
     label: 'ACCOUNT',
     items: [
       { to: '/settings', icon: Settings, label: 'Settings' },
+      { to: '/help', icon: HelpCircle, label: 'Help' },
     ],
   },
 ]

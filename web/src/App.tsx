@@ -10,6 +10,7 @@ import { InvoicesPage } from '@/pages/InvoicesPage'
 import { IntakePage } from '@/pages/IntakePage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { DashboardPage } from '@/pages/DashboardPage'
+import { HelpPage } from '@/pages/HelpPage'
 
 export function AppRouter() {
   return (
@@ -54,6 +55,7 @@ export function AppRouter() {
             <Route path="invoices" element={<InvoicesPage />} />
             <Route path="intake" element={<IntakePage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="help" element={<HelpPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

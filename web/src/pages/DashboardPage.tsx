@@ -29,7 +29,7 @@ export function DashboardPage() {
   const { metrics, radar, today, moneyAtRisk, mySignals } = data
 
   return (
-    <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+    <div>
       {/* Page header */}
       <div className="sm:flex sm:items-center sm:justify-between mb-8">
         <div>

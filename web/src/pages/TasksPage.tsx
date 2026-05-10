@@ -97,7 +97,8 @@ export function TasksPage() {
                     const next = task.status === 'todo' ? 'in_progress' : task.status === 'in_progress' ? 'done' : 'todo'
                     updateTask.mutate({ id: task.id, data: { title: task.title, description: task.description || '', status: next, dueDate: task.dueDate || '' } })
                   }}
-                  className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${task.status === 'done' ? 'bg-green-500 border-green-500' : task.status === 'in_progress' ? 'border-blue-500' : 'border-gray-300'}`}
+                  title={`Status: ${task.status.replace('_', ' ')} — click to cycle`}
+                  className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors cursor-pointer ${task.status === 'done' ? 'bg-green-500 border-green-500' : task.status === 'in_progress' ? 'border-blue-500' : 'border-gray-300'}`}
                 >
                   {task.status === 'done' && <span className="text-white text-xs">✓</span>}
                 </button>
