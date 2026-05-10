@@ -17,9 +17,9 @@ export function CrmPage() {
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-6">
-        <Users className="w-5 h-5 text-muted-foreground" />
-        <h2 className="text-xl font-semibold">CRM</h2>
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold text-slate-900">CRM</h2>
+        <p className="text-sm text-slate-500 mt-0.5">Manage your contacts and pipeline</p>
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'contacts' | 'deals')}>
@@ -60,7 +60,9 @@ function ContactsTab() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['contacts'] }),
   })
 
-  if (isLoading) return <div className="text-muted-foreground">Loading contacts...</div>
+  if (isLoading) return (
+    <div className="flex items-center justify-center h-48 text-slate-400 text-sm">Loading contacts...</div>
+  )
 
   return (
     <div>
@@ -88,8 +90,8 @@ function ContactsTab() {
       </div>
 
 
-      <div className="bg-card rounded-lg border">
-        <div className="grid grid-cols-12 gap-4 px-4 py-3 border-b text-sm font-medium text-muted-foreground">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+        <div className="grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wide">
           <button className="col-span-4 flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort('name')}>
             Name <ArrowUpDown className="w-3 h-3" />
           </button>
@@ -101,10 +103,10 @@ function ContactsTab() {
         </div>
 
         {items.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground"><p>No contacts found.</p></div>
+          <div className="text-center py-16 text-slate-400"><Users className="w-8 h-8 mx-auto mb-2 opacity-30" /><p className="text-sm">No contacts yet.</p></div>
         ) : (
           items.map((contact: any) => (
-            <div key={contact.id} className="grid grid-cols-12 gap-4 px-4 py-3 border-b last:border-0 hover:bg-muted/50 items-center">
+            <div key={contact.id} className="grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors items-center">
               <div className="col-span-4 font-medium">{contact.name}</div>
               <div className="col-span-4 text-sm text-muted-foreground">{contact.email}</div>
               <div className="col-span-2 text-sm text-muted-foreground">{contact.companyName || '-'}</div>
@@ -164,7 +166,9 @@ function DealsTab() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['deals'] }),
   })
 
-  if (isLoading) return <div className="text-muted-foreground">Loading deals...</div>
+  if (isLoading) return (
+    <div className="flex items-center justify-center h-48 text-slate-400 text-sm">Loading deals...</div>
+  )
 
   return (
     <div>
@@ -196,8 +200,8 @@ function DealsTab() {
       </div>
 
 
-      <div className="bg-card rounded-lg border">
-        <div className="grid grid-cols-12 gap-4 px-4 py-3 border-b text-sm font-medium text-muted-foreground">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+        <div className="grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wide">
           <button className="col-span-5 flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort('title')}>
             Title <ArrowUpDown className="w-3 h-3" />
           </button>
@@ -209,10 +213,10 @@ function DealsTab() {
         </div>
 
         {items.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground"><p>No deals found.</p></div>
+          <div className="text-center py-16 text-slate-400"><p className="text-sm">No deals yet.</p></div>
         ) : (
           items.map((deal: any) => (
-            <div key={deal.id} className="grid grid-cols-12 gap-4 px-4 py-3 border-b last:border-0 hover:bg-muted/50 items-center">
+            <div key={deal.id} className="grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors items-center">
               <div className="col-span-5 font-medium">{deal.title}</div>
               <div className="col-span-2 text-sm text-muted-foreground">${deal.value?.toLocaleString()}</div>
               <div className="col-span-3"><Badge className={stageColors[deal.stage] || ''}>{deal.stage}</Badge></div>

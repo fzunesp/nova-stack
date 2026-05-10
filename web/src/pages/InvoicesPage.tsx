@@ -3,7 +3,6 @@ import { FileText, Search, Trash2, Pencil, ArrowUpDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -41,7 +40,9 @@ export function InvoicesPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['invoices'] }),
   })
 
-  if (isLoading) return <div className="text-muted-foreground">Loading invoices...</div>
+  if (isLoading) return (
+    <div className="flex items-center justify-center h-48 text-slate-400 text-sm">Loading invoices...</div>
+  )
 
   const allInvoices = items as any[]
   const totalOutstanding = allInvoices?.filter((i) => i.status === 'sent').reduce((sum: number, i) => sum + (i.amount || 0), 0) || 0
@@ -50,9 +51,9 @@ export function InvoicesPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-2">
-          <FileText className="w-5 h-5 text-muted-foreground" />
-          <h2 className="text-xl font-semibold">Invoices</h2>
+        <div>
+          <h2 className="text-xl font-semibold text-slate-900">Invoices</h2>
+          <p className="text-sm text-slate-500 mt-0.5">{totalItems} invoice{totalItems !== 1 ? 's' : ''} total</p>
         </div>
         <Dialog open={creating} onOpenChange={setCreating}>
           <DialogTrigger asChild>
@@ -78,8 +79,14 @@ export function InvoicesPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <Card><CardContent className="pt-4"><p className="text-sm text-muted-foreground">Outstanding</p><p className="text-2xl font-semibold text-blue-600">${totalOutstanding.toLocaleString()}</p></CardContent></Card>
-        <Card><CardContent className="pt-4"><p className="text-sm text-muted-foreground">Paid</p><p className="text-2xl font-semibold text-green-600">${totalPaid.toLocaleString()}</p></CardContent></Card>
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Outstanding</p>
+          <p className="text-2xl font-bold text-indigo-600">${totalOutstanding.toLocaleString()}</p>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Paid</p>
+          <p className="text-2xl font-bold text-emerald-600">${totalPaid.toLocaleString()}</p>
+        </div>
       </div>
 
       <div className="relative mb-4 max-w-md">
@@ -88,8 +95,8 @@ export function InvoicesPage() {
       </div>
 
 
-      <div className="bg-card rounded-lg border">
-        <div className="grid grid-cols-12 gap-4 px-4 py-3 border-b text-sm font-medium text-muted-foreground">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+        <div className="grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wide">
           <button className="col-span-5 flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort('title')}>
             Title <ArrowUpDown className="w-3 h-3" />
           </button>
@@ -101,10 +108,10 @@ export function InvoicesPage() {
         </div>
 
         {items.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground"><p>No invoices found.</p></div>
+          <div className="text-center py-16 text-slate-400"><FileText className="w-8 h-8 mx-auto mb-2 opacity-30" /><p className="text-sm">No invoices yet.</p></div>
         ) : (
           items.map((invoice: any) => (
-            <div key={invoice.id} className="grid grid-cols-12 gap-4 px-4 py-3 border-b last:border-0 hover:bg-muted/50 items-center">
+            <div key={invoice.id} className="grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors items-center">
               <div className="col-span-5 font-medium">{invoice.title}</div>
               <div className="col-span-2 text-sm text-muted-foreground">${invoice.amount?.toLocaleString()}</div>
               <div className="col-span-3"><Badge className={statusColors[invoice.status]}>{invoice.status}</Badge></div>

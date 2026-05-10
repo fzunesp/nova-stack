@@ -39,7 +39,9 @@ export function IntakePage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['intake_submissions'] }),
   })
 
-  if (isLoading) return <div className="text-muted-foreground">Loading submissions...</div>
+  if (isLoading) return (
+    <div className="flex items-center justify-center h-48 text-slate-400 text-sm">Loading submissions...</div>
+  )
 
   const statusBadge = (status: string) => {
     const map: Record<string, string> = { new: 'bg-blue-100 text-blue-800', in_review: 'bg-yellow-100 text-yellow-800', approved: 'bg-green-100 text-green-800', rejected: 'bg-red-100 text-red-800', converted: 'bg-purple-100 text-purple-800' }
@@ -49,9 +51,9 @@ export function IntakePage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-2">
-          <Inbox className="w-5 h-5 text-muted-foreground" />
-          <h2 className="text-xl font-semibold">Intake</h2>
+        <div>
+          <h2 className="text-xl font-semibold text-slate-900">Intake</h2>
+          <p className="text-sm text-slate-500 mt-0.5">{totalItems} submission{totalItems !== 1 ? 's' : ''}</p>
         </div>
         <Dialog open={creating} onOpenChange={setCreating}>
           <DialogTrigger asChild>
@@ -82,8 +84,8 @@ export function IntakePage() {
       </div>
 
 
-      <div className="bg-card rounded-lg border">
-        <div className="grid grid-cols-12 gap-4 px-4 py-3 border-b text-sm font-medium text-muted-foreground">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+        <div className="grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wide">
           <button className="col-span-4 flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort('name')}>
             Name <ArrowUpDown className="w-3 h-3" />
           </button>
@@ -93,10 +95,10 @@ export function IntakePage() {
         </div>
 
         {items.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground"><p>No submissions found.</p></div>
+          <div className="text-center py-16 text-slate-400"><Inbox className="w-8 h-8 mx-auto mb-2 opacity-30" /><p className="text-sm">No submissions yet.</p></div>
         ) : (
           items.map((sub: any) => (
-            <div key={sub.id} className="grid grid-cols-12 gap-4 px-4 py-3 border-b last:border-0 hover:bg-muted/50 items-center">
+            <div key={sub.id} className="grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors items-center">
               <div className="col-span-4">
                 <p className="font-medium">{sub.name}</p>
                 <p className="text-sm text-muted-foreground">{sub.email}</p>

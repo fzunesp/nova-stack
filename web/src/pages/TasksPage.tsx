@@ -40,14 +40,16 @@ export function TasksPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
   })
 
-  if (isLoading) return <div className="text-muted-foreground">Loading tasks...</div>
+  if (isLoading) return (
+    <div className="flex items-center justify-center h-48 text-slate-400 text-sm">Loading tasks...</div>
+  )
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-2">
-          <CheckSquare className="w-5 h-5 text-muted-foreground" />
-          <h2 className="text-xl font-semibold">Tasks</h2>
+        <div>
+          <h2 className="text-xl font-semibold text-slate-900">Tasks</h2>
+          <p className="text-sm text-slate-500 mt-0.5">{totalItems} task{totalItems !== 1 ? 's' : ''} total</p>
         </div>
         <Dialog open={creating} onOpenChange={setCreating}>
           <DialogTrigger asChild>
@@ -71,8 +73,8 @@ export function TasksPage() {
       </div>
 
 
-      <div className="bg-card rounded-lg border">
-        <div className="grid grid-cols-12 gap-4 px-4 py-3 border-b text-sm font-medium text-muted-foreground">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+        <div className="grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wide">
           <div className="col-span-1"></div>
           <button className="col-span-5 flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort('title')}>
             Task <ArrowUpDown className="w-3 h-3" />
@@ -85,10 +87,10 @@ export function TasksPage() {
         </div>
 
         {items.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground"><p>No tasks found.</p></div>
+          <div className="text-center py-16 text-slate-400"><CheckSquare className="w-8 h-8 mx-auto mb-2 opacity-30" /><p className="text-sm">No tasks yet. Create your first task!</p></div>
         ) : (
           items.map((task: any) => (
-            <div key={task.id} className="grid grid-cols-12 gap-4 px-4 py-3 border-b last:border-0 hover:bg-muted/50 items-center">
+            <div key={task.id} className="grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors items-center">
               <div className="col-span-1">
                 <button
                   onClick={() => {
