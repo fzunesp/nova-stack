@@ -21,7 +21,17 @@
   --input: oklch(0.929 0.013 255.508);
   --ring: oklch(0.511 0.262 276.966);
   --radius: 0.625rem;
+
+  /* NovaStack accent theme tokens (space-separated RGB for rgb()) */
+  --ns-accent:    79 70 229;   /* indigo-600 */
+  --ns-accent-dk: 67 56 202;   /* indigo-700 */
 }
+
+/* ── Theme overrides applied via data-theme on <html> ── */
+[data-theme="indigo"]  { --ns-accent: 79 70 229;   --ns-accent-dk: 67 56 202;  }
+[data-theme="violet"]  { --ns-accent: 124 58 237;  --ns-accent-dk: 109 40 217; }
+[data-theme="emerald"] { --ns-accent: 16 185 129;  --ns-accent-dk: 5 150 105;  }
+[data-theme="orange"]  { --ns-accent: 234 88 12;   --ns-accent-dk: 194 65 12;  }
 
 @theme inline {
   --color-background: var(--background);
