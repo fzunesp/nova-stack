@@ -25,7 +25,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Callout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="bg-indigo-50 border border-indigo-100 rounded-lg px-4 py-3 text-sm text-indigo-800">
+    <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-700 border-l-4" style={{ borderLeftColor: 'rgb(var(--ns-accent))' }}>
       {children}
     </div>
   )
@@ -80,11 +80,11 @@ const content: Record<string, React.ReactNode> = {
       </Section>
       <Section title="How the app is structured">
         <ul className="space-y-2">
-          <li className="flex items-start gap-2"><ChevronRight className="w-4 h-4 mt-0.5 text-indigo-500 flex-shrink-0" /><span><strong>Dashboard</strong> — Command Center showing what needs your attention right now.</span></li>
-          <li className="flex items-start gap-2"><ChevronRight className="w-4 h-4 mt-0.5 text-indigo-500 flex-shrink-0" /><span><strong>CRM</strong> — Contacts and deals pipeline.</span></li>
-          <li className="flex items-start gap-2"><ChevronRight className="w-4 h-4 mt-0.5 text-indigo-500 flex-shrink-0" /><span><strong>Tasks</strong> — Personal and work task management.</span></li>
-          <li className="flex items-start gap-2"><ChevronRight className="w-4 h-4 mt-0.5 text-indigo-500 flex-shrink-0" /><span><strong>Invoices</strong> — Billing and payment tracking.</span></li>
-          <li className="flex items-start gap-2"><ChevronRight className="w-4 h-4 mt-0.5 text-indigo-500 flex-shrink-0" /><span><strong>Intake</strong> — Capture new client enquiries and route them to deals.</span></li>
+          <li className="flex items-start gap-2"><ChevronRight className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'rgb(var(--ns-accent))' }} /><span><strong>Dashboard</strong> — Command Center showing what needs your attention right now.</span></li>
+          <li className="flex items-start gap-2"><ChevronRight className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'rgb(var(--ns-accent))' }} /><span><strong>CRM</strong> — Contacts and deals pipeline.</span></li>
+          <li className="flex items-start gap-2"><ChevronRight className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'rgb(var(--ns-accent))' }} /><span><strong>Tasks</strong> — Personal and work task management.</span></li>
+          <li className="flex items-start gap-2"><ChevronRight className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'rgb(var(--ns-accent))' }} /><span><strong>Invoices</strong> — Billing and payment tracking.</span></li>
+          <li className="flex items-start gap-2"><ChevronRight className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'rgb(var(--ns-accent))' }} /><span><strong>Intake</strong> — Capture new client enquiries and route them to deals.</span></li>
         </ul>
       </Section>
     </>
@@ -306,9 +306,10 @@ export function HelpPage() {
                 onClick={() => setActive(s.id)}
                 className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-left transition-all ${
                   active === s.id
-                    ? 'bg-indigo-600 text-white'
+                    ? 'text-white'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                 }`}
+                style={active === s.id ? { backgroundColor: 'rgb(var(--ns-accent))' } : undefined}
               >
                 <s.icon className="w-4 h-4 flex-shrink-0" />
                 {s.label}
