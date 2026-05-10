@@ -94,8 +94,7 @@ export function TasksPage() {
       {isLoading ? <TableSkeleton rows={6} /> : (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
           <div className="grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wide">
-            <div className="col-span-1" />
-            <button className="col-span-5 flex items-center gap-1 hover:text-slate-600" onClick={() => toggleSort('title')}>Task <ArrowUpDown className="w-3 h-3" /></button>
+            <button className="col-span-6 flex items-center gap-1 hover:text-slate-600" onClick={() => toggleSort('title')}>Task <ArrowUpDown className="w-3 h-3" /></button>
             <button className="col-span-2 flex items-center gap-1 hover:text-slate-600" onClick={() => toggleSort('status')}>Status <ArrowUpDown className="w-3 h-3" /></button>
             <div className="col-span-2">Due</div>
             <div className="col-span-2 text-right">Actions</div>
@@ -110,19 +109,7 @@ export function TasksPage() {
           ) : (
             items.map((task: any) => (
               <div key={task.id} className="group grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors items-center">
-                <div className="col-span-1">
-                  <button
-                    onClick={() => {
-                      const next = task.status === 'todo' ? 'in_progress' : task.status === 'in_progress' ? 'done' : 'todo'
-                      updateTask.mutate({ id: task.id, data: { title: task.title, description: task.description || '', status: next, dueDate: task.dueDate || '' } })
-                    }}
-                    title={`Status: ${task.status.replace('_', ' ')} — click to cycle`}
-                    className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors cursor-pointer ${task.status === 'done' ? 'bg-green-500 border-green-500' : task.status === 'in_progress' ? 'border-blue-500' : 'border-gray-300'}`}
-                  >
-                    {task.status === 'done' && <span className="text-white text-xs">✓</span>}
-                  </button>
-                </div>
-                <div className="col-span-5">
+                <div className="col-span-6">
                   <p className={`font-medium ${task.status === 'done' ? 'line-through text-slate-400' : 'text-slate-900'}`}>{task.title}</p>
                   {task.description && <p className="text-xs text-slate-400 mt-0.5 truncate">{task.description}</p>}
                 </div>
