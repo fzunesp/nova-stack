@@ -56,8 +56,8 @@ Current implemented systems include:
 ## Infrastructure
 - Docker Compose
 - Mailpit
-- Prisma
-- PostgreSQL migration (in progress/completing)
+- PocketBase (SQLite, single binary)
+- React SPA + Vite + shadcn/ui
 
 ---
 
@@ -173,67 +173,21 @@ Future AI sessions should generally follow this sequence unless debugging or urg
 
 ---
 
-# Phase 1 — Stabilization (CURRENT)
+# Phase 1 — Foundation ✅ COMPLETE
 
 Goal:
-Solidify infrastructure and operational consistency.
+Establish the full operational stack.
 
-## Priority 1 — PostgreSQL Stabilization
-
-Status:
-In progress.
-
-Objectives:
-- complete migration from SQLite
-- validate Prisma consistency
-- ensure Docker stability
-- eliminate stale SQLite references
-- validate migrations
-- validate seed consistency
-- ensure app + Docker use same database
-
-Required outcomes:
-- local dev stable
-- Docker stable
-- VPS-ready architecture
-
----
-
-## Priority 2 — Environment Standardization
-
-Objectives:
-- unify env handling
-- standardize DATABASE_URL strategy
-- eliminate duplicate config patterns
-- separate dev vs docker env cleanly
-
-Recommended strategy:
-
-### Local Dev
-
-```env
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/novastack
-```
-
-### Docker Internal
-
-```env
-DATABASE_URL=postgresql://postgres:postgres@db:5432/novastack
-```
-
----
-
-## Priority 3 — Backup & Persistence
-
-Objectives:
-- verify postgres volume persistence
-- create backup strategy
-- document restore process
-- ensure upgrades are safe
-
-Future:
-- automated backup support
-- export/restore UI
+Completed:
+- CRM (Contacts, Deals)
+- Tasks
+- Invoices with lifecycle (draft → pending → approved/rejected)
+- Intake system with assignment and approval
+- Dashboard (KPIs, Radar, Today, Activity, Signals, Work Queue)
+- Auth with role-based access control (admin / hr / user)
+- PocketBase as database (SQLite, single binary)
+- Docker Compose: one-command startup (pocketbase + mailpit)
+- React SPA + Vite + shadcn/ui frontend
 
 ---
 

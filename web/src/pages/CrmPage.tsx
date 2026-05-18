@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Users, Search, Trash2, Pencil, ArrowUpDown, Briefcase } from 'lucide-react'
+import { Users, Search, Trash2, Pencil, ArrowUpDown, Briefcase, FileText, CheckSquare, User, Calendar, Activity, Info, Phone, Mail, Building, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -11,9 +11,11 @@ import { usePaginatedQuery } from '@/hooks/usePaginatedQuery'
 import { DataTablePagination } from '@/components/DataTablePagination'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import pb from '@/lib/pocketbase'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useLocation } from 'react-router'
+import { contactService, dealService, isAppError } from '@/services'
+import type { Status } from '@/services'
 
 export function CrmPage() {
   const location = useLocation()
@@ -44,29 +46,53 @@ export function CrmPage() {
 
 function ContactsTab({ autoOpen = false }: { autoOpen?: boolean }) {
   const queryClient = useQueryClient()
+  const location = useLocation()
+  const initialSearch = location.state?.search || ''
+  
   const { items, totalItems, totalPages, page, perPage, search, isLoading, toggleSort, goToPage, updateSearch } =
-    usePaginatedQuery({ collection: 'contacts', searchFields: ['name', 'email'] })
+    usePaginatedQuery({ collection: 'contacts', searchFields: ['name', 'email'], expand: 'companyId', defaultSort: '+companyId', initialSearch })
 
-  const [formData, setFormData] = useState({ name: '', email: '', phone: '', companyName: '', notes: '' })
+  const [formData, setFormData] = useState({ name: '', email: '', phone: '', title: '', companyId: '', notes: '', status: 'active' as Status })
   const [creating, setCreating] = useState(autoOpen)
   const [editing, setEditing] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState({ name: '', email: '', phone: '', companyName: '', notes: '' })
+  const [editForm, setEditForm] = useState({ name: '', email: '', phone: '', title: '', companyId: '', notes: '', status: 'active' as Status })
+  const [selectedContact, setSelectedContact] = useState<any | null>(null)
+
+  const actorId = pb.authStore.record?.id || ''
+
+  // Fetch companies for the dropdown
+  const { data: companiesList } = useQuery({
+    queryKey: ['companies-all'],
+    queryFn: () => pb.collection('companies').getFullList({ sort: 'name' })
+  })
 
   const createContact = useMutation({
-    mutationFn: (data: typeof formData) => pb.collection('contacts').create({ ...data, userId: pb.authStore.record?.id }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['contacts'] }); setFormData({ name: '', email: '', phone: '', companyName: '', notes: '' }); setCreating(false); toast.success('Contact added') },
-    onError: () => toast.error('Failed to add contact'),
+    mutationFn: (data: typeof formData) => contactService.create({ ...data, userId: pb.authStore.record?.id, companyId: data.companyId || undefined }, actorId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contacts'] })
+      setFormData({ name: '', email: '', phone: '', title: '', companyId: '', notes: '', status: 'active' })
+      setCreating(false)
+      toast.success('Contact added')
+    },
+    onError: (err) => toast.error(isAppError(err) ? err.message : 'Failed to add contact'),
   })
 
   const updateContact = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: typeof editForm }) => pb.collection('contacts').update(id, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['contacts'] }); setEditing(null); toast.success('Contact updated') },
-    onError: () => toast.error('Failed to update contact'),
+    mutationFn: ({ id, data }: { id: string; data: typeof editForm }) => contactService.update(id, { ...data, companyId: data.companyId || undefined }, actorId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contacts'] })
+      setEditing(null)
+      toast.success('Contact updated')
+    },
+    onError: (err) => toast.error(isAppError(err) ? err.message : 'Failed to update contact'),
   })
 
   const deleteContact = useMutation({
-    mutationFn: (id: string) => pb.collection('contacts').delete(id),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['contacts'] }); toast.success('Contact deleted') },
+    mutationFn: (id: string) => contactService.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contacts'] })
+      toast.success('Contact deleted')
+    },
     onError: () => toast.error('Failed to delete contact'),
   })
 
@@ -81,12 +107,24 @@ function ContactsTab({ autoOpen = false }: { autoOpen?: boolean }) {
           <DialogTrigger asChild><Button>Add Contact</Button></DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>Add New Contact</DialogTitle></DialogHeader>
-            <form onSubmit={(e) => { e.preventDefault(); createContact.mutate(formData) }} className="space-y-4">
-              <div className="space-y-2"><Label>Name</Label><Input placeholder="Full name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required /></div>
-              <div className="space-y-2"><Label>Email</Label><Input type="email" placeholder="Email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required /></div>
-              <div className="space-y-2"><Label>Phone</Label><Input placeholder="Phone" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Company</Label><Input placeholder="Company" value={formData.companyName} onChange={(e) => setFormData({ ...formData, companyName: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Notes</Label><Input placeholder="Notes" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} /></div>
+            <form onSubmit={(e) => { e.preventDefault(); createContact.mutate(formData) }} className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2 space-y-1"><Label>Full Name *</Label><Input placeholder="Full name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required /></div>
+                <div className="space-y-1"><Label>Email *</Label><Input type="email" placeholder="Email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required /></div>
+                <div className="space-y-1"><Label>Phone</Label><Input placeholder="Phone" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} /></div>
+                <div className="space-y-1"><Label>Job Title</Label><Input placeholder="e.g. CEO" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} /></div>
+                <div className="space-y-1">
+                  <Label>Company</Label>
+                  <Select value={formData.companyId || 'none'} onValueChange={(v) => setFormData({ ...formData, companyId: v === 'none' ? '' : v })}>
+                    <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No Company</SelectItem>
+                      {companiesList?.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="col-span-2 space-y-1"><Label>Notes</Label><Input placeholder="Notes" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} /></div>
+              </div>
               <DialogFooter><Button type="submit" disabled={createContact.isPending}>Add Contact</Button></DialogFooter>
             </form>
           </DialogContent>
@@ -96,9 +134,9 @@ function ContactsTab({ autoOpen = false }: { autoOpen?: boolean }) {
       {isLoading ? <TableSkeleton rows={5} /> : (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
           <div className="grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wide">
-            <button className="col-span-4 flex items-center gap-1 hover:text-slate-600" onClick={() => toggleSort('name')}>Name <ArrowUpDown className="w-3 h-3" /></button>
+            <button className="col-span-3 flex items-center gap-1 hover:text-slate-600" onClick={() => toggleSort('companyId')}>Company <ArrowUpDown className="w-3 h-3" /></button>
+            <button className="col-span-3 flex items-center gap-1 hover:text-slate-600" onClick={() => toggleSort('name')}>Name <ArrowUpDown className="w-3 h-3" /></button>
             <button className="col-span-4 flex items-center gap-1 hover:text-slate-600" onClick={() => toggleSort('email')}>Email <ArrowUpDown className="w-3 h-3" /></button>
-            <div className="col-span-2">Company</div>
             <div className="col-span-2 text-right">Actions</div>
           </div>
           {items.length === 0 ? (
@@ -108,32 +146,51 @@ function ContactsTab({ autoOpen = false }: { autoOpen?: boolean }) {
               <Button size="sm" variant="outline" onClick={() => setCreating(true)}>Add your first contact</Button>
             </div>
           ) : (
-            items.map((contact: any) => (
+            items.map((contact: any, index: number) => {
+              const currentCompany = contact.expand?.companyId?.name || contact.companyName || '—'
+              const previousCompany = index > 0 ? (items[index - 1].expand?.companyId?.name || items[index - 1].companyName || '—') : null
+              const showCompany = currentCompany !== previousCompany
+
+              return (
               <div key={contact.id} className="group grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors items-center">
-                <div className="col-span-4">
+                <div className="col-span-3 text-sm font-semibold text-slate-700 truncate">
+                  {showCompany ? currentCompany : ''}
+                </div>
+                <div className="col-span-3 cursor-pointer" onClick={() => setSelectedContact(contact)}>
                   <div className="flex items-center gap-2.5">
                     <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 text-xs font-bold flex-shrink-0">
                       {contact.name?.charAt(0)?.toUpperCase() || '?'}
                     </div>
-                    <span className="font-medium text-slate-900 truncate">{contact.name}</span>
+                    <span className="font-medium text-slate-900 truncate group-hover:text-[rgb(var(--ns-accent))] transition-colors">{contact.name}</span>
                   </div>
                 </div>
                 <div className="col-span-4 text-sm text-slate-500 truncate">{contact.email}</div>
-                <div className="col-span-2 text-sm text-slate-400 truncate">{contact.companyName || '—'}</div>
                 <div className="col-span-2 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <Dialog open={editing === contact.id} onOpenChange={(open) => {
-                    if (open) { setEditing(contact.id); setEditForm({ name: contact.name || '', email: contact.email || '', phone: contact.phone || '', companyName: contact.companyName || '', notes: contact.notes || '' }) }
+                    if (open) { setEditing(contact.id); setEditForm({ name: contact.name || '', email: contact.email || '', phone: contact.phone || '', title: contact.title || '', companyId: contact.companyId || '', notes: contact.notes || '', status: contact.status || 'active' }) }
                     else setEditing(null)
                   }}>
                     <DialogTrigger asChild><Button variant="ghost" size="icon"><Pencil className="w-3.5 h-3.5" /></Button></DialogTrigger>
                     <DialogContent>
                       <DialogHeader><DialogTitle>Edit Contact</DialogTitle></DialogHeader>
-                      <form onSubmit={(e) => { e.preventDefault(); updateContact.mutate({ id: contact.id, data: editForm }) }} className="space-y-4">
-                        <div className="space-y-2"><Label>Name</Label><Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required /></div>
-                        <div className="space-y-2"><Label>Email</Label><Input type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} required /></div>
-                        <div className="space-y-2"><Label>Phone</Label><Input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} /></div>
-                        <div className="space-y-2"><Label>Company</Label><Input value={editForm.companyName} onChange={(e) => setEditForm({ ...editForm, companyName: e.target.value })} /></div>
-                        <div className="space-y-2"><Label>Notes</Label><Input value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} /></div>
+                      <form onSubmit={(e) => { e.preventDefault(); updateContact.mutate({ id: contact.id, data: editForm }) }} className="space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="col-span-2 space-y-1"><Label>Full Name *</Label><Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required /></div>
+                          <div className="space-y-1"><Label>Email *</Label><Input type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} required /></div>
+                          <div className="space-y-1"><Label>Phone</Label><Input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} /></div>
+                          <div className="space-y-1"><Label>Job Title</Label><Input placeholder="e.g. CEO" value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} /></div>
+                          <div className="space-y-1">
+                            <Label>Company</Label>
+                            <Select value={editForm.companyId || 'none'} onValueChange={(v) => setEditForm({ ...editForm, companyId: v === 'none' ? '' : v })}>
+                              <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">No Company</SelectItem>
+                                {companiesList?.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="col-span-2 space-y-1"><Label>Notes</Label><Input value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} /></div>
+                        </div>
                         <DialogFooter><Button type="submit" disabled={updateContact.isPending}>Save</Button></DialogFooter>
                       </form>
                     </DialogContent>
@@ -143,10 +200,17 @@ function ContactsTab({ autoOpen = false }: { autoOpen?: boolean }) {
                   </Button>
                 </div>
               </div>
-            ))
+              )
+            })
           )}
           <DataTablePagination page={page} totalPages={totalPages} totalItems={totalItems} perPage={perPage} onPageChange={goToPage} />
         </div>
+      )}
+      {selectedContact && (
+        <ContactDetailDialog
+          contact={selectedContact}
+          onClose={() => setSelectedContact(null)}
+        />
       )}
     </div>
   )
@@ -169,31 +233,52 @@ const stageDots: Record<string, string> = {
 
 function DealsTab({ autoOpen = false }: { autoOpen?: boolean }) {
   const queryClient = useQueryClient()
+  const location = useLocation()
+  const initialSearch = location.state?.search || ''
+  
   const { items, totalItems, totalPages, page, perPage, search, isLoading, toggleSort, goToPage, updateSearch } =
-    usePaginatedQuery({ collection: 'deals', searchFields: ['title'] })
+    usePaginatedQuery({ collection: 'deals', searchFields: ['title'], expand: 'contactId', initialSearch })
 
-  const [formData, setFormData] = useState({ title: '', value: '', stage: 'lead' })
+  const [formData, setFormData] = useState({ title: '', value: '', stage: 'lead' as 'lead' | 'contacted' | 'quoted' | 'won' | 'lost', status: 'active' as Status, contactId: '', companyId: '' })
   const [creating, setCreating] = useState(autoOpen)
   const [editing, setEditing] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState({ title: '', value: '', stage: 'lead' })
+  const [editForm, setEditForm] = useState({ title: '', value: '', stage: 'lead' as 'lead' | 'contacted' | 'quoted' | 'won' | 'lost', status: 'active' as Status, contactId: '', companyId: '' })
+
+  const { data: contacts } = useQuery({
+    queryKey: ['allContactsList'],
+    queryFn: () => pb.collection('contacts').getFullList({ sort: 'name' })
+  })
 
   const stages = ['lead', 'contacted', 'quoted', 'won', 'lost']
+  const actorId = pb.authStore.record?.id || ''
 
   const createDeal = useMutation({
-    mutationFn: (data: typeof formData) => pb.collection('deals').create({ ...data, value: parseFloat(data.value) || 0, userId: pb.authStore.record?.id }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['deals'] }); setFormData({ title: '', value: '', stage: 'lead' }); setCreating(false); toast.success('Deal added') },
-    onError: () => toast.error('Failed to add deal'),
+    mutationFn: (data: typeof formData) => dealService.create({ ...data, value: parseFloat(data.value) || 0, userId: pb.authStore.record?.id, contactId: data.contactId || undefined, companyId: data.companyId || undefined }, actorId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['deals'] })
+      setFormData({ title: '', value: '', stage: 'lead', status: 'active', contactId: '', companyId: '' })
+      setCreating(false)
+      toast.success('Deal added')
+    },
+    onError: (err) => toast.error(isAppError(err) ? err.message : 'Failed to add deal'),
   })
 
   const updateDeal = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: typeof editForm }) => pb.collection('deals').update(id, { ...data, value: parseFloat(data.value) || 0 }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['deals'] }); setEditing(null); toast.success('Deal updated') },
-    onError: () => toast.error('Failed to update deal'),
+    mutationFn: ({ id, data }: { id: string; data: typeof editForm }) => dealService.update(id, { ...data, value: parseFloat(data.value) || 0, contactId: data.contactId || undefined, companyId: data.companyId || undefined }, actorId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['deals'] })
+      setEditing(null)
+      toast.success('Deal updated')
+    },
+    onError: (err) => toast.error(isAppError(err) ? err.message : 'Failed to update deal'),
   })
 
   const deleteDeal = useMutation({
-    mutationFn: (id: string) => pb.collection('deals').delete(id),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['deals'] }); toast.success('Deal deleted') },
+    mutationFn: (id: string) => dealService.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['deals'] })
+      toast.success('Deal deleted')
+    },
     onError: () => toast.error('Failed to delete deal'),
   })
 
@@ -212,12 +297,25 @@ function DealsTab({ autoOpen = false }: { autoOpen?: boolean }) {
               <div className="space-y-2"><Label>Title</Label><Input placeholder="Deal title" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} required /></div>
               <div className="space-y-2"><Label>Value ($)</Label><Input type="number" placeholder="Value" value={formData.value} onChange={(e) => setFormData({ ...formData, value: e.target.value })} /></div>
               <div className="space-y-2"><Label>Stage</Label>
-                <Select value={formData.stage} onValueChange={(v) => setFormData({ ...formData, stage: v })}>
+                <Select value={formData.stage} onValueChange={(v) => setFormData({ ...formData, stage: v as any })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{stages.map((s) => <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <DialogFooter><Button type="submit" disabled={createDeal.isPending}>Add Deal</Button></DialogFooter>
+              <div className="space-y-2">
+                <Label>Contact / Client *</Label>
+                <Select value={formData.contactId} onValueChange={(v) => setFormData({ ...formData, contactId: v })} required>
+                  <SelectTrigger className={!formData.contactId ? 'border-red-200' : ''}>
+                    <SelectValue placeholder="— Select a contact —" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {contacts?.map((c: any) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <DialogFooter><Button type="submit" disabled={createDeal.isPending || !formData.contactId}>Add Deal</Button></DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
@@ -240,7 +338,14 @@ function DealsTab({ autoOpen = false }: { autoOpen?: boolean }) {
           ) : (
             items.map((deal: any) => (
               <div key={deal.id} className="group grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors items-center">
-                <div className="col-span-5 font-medium text-slate-900">{deal.title}</div>
+                <div className="col-span-5">
+                  <span className="font-medium text-slate-900">{deal.title}</span>
+                  {deal.expand?.contactId && (
+                    <span className="text-xs text-slate-400 block mt-0.5 font-medium truncate">
+                      Client: {deal.expand.contactId.name}
+                    </span>
+                  )}
+                </div>
                 <div className="col-span-2 text-sm font-semibold text-slate-700">${deal.value?.toLocaleString()}</div>
                 <div className="col-span-3">
                   <Badge className={`${stageColors[deal.stage] || ''} inline-flex items-center gap-1.5 text-xs`}>
@@ -250,7 +355,7 @@ function DealsTab({ autoOpen = false }: { autoOpen?: boolean }) {
                 </div>
                 <div className="col-span-2 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <Dialog open={editing === deal.id} onOpenChange={(open) => {
-                    if (open) { setEditing(deal.id); setEditForm({ title: deal.title || '', value: String(deal.value || ''), stage: deal.stage || 'lead' }) }
+                    if (open) { setEditing(deal.id); setEditForm({ title: deal.title || '', value: String(deal.value || ''), stage: deal.stage || 'lead', status: deal.status || 'active', contactId: deal.contactId || '', companyId: deal.companyId || '' }) }
                     else setEditing(null)
                   }}>
                     <DialogTrigger asChild><Button variant="ghost" size="icon"><Pencil className="w-3.5 h-3.5" /></Button></DialogTrigger>
@@ -260,12 +365,25 @@ function DealsTab({ autoOpen = false }: { autoOpen?: boolean }) {
                         <div className="space-y-2"><Label>Title</Label><Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required /></div>
                         <div className="space-y-2"><Label>Value ($)</Label><Input type="number" value={editForm.value} onChange={(e) => setEditForm({ ...editForm, value: e.target.value })} /></div>
                         <div className="space-y-2"><Label>Stage</Label>
-                          <Select value={editForm.stage} onValueChange={(v) => setEditForm({ ...editForm, stage: v })}>
+                          <Select value={editForm.stage} onValueChange={(v) => setEditForm({ ...editForm, stage: v as any })}>
                             <SelectTrigger><SelectValue /></SelectTrigger>
                             <SelectContent>{stages.map((s) => <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}</SelectContent>
                           </Select>
                         </div>
-                        <DialogFooter><Button type="submit" disabled={updateDeal.isPending}>Save</Button></DialogFooter>
+                        <div className="space-y-2">
+                          <Label>Contact / Client *</Label>
+                          <Select value={editForm.contactId} onValueChange={(v) => setEditForm({ ...editForm, contactId: v })}>
+                            <SelectTrigger className={!editForm.contactId ? 'border-red-200' : ''}>
+                              <SelectValue placeholder="— Select a contact —" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {contacts?.map((c: any) => (
+                                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <DialogFooter><Button type="submit" disabled={updateDeal.isPending || !editForm.contactId}>Save</Button></DialogFooter>
                       </form>
                     </DialogContent>
                   </Dialog>
@@ -282,3 +400,225 @@ function DealsTab({ autoOpen = false }: { autoOpen?: boolean }) {
     </div>
   )
 }
+
+function ContactDetailDialog({ contact, onClose }: { contact: any; onClose: () => void }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['contactTimeline', contact.id],
+    queryFn: async () => {
+      const [deals, tasks, invoices] = await Promise.all([
+        pb.collection('deals').getFullList({
+          filter: `contactId = "${contact.id}"`,
+          sort: '-created'
+        }),
+        pb.collection('tasks').getFullList({
+          filter: `contactId = "${contact.id}"`,
+          sort: '-created'
+        }),
+        pb.collection('invoices').getFullList({
+          filter: `dealId.contactId = "${contact.id}"`,
+          expand: 'dealId',
+          sort: '-created'
+        })
+      ])
+      return { deals, tasks, invoices }
+    }
+  })
+
+  const events = getTimelineEvents(contact, data)
+
+  return (
+    <Dialog open={true} onOpenChange={(open) => { if (!open) onClose() }}>
+      <DialogContent className="sm:max-w-4xl max-h-[85vh] flex flex-col p-0 overflow-hidden">
+        <DialogHeader className="px-6 py-4 border-b border-slate-100 flex-shrink-0">
+          <DialogTitle className="flex items-center gap-2 text-slate-900 text-lg font-semibold">
+            <Activity className="w-5 h-5 text-indigo-500" />
+            Contact Profile & Timeline
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-y-auto grid grid-cols-12 divide-y md:divide-y-0 md:divide-x divide-slate-100 min-h-0">
+          {/* Left Column: Contact Details */}
+          <div className="col-span-12 md:col-span-4 p-6 bg-slate-50/50 flex flex-col">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xl font-bold mx-auto mb-3 border-2 border-white shadow-sm">
+                {contact.name?.charAt(0)?.toUpperCase() || '?'}
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 leading-tight">{contact.name}</h3>
+              <p className="text-sm text-slate-500 mt-1 font-medium">{contact.companyName || 'No Company'}</p>
+            </div>
+
+            <div className="space-y-4 text-sm flex-1">
+              <div className="flex items-start gap-2.5">
+                <Mail className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Email</div>
+                  <div className="text-slate-700 font-medium break-all">{contact.email || '—'}</div>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2.5">
+                <Phone className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Phone</div>
+                  <div className="text-slate-700 font-medium">{contact.phone || '—'}</div>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2.5">
+                <Building className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Company</div>
+                  <div className="text-slate-700 font-medium">{contact.companyName || '—'}</div>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2.5">
+                <Calendar className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Created At</div>
+                  <div className="text-slate-700 font-medium">
+                    {contact.created ? new Date(contact.created).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '—'}
+                  </div>
+                </div>
+              </div>
+
+              {contact.notes && (
+                <div className="pt-3 border-t border-slate-100 mt-4">
+                  <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                    <Info className="w-3.5 h-3.5" /> Notes
+                  </div>
+                  <p className="text-xs text-slate-600 bg-white border border-slate-100 rounded-lg p-2.5 italic leading-relaxed whitespace-pre-wrap">
+                    {contact.notes}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right Column: Unified Timeline */}
+          <div className="col-span-12 md:col-span-8 p-6 flex flex-col min-h-0 bg-white">
+            <h4 className="text-sm font-semibold text-slate-800 mb-4 flex items-center gap-2">
+              <Activity className="w-4 h-4 text-slate-400" />
+              Unified Activity History
+            </h4>
+
+            {isLoading ? (
+              <div className="flex-1 flex flex-col items-center justify-center py-16 gap-3 text-slate-400">
+                <Loader2 className="w-8 h-8 animate-spin" />
+                <span className="text-xs font-medium">Loading activity history...</span>
+              </div>
+            ) : events.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center py-16 border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+                <Activity className="w-8 h-8 text-slate-300 mb-2.5" />
+                <p className="text-sm font-medium text-slate-600">No activity history yet</p>
+                <p className="text-xs text-slate-400 mt-1 max-w-xs text-center leading-relaxed">
+                  Deals, invoices, and tasks linked to this contact will automatically compile in this visual timeline.
+                </p>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto pr-1">
+                <div className="relative pl-6 border-l-2 border-slate-100 space-y-6 py-2 ml-3">
+                  {events.map((event, idx) => {
+                    const Icon = getEventIcon(event.type)
+                    return (
+                      <div key={idx} className="relative group/item">
+                        {/* Event icon marker */}
+                        <div className="absolute -left-[35px] top-0.5 w-6 h-6 rounded-full bg-white border-2 border-slate-100 flex items-center justify-center text-slate-500 shadow-sm group-hover/item:border-indigo-200 group-hover/item:text-indigo-600 transition-colors">
+                          <Icon className="w-3.5 h-3.5" />
+                        </div>
+                        
+                        {/* Event content */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between gap-4">
+                            <span className="text-xs font-semibold text-slate-900 group-hover/item:text-indigo-600 transition-colors">{event.title}</span>
+                            <span className="text-[10px] text-slate-400 font-medium">
+                              {event.date.toLocaleDateString(undefined, { dateStyle: 'medium' })} @ {event.date.toLocaleTimeString(undefined, { timeStyle: 'short' })}
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center justify-between gap-4 bg-slate-50/60 group-hover/item:bg-slate-50/90 rounded-lg px-3 py-2 border border-slate-100/50 transition-colors">
+                            <p className="text-xs text-slate-600 font-medium flex-1">{event.description}</p>
+                            <Badge className={`${event.badgeColor} border-0 text-[10px] px-1.5 py-0.5 uppercase tracking-wider font-bold shadow-none`}>
+                              {event.status}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function getEventIcon(type: string) {
+  switch (type) {
+    case 'created': return User
+    case 'deal': return Briefcase
+    case 'invoice': return FileText
+    case 'task': return CheckSquare
+    default: return Activity
+  }
+}
+
+function getTimelineEvents(contact: any, data: any) {
+  const events: any[] = []
+
+  if (contact?.created) {
+    events.push({
+      id: 'created',
+      type: 'created',
+      date: new Date(contact.created),
+      title: 'Contact Created',
+      description: `Added to CRM list`,
+      status: contact.status || 'active',
+      badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-100'
+    })
+  }
+
+  if (data) {
+    data.deals?.forEach((deal: any) => {
+      events.push({
+        id: deal.id,
+        type: 'deal',
+        date: new Date(deal.created),
+        title: 'Deal Logged',
+        description: `${deal.title} — Value: $${(deal.value || 0).toLocaleString()}`,
+        status: deal.stage || 'lead',
+        badgeColor: deal.stage === 'won' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-blue-50 text-blue-700 border-blue-100'
+      })
+    })
+
+    data.invoices?.forEach((invoice: any) => {
+      events.push({
+        id: invoice.id,
+        type: 'invoice',
+        date: new Date(invoice.created),
+        title: 'Invoice Issued',
+        description: `${invoice.title} — Total: $${(invoice.amount || 0).toLocaleString()}`,
+        status: invoice.status || 'pending',
+        badgeColor: invoice.status === 'approved' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-amber-50 text-amber-700 border-amber-100'
+      })
+    })
+
+    data.tasks?.forEach((task: any) => {
+      events.push({
+        id: task.id,
+        type: 'task',
+        date: new Date(task.created),
+        title: 'Task Created',
+        description: task.title,
+        status: task.status || 'draft',
+        badgeColor: task.status === 'approved' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-slate-50 text-slate-700 border-slate-100'
+      })
+    })
+  }
+
+  return events.sort((a, b) => b.date.getTime() - a.date.getTime())
+}
+

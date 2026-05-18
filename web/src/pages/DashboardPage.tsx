@@ -1,13 +1,22 @@
 import { useDashboardData } from '@/hooks/useDashboardData'
+import { useActivityFeed } from '@/hooks/useActivityFeed'
+import { useMyWorkQueue } from '@/hooks/useMyWorkQueue'
+import { useAuth } from '@/hooks/useAuth'
 import { TodayStrip } from '@/components/dashboard/TodayStrip'
 import { MySignalsPanel } from '@/components/dashboard/MySignalsPanel'
 import { MoneyAtRiskStrip } from '@/components/dashboard/MoneyAtRiskStrip'
 import { RadarPanel } from '@/components/dashboard/RadarPanel'
 import { BusinessKpiGrid } from '@/components/dashboard/BusinessKpiGrid'
+import { ActivityFeed } from '@/components/dashboard/ActivityFeed'
+import { MyWorkQueue } from '@/components/dashboard/MyWorkQueue'
+import { groupWorkQueue } from '@/services/work-queue'
 import { Loader2 } from 'lucide-react'
 
 export function DashboardPage() {
   const { data, isLoading, error } = useDashboardData()
+  const { data: feedEvents, isLoading: feedLoading } = useActivityFeed()
+  const { data: workItems, isLoading: workLoading } = useMyWorkQueue()
+  const { isHrOrAdmin } = useAuth()
 
   if (isLoading) {
     return (
@@ -26,6 +35,7 @@ export function DashboardPage() {
   }
 
   const { metrics, radar, today, moneyAtRisk, mySignals } = data
+  const grouped = workItems ? groupWorkQueue(workItems) : { needsAttention: [], recentlyUpdated: [], waiting: [] }
 
   return (
     <div>
@@ -35,6 +45,8 @@ export function DashboardPage() {
       </div>
 
       <TodayStrip summary={today} />
+      {isHrOrAdmin && <ActivityFeed events={feedEvents || []} isLoading={feedLoading} />}
+      <MyWorkQueue grouped={grouped} isLoading={workLoading} />
       <MySignalsPanel items={mySignals} />
       <MoneyAtRiskStrip data={moneyAtRisk} />
       <RadarPanel data={radar} />

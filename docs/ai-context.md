@@ -35,9 +35,9 @@ Primary philosophy:
 
 ## Database
 
-Current:
-- Prisma ORM
-- PostgreSQL (migrating from SQLite)
+- PocketBase (SQLite, single binary)
+- JS migrations in pocketbase/pb_migrations/
+- JS hooks in pocketbase/pb_hooks/
 
 ## Infrastructure
 

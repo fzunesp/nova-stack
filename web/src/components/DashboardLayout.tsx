@@ -3,18 +3,22 @@ import { useAuth } from '@/hooks/useAuth'
 import {
   LayoutDashboard, CheckSquare, FileText, Inbox, Settings,
   LogOut, Menu, X, Users, Search, Bell, Plus, HelpCircle,
-  ChevronLeft, ChevronRight, ChevronDown, Briefcase,
+  ChevronLeft, ChevronRight, ChevronDown, Briefcase, Package, Building2
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
+import { useGlobalSearch } from '@/hooks/useGlobalSearch'
+import { GlobalSearch } from '@/components/GlobalSearch'
 
 const navSections = [
   {
     label: 'WORKSPACE',
     items: [
       { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+      { to: '/companies', icon: Building2, label: 'Companies' },
       { to: '/crm', icon: Users, label: 'CRM' },
       { to: '/tasks', icon: CheckSquare, label: 'Tasks' },
       { to: '/invoices', icon: FileText, label: 'Invoices' },
+      { to: '/products', icon: Package, label: 'Products' },
       { to: '/intake', icon: Inbox, label: 'Intake' },
     ],
   },
@@ -28,10 +32,11 @@ const navSections = [
 ]
 
 const quickCreateItems = [
-  { label: 'Task', icon: CheckSquare, path: '/tasks', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600' },
-  { label: 'Invoice', icon: FileText, path: '/invoices', iconBg: 'bg-violet-100', iconColor: 'text-violet-600' },
+  { label: 'Company', icon: Building2, path: '/companies', iconBg: 'bg-indigo-100', iconColor: 'text-indigo-600' },
   { label: 'Contact', icon: Users, path: '/crm', iconBg: 'bg-blue-100', iconColor: 'text-blue-600', tab: 'contacts' },
   { label: 'Deal', icon: Briefcase, path: '/crm', iconBg: 'bg-orange-100', iconColor: 'text-orange-600', tab: 'deals' },
+  { label: 'Task', icon: CheckSquare, path: '/tasks', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600' },
+  { label: 'Invoice', icon: FileText, path: '/invoices', iconBg: 'bg-violet-100', iconColor: 'text-violet-600' },
   { label: 'Intake', icon: Inbox, path: '/intake', iconBg: 'bg-pink-100', iconColor: 'text-pink-600' },
 ]
 
@@ -51,6 +56,7 @@ export function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(false)
   const [quickCreateOpen, setQuickCreateOpen] = useState(false)
   const quickCreateRef = useRef<HTMLDivElement>(null)
+  const search = useGlobalSearch()
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -76,9 +82,20 @@ export function DashboardLayout() {
     .find((item) => location.pathname.startsWith(item.to))?.label || 'Dashboard'
 
   const userInitial = (user as any)?.name?.charAt(0)?.toUpperCase() || 'U'
+  const userRole = (user as any)?.role || ''
 
   return (
     <div className="flex h-screen bg-slate-50">
+      <GlobalSearch
+        open={search.open}
+        onClose={() => search.setOpen(false)}
+        query={search.query}
+        onQueryChange={search.setQuery}
+        data={search.data}
+        isLoading={search.isLoading}
+        hasResults={search.hasResults}
+        debouncedQuery={search.debouncedQuery}
+      />
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/40 z-40 lg:hidden backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
       )}
@@ -142,8 +159,9 @@ export function DashboardLayout() {
         {/* User section */}
         <div className="p-2 border-t border-slate-800 flex-shrink-0">
           {collapsed ? (
-            <div className="flex flex-col items-center gap-2 py-1">
+            <div className="flex flex-col items-center gap-1 py-1">
               <div className="w-8 h-8 rounded-full bg-[rgb(var(--ns-accent))] flex items-center justify-center text-white text-xs font-bold">{userInitial}</div>
+              {userRole && <span className="text-[9px] font-semibold text-slate-500 uppercase tracking-wider">{userRole}</span>}
               <button onClick={handleLogout} className="p-1.5 rounded-md hover:bg-slate-800 text-slate-400" title="Sign out">
                 <LogOut className="w-3.5 h-3.5" />
               </button>
@@ -155,6 +173,7 @@ export function DashboardLayout() {
                 <p className="text-sm font-medium text-slate-200 truncate">{(user as any)?.name || 'User'}</p>
                 <p className="text-xs text-slate-500 truncate">{(user as any)?.email || ''}</p>
               </div>
+              {userRole && <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-1">{userRole}</span>}
               <button onClick={handleLogout} className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-slate-700 transition-all" title="Sign out">
                 <LogOut className="w-3.5 h-3.5 text-slate-400" />
               </button>
@@ -174,10 +193,14 @@ export function DashboardLayout() {
             <h1 className="text-[15px] font-semibold text-slate-900">{currentPage}</h1>
           </div>
           <div className="flex items-center gap-2">
-            <div className="hidden md:flex items-center gap-2 bg-slate-100 hover:bg-slate-200 rounded-lg px-3 py-1.5 transition-colors">
+            <button
+              onClick={() => search.setOpen(true)}
+              className="hidden md:flex items-center gap-2 bg-slate-100 hover:bg-slate-200 rounded-lg px-3 py-1.5 transition-colors text-left"
+            >
               <Search className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-              <input className="bg-transparent text-sm text-slate-600 placeholder-slate-400 outline-none w-36" placeholder="Search..." />
-            </div>
+              <span className="text-sm text-slate-400 w-36">Search...</span>
+              <kbd className="ml-1 px-1.5 py-0.5 text-[10px] font-medium text-slate-400 bg-white border border-slate-200 rounded">⌘K</kbd>
+            </button>
             <button className="relative p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">
               <Bell className="w-4 h-4" />
               <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-[rgb(var(--ns-accent))] rounded-full" />

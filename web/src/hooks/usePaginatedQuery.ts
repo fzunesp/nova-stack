@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import pb from '@/lib/pocketbase'
 
@@ -8,6 +8,7 @@ interface UsePaginatedQueryOptions {
   searchFields?: string[]
   defaultSort?: string
   expand?: string
+  initialSearch?: string
 }
 
 export function usePaginatedQuery({
@@ -16,10 +17,18 @@ export function usePaginatedQuery({
   searchFields = ['name'],
   defaultSort = '-id',
   expand,
+  initialSearch = '',
 }: UsePaginatedQueryOptions) {
   const [page, setPage] = useState(1)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(initialSearch)
   const [sortField, setSortField] = useState(defaultSort)
+
+  useEffect(() => {
+    if (initialSearch !== undefined) {
+      setSearch(initialSearch)
+      setPage(1)
+    }
+  }, [initialSearch])
 
   const buildFilter = useCallback(() => {
     if (!search.trim()) return ''

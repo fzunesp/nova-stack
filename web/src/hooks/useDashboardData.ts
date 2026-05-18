@@ -68,7 +68,6 @@ export function useDashboardData() {
       const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)
       const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
       const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000)
-      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
 
       // Fetch all required data
       const [tasks, deals, invoices, contacts, intakes] = await Promise.all([
@@ -85,7 +84,7 @@ export function useDashboardData() {
         .reduce((sum, i) => sum + (i.amount || 0), 0)
 
       const outstandingRevenue = invoices
-        .filter((i) => i.status === 'sent' || i.status === 'draft')
+        .filter((i) => i.status === 'pending' || i.status === 'draft' || i.status === 'active')
         .reduce((sum, i) => sum + (i.amount || 0), 0)
 
       const activeStages = new Set(['lead', 'contacted', 'quoted'])
@@ -94,7 +93,7 @@ export function useDashboardData() {
       const totalDeals = deals.length
       const conversionRate = totalDeals > 0 ? (wonDeals / totalDeals) * 100 : 0
 
-      const pendingTasks = tasks.filter((t) => t.status !== 'done').length
+      const pendingTasks = tasks.filter((t) => t.status !== 'approved').length
       const totalInvoices = invoices.length
 
       const metrics: BusinessMetrics = {
@@ -115,7 +114,7 @@ export function useDashboardData() {
 
       // === URGENT ===
       for (const t of tasks) {
-        if (t.dueDate && new Date(t.dueDate) < now && t.status !== 'done') {
+        if (t.dueDate && new Date(t.dueDate) < now && t.status !== 'approved') {
           const daysOverdue = daysBetween(new Date(t.dueDate), now)
           urgent.push({
             id: t.id,
@@ -143,7 +142,7 @@ export function useDashboardData() {
       }
 
       for (const i of invoices) {
-        if (i.status === 'sent' && i.issuedDate && new Date(i.issuedDate) < sevenDaysAgo) {
+        if (i.status === 'pending' && i.issuedDate && new Date(i.issuedDate) < sevenDaysAgo) {
           const daysAgo = daysBetween(new Date(i.issuedDate), now)
           urgent.push({
             id: i.id,
@@ -201,7 +200,7 @@ export function useDashboardData() {
       }
 
       for (const i of invoices) {
-        if (i.status === 'sent' && i.issuedDate) {
+        if (i.status === 'pending' && i.issuedDate) {
           const issued = new Date(i.issuedDate)
           if (issued >= sevenDaysAgo) {
             const daysAgo = daysBetween(issued, now)
@@ -270,8 +269,8 @@ export function useDashboardData() {
       }
 
       // 3. Today Summary
-      const dueTasksCount = tasks.filter(t => t.dueDate && new Date(t.dueDate) <= now && t.status !== 'done').length
-      const overdueInvoicesCount = invoices.filter(i => i.status === 'sent' && i.issuedDate && new Date(i.issuedDate) < sevenDaysAgo).length
+      const dueTasksCount = tasks.filter(t => t.dueDate && new Date(t.dueDate) <= now && t.status !== 'approved').length
+      const overdueInvoicesCount = invoices.filter(i => i.status === 'pending' && i.issuedDate && new Date(i.issuedDate) < sevenDaysAgo).length
       const staleDealsCount = deals.filter(d => ['contacted', 'quoted'].includes(d.stage) && (d.created ? new Date(d.created) : new Date()) < fourteenDaysAgo).length
 
       const today: TodaySummary = {
@@ -281,7 +280,7 @@ export function useDashboardData() {
       }
 
       // 4. Money At Risk
-      const overdueInvoicesItems = invoices.filter(i => i.status === 'sent' && i.issuedDate && new Date(i.issuedDate) < sevenDaysAgo)
+      const overdueInvoicesItems = invoices.filter(i => i.status === 'pending' && i.issuedDate && new Date(i.issuedDate) < sevenDaysAgo)
       const openDealsItems = deals.filter(d => !['won', 'lost'].includes(d.stage) && d.value > 0)
 
       const overdueInvoicesTotal = overdueInvoicesItems.reduce((sum, i) => sum + (i.amount || 0), 0)
@@ -297,11 +296,11 @@ export function useDashboardData() {
       // Get the current user
       const userId = pb.authStore.record?.id
       
-      const myTasks = tasks.filter(t => t.assignedToId === userId && t.status !== 'done')
+      const myTasks = tasks.filter(t => t.assignedToId === userId && t.status !== 'approved')
         .sort((a, b) => (b.created ? new Date(b.created).getTime() : 0) - (a.created ? new Date(a.created).getTime() : 0))
         .slice(0, 5)
         
-      const myIntakes = intakes.filter(i => i.assignedToId === userId && !['approved', 'rejected', 'converted'].includes(i.status))
+      const myIntakes = intakes.filter(i => i.assignedToId === userId && !['approved', 'rejected', 'archived'].includes(i.status))
         .sort((a, b) => (b.created ? new Date(b.created).getTime() : 0) - (a.created ? new Date(a.created).getTime() : 0))
         .slice(0, 5)
         
@@ -317,7 +316,7 @@ export function useDashboardData() {
           status: t.status,
           link: `/tasks`,
           timestamp: t.created || '',
-          isNew: t.status === 'todo',
+          isNew: t.status === 'draft',
         })),
         ...myIntakes.map((i): SignalItem => ({
           id: i.id,
@@ -326,7 +325,7 @@ export function useDashboardData() {
           status: i.status,
           link: `/intake`,
           timestamp: i.created || '',
-          isNew: i.status === 'new',
+          isNew: i.status === 'draft',
         })),
         ...myDeals.map((d): SignalItem => ({
           id: d.id,

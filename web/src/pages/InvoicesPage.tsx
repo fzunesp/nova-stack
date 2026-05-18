@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FileText, Search, Trash2, Pencil, ArrowUpDown } from 'lucide-react'
+import { FileText, Search, Trash2, Pencil, ArrowUpDown, Plus, X, ChevronDown, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -10,64 +10,194 @@ import { usePaginatedQuery } from '@/hooks/usePaginatedQuery'
 import { DataTablePagination } from '@/components/DataTablePagination'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import pb from '@/lib/pocketbase'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useLocation } from 'react-router'
+import { invoiceService, isAppError } from '@/services'
+import type { Status } from '@/services'
 
-const statusColors: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-700',
-  sent: 'bg-amber-100 text-amber-700',
-  paid: 'bg-green-100 text-green-700',
-  cancelled: 'bg-red-100 text-red-600',
+const statusLabels: Record<Status, string> = {
+  draft: 'Draft',
+  active: 'Active',
+  pending: 'Pending payment',
+  approved: 'Paid',
+  rejected: 'Cancelled',
+  archived: 'Archived',
+  lead: 'Lead',
+  inactive: 'Inactive',
 }
-const statusDots: Record<string, string> = {
+
+const statusColors: Record<Status, string> = {
+  draft: 'bg-gray-100 text-gray-700',
+  active: 'bg-blue-100 text-blue-700',
+  pending: 'bg-amber-100 text-amber-700',
+  approved: 'bg-green-100 text-green-700',
+  rejected: 'bg-red-100 text-red-600',
+  archived: 'bg-slate-100 text-slate-500',
+  lead: 'bg-blue-100 text-blue-700',
+  inactive: 'bg-slate-100 text-slate-500',
+}
+
+const statusDots: Record<Status, string> = {
   draft: 'bg-gray-400',
-  sent: 'bg-amber-500',
-  paid: 'bg-green-500',
-  cancelled: 'bg-red-400',
+  active: 'bg-blue-500',
+  pending: 'bg-amber-500',
+  approved: 'bg-green-500',
+  rejected: 'bg-red-400',
+  archived: 'bg-slate-400',
+  lead: 'bg-blue-500',
+  inactive: 'bg-slate-400',
+}
+
+interface LineItem {
+  productId: string
+  name: string
+  price: number
+  quantity: number
+  total: number
 }
 
 export function InvoicesPage() {
   const location = useLocation()
   const queryClient = useQueryClient()
+  const initialSearch = location.state?.search || ''
   const { items, totalItems, totalPages, page, perPage, search, isLoading, toggleSort, goToPage, updateSearch } =
-    usePaginatedQuery({ collection: 'invoices', searchFields: ['title'] })
+    usePaginatedQuery({ collection: 'invoices', searchFields: ['title'], expand: 'dealId', initialSearch })
 
-  const [formData, setFormData] = useState({ title: '', amount: '', status: 'draft', dueDate: '' })
+  const [formData, setFormData] = useState({ title: '', amount: '', status: 'draft' as Status, dueDate: '', dealId: '' })
   const [creating, setCreating] = useState(location.state?.openCreate === true)
+  const [createLineItems, setCreateLineItems] = useState<LineItem[]>([])
+  
   const [editing, setEditing] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState({ title: '', amount: '', status: 'draft', dueDate: '' })
+  const [editForm, setEditForm] = useState({ title: '', amount: '', status: 'draft' as Status, dueDate: '', dealId: '' })
+  const [editLineItems, setEditLineItems] = useState<LineItem[]>([])
+  const [expandedInvoices, setExpandedInvoices] = useState<Record<string, boolean>>({})
+  const toggleExpand = (id: string) => setExpandedInvoices(prev => ({ ...prev, [id]: !prev[id] }))
+
+  const actorId = pb.authStore.record?.id || ''
+
+  // Fetch active products
+  const { data: productsData } = useQuery({
+    queryKey: ['products-all'],
+    queryFn: () => pb.collection('products').getFullList({ filter: "status = 'active'", sort: 'name' })
+  })
+  const products = productsData || []
+
+  // Fetch deals for dropdown
+  const { data: dealsData } = useQuery({
+    queryKey: ['deals-all'],
+    queryFn: () => pb.collection('deals').getFullList({ expand: 'contactId', sort: '-created' })
+  })
+  const deals = dealsData || []
 
   const createInvoice = useMutation({
-    mutationFn: (data: typeof formData) =>
-      pb.collection('invoices').create({ ...data, amount: parseFloat(data.amount) || 0, userId: pb.authStore.record?.id }),
+    mutationFn: (data: typeof formData & { lineItems: LineItem[] }) =>
+      invoiceService.create({ 
+        ...data, 
+        amount: parseFloat(data.amount) || 0, 
+        userId: pb.authStore.record?.id,
+        lineItems: data.lineItems,
+        dealId: data.dealId || undefined
+      }, actorId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] })
-      setFormData({ title: '', amount: '', status: 'draft', dueDate: '' })
+      setFormData({ title: '', amount: '', status: 'draft', dueDate: '', dealId: '' })
+      setCreateLineItems([])
       setCreating(false)
       toast.success('Invoice created')
     },
-    onError: () => toast.error('Failed to create invoice'),
+    onError: (err) => toast.error(isAppError(err) ? err.message : 'Failed to create invoice'),
   })
 
   const updateInvoice = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: typeof editForm }) =>
-      pb.collection('invoices').update(id, { ...data, amount: parseFloat(data.amount) || 0 }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['invoices'] }); setEditing(null); toast.success('Invoice updated') },
-    onError: () => toast.error('Failed to update invoice'),
+    mutationFn: ({ id, data, lineItems }: { id: string; data: typeof editForm; lineItems: LineItem[] }) =>
+      invoiceService.update(id, { 
+        ...data, 
+        amount: parseFloat(data.amount) || 0,
+        lineItems,
+        dealId: data.dealId || undefined
+      }, actorId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      setEditing(null)
+      setEditLineItems([])
+      toast.success('Invoice updated')
+    },
+    onError: (err) => toast.error(isAppError(err) ? err.message : 'Failed to update invoice'),
   })
 
   const deleteInvoice = useMutation({
-    mutationFn: (id: string) => pb.collection('invoices').delete(id),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['invoices'] }); toast.success('Invoice deleted') },
+    mutationFn: (id: string) => invoiceService.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      toast.success('Invoice deleted')
+    },
     onError: () => toast.error('Failed to delete invoice'),
   })
 
-  const allInvoices = items as any[]
-  const totalOutstanding = allInvoices.filter((i) => i.status === 'sent' || i.status === 'draft').reduce((s, i) => s + (i.amount || 0), 0)
-  const totalPaid = allInvoices.filter((i) => i.status === 'paid').reduce((s, i) => s + (i.amount || 0), 0)
+  const addCreateLineItem = () => {
+    setCreateLineItems([...createLineItems, { productId: '', name: '', price: 0, quantity: 1, total: 0 }])
+  }
 
-  const statusOptions = ['draft', 'sent', 'paid', 'cancelled']
+  const updateCreateLineItem = (index: number, field: keyof LineItem, value: any) => {
+    const updated = createLineItems.map((item, idx) => {
+      if (idx !== index) return item
+      const newItem = { ...item, [field]: value }
+      if (field === 'productId') {
+        const prod = products.find(p => p.id === value)
+        if (prod) {
+          newItem.name = prod.name
+          newItem.price = prod.price
+        }
+      }
+      newItem.total = (Number(newItem.price) || 0) * (Number(newItem.quantity) || 0)
+      return newItem
+    })
+    setCreateLineItems(updated)
+    const totalAmount = updated.reduce((sum, item) => sum + item.total, 0)
+    setFormData(prev => ({ ...prev, amount: totalAmount.toString() }))
+  }
+
+  const removeCreateLineItem = (index: number) => {
+    const updated = createLineItems.filter((_, idx) => idx !== index)
+    setCreateLineItems(updated)
+    const totalAmount = updated.reduce((sum, item) => sum + item.total, 0)
+    setFormData(prev => ({ ...prev, amount: totalAmount.toString() }))
+  }
+
+  const addEditLineItem = () => {
+    setEditLineItems([...editLineItems, { productId: '', name: '', price: 0, quantity: 1, total: 0 }])
+  }
+
+  const updateEditLineItem = (index: number, field: keyof LineItem, value: any) => {
+    const updated = editLineItems.map((item, idx) => {
+      if (idx !== index) return item
+      const newItem = { ...item, [field]: value }
+      if (field === 'productId') {
+        const prod = products.find(p => p.id === value)
+        if (prod) {
+          newItem.name = prod.name
+          newItem.price = prod.price
+        }
+      }
+      newItem.total = (Number(newItem.price) || 0) * (Number(newItem.quantity) || 0)
+      return newItem
+    })
+    setEditLineItems(updated)
+    const totalAmount = updated.reduce((sum, item) => sum + item.total, 0)
+    setEditForm(prev => ({ ...prev, amount: totalAmount.toString() }))
+  }
+
+  const removeEditLineItem = (index: number) => {
+    const updated = editLineItems.filter((_, idx) => idx !== index)
+    setEditLineItems(updated)
+    const totalAmount = updated.reduce((sum, item) => sum + item.total, 0)
+    setEditForm(prev => ({ ...prev, amount: totalAmount.toString() }))
+  }
+
+  const allInvoices = items as any[]
+  const totalOutstanding = allInvoices.filter((i) => i.status === 'pending' || i.status === 'draft' || i.status === 'active').reduce((s, i) => s + (i.amount || 0), 0)
+  const totalPaid = allInvoices.filter((i) => i.status === 'approved').reduce((s, i) => s + (i.amount || 0), 0)
 
   return (
     <div>
@@ -78,19 +208,92 @@ export function InvoicesPage() {
         </div>
         <Dialog open={creating} onOpenChange={setCreating}>
           <DialogTrigger asChild><Button>Add Invoice</Button></DialogTrigger>
-          <DialogContent>
+          <DialogContent className="sm:max-w-2xl">
             <DialogHeader><DialogTitle>Add New Invoice</DialogTitle></DialogHeader>
-            <form onSubmit={(e) => { e.preventDefault(); createInvoice.mutate(formData) }} className="space-y-4">
-              <div className="space-y-2"><Label>Title</Label><Input placeholder="Invoice title" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} required /></div>
-              <div className="space-y-2"><Label>Amount ($)</Label><Input type="number" step="0.01" placeholder="0.00" value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Status</Label>
-                <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{statusOptions.map((s) => <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}</SelectContent>
-                </Select>
+            <form onSubmit={(e) => { e.preventDefault(); createInvoice.mutate({ ...formData, lineItems: createLineItems }) }} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2 space-y-1"><Label>Title</Label><Input placeholder="Invoice title" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} required /></div>
+                
+                <div className="col-span-2 space-y-1">
+                  <Label>Deal / Project *</Label>
+                  <Select value={formData.dealId} onValueChange={(v) => setFormData({ ...formData, dealId: v })}>
+                    <SelectTrigger className={!formData.dealId ? 'border-red-200' : ''}>
+                      <SelectValue placeholder="— Select a deal —" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {deals.map((d: any) => (
+                        <SelectItem key={d.id} value={d.id}>
+                          {d.title} {d.expand?.contactId ? `— ${d.expand.contactId.name}` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1"><Label>Due Date</Label><Input type="date" value={formData.dueDate} onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })} /></div>
+                <div className="space-y-1"><Label>Status</Label>
+                  <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v as Status })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(statusLabels) as Status[]).map((s) => (
+                        <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-2"><Label>Due Date</Label><Input type="date" value={formData.dueDate} onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })} /></div>
-              <DialogFooter><Button type="submit" disabled={createInvoice.isPending}>Add Invoice</Button></DialogFooter>
+
+              {/* Line Items */}
+              <div className="space-y-2 mt-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <Label className="text-sm font-semibold text-slate-700">Line Items</Label>
+                  <Button type="button" variant="outline" size="sm" onClick={addCreateLineItem} className="h-8 text-xs">
+                    <Plus className="w-3.5 h-3.5 mr-1" /> Add Item
+                  </Button>
+                </div>
+                
+                {createLineItems.length === 0 ? (
+                  <div className="text-center py-6 border border-dashed border-slate-200 rounded-lg text-slate-400 text-xs">
+                    No items added yet. Click 'Add Item' to start building this invoice.
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    {createLineItems.map((item, index) => (
+                      <div key={index} className="grid grid-cols-12 gap-2 items-center">
+                        <div className="col-span-5">
+                          <Select value={item.productId} onValueChange={(v) => updateCreateLineItem(index, 'productId', v)}>
+                            <SelectTrigger className="h-9"><SelectValue placeholder="Select Product" /></SelectTrigger>
+                            <SelectContent>
+                              {products.map(p => (
+                                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-2">
+                          <Input type="number" min="1" placeholder="Qty" value={item.quantity} onChange={e => updateCreateLineItem(index, 'quantity', parseInt(e.target.value) || 0)} className="h-9" />
+                        </div>
+                        <div className="col-span-3">
+                          <Input type="number" step="0.01" min="0" placeholder="Price" value={item.price} onChange={e => updateCreateLineItem(index, 'price', parseFloat(e.target.value) || 0)} className="h-9" />
+                        </div>
+                        <div className="col-span-2 flex items-center justify-between gap-1 pl-1">
+                          <span className="text-xs font-mono font-semibold text-slate-600">${item.total.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+                          <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500 hover:bg-red-50" onClick={() => removeCreateLineItem(index)}>
+                            <X className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between border-t border-slate-100 pt-4 mt-2">
+                <span className="text-sm font-semibold text-slate-700">Total Invoice Amount:</span>
+                <span className="text-lg font-bold text-slate-900">${(parseFloat(formData.amount) || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+              </div>
+
+              <DialogFooter className="pt-2"><Button type="submit" disabled={createInvoice.isPending || !formData.dealId} className="bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white">{createInvoice.isPending ? 'Adding...' : 'Add Invoice'}</Button></DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
@@ -130,41 +333,183 @@ export function InvoicesPage() {
             </div>
           ) : (
             items.map((invoice: any) => (
-              <div key={invoice.id} className="group grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors items-center">
-                <div className="col-span-5 font-medium text-slate-900">{invoice.title}</div>
-                <div className="col-span-2 text-sm font-semibold text-slate-700">${invoice.amount?.toLocaleString()}</div>
-                <div className="col-span-3">
-                  <Badge className={`${statusColors[invoice.status]} inline-flex items-center gap-1.5 text-xs`}>
-                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusDots[invoice.status]}`} />
-                    {invoice.status}
-                  </Badge>
+              <div key={invoice.id} className="border-b border-slate-50 last:border-0">
+                <div className="group grid grid-cols-12 gap-4 px-4 py-3 hover:bg-slate-50 transition-colors items-center">
+                  <div className="col-span-5 flex items-start gap-2">
+                    <button 
+                      onClick={() => toggleExpand(invoice.id)}
+                      className="p-1 mt-0.5 rounded hover:bg-slate-200/50 text-slate-400 hover:text-slate-600 transition-colors flex-shrink-0"
+                    >
+                      {expandedInvoices[invoice.id] ? (
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      ) : (
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                    <div className="min-w-0">
+                      <span 
+                        onClick={() => toggleExpand(invoice.id)}
+                        className="font-medium text-slate-900 cursor-pointer hover:text-[rgb(var(--ns-accent))] transition-colors block truncate"
+                      >
+                        {invoice.title}
+                      </span>
+                      {invoice.expand?.dealId && (
+                        <span className="text-xs text-slate-400 block mt-0.5 font-medium truncate">
+                          Project: {invoice.expand.dealId.title} {invoice.expand.dealId.expand?.contactId ? `(${invoice.expand.dealId.expand.contactId.name})` : ''}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="col-span-2 text-sm font-semibold text-slate-700">${invoice.amount?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                  <div className="col-span-3">
+                    <Badge className={`${statusColors[invoice.status as Status] || statusColors.draft} inline-flex items-center gap-1.5 text-xs`}>
+                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusDots[invoice.status as Status] || statusDots.draft}`} />
+                      {statusLabels[invoice.status as Status] || invoice.status}
+                    </Badge>
+                  </div>
+                  <div className="col-span-2 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Dialog open={editing === invoice.id} onOpenChange={(open) => {
+                      if (open) { 
+                        setEditing(invoice.id)
+                        setEditForm({ title: invoice.title || '', amount: String(invoice.amount || ''), status: invoice.status || 'draft', dueDate: invoice.dueDate?.split('T')[0] || '', dealId: invoice.dealId || '' })
+                        setEditLineItems(Array.isArray(invoice.lineItems) ? invoice.lineItems : [])
+                      } else {
+                        setEditing(null)
+                      }
+                    }}>
+                      <DialogTrigger asChild><Button variant="ghost" size="icon"><Pencil className="w-3.5 h-3.5" /></Button></DialogTrigger>
+                      <DialogContent className="sm:max-w-2xl">
+                        <DialogHeader><DialogTitle>Edit Invoice</DialogTitle></DialogHeader>
+                        <form onSubmit={(e) => { e.preventDefault(); updateInvoice.mutate({ id: invoice.id, data: editForm, lineItems: editLineItems }) }} className="space-y-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="col-span-2 space-y-1"><Label>Title</Label><Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required /></div>
+                            
+                            <div className="col-span-2 space-y-1">
+                              <Label>Deal / Project *</Label>
+                              <Select value={editForm.dealId} onValueChange={(v) => setEditForm({ ...editForm, dealId: v })}>
+                                <SelectTrigger className={!editForm.dealId ? 'border-red-200' : ''}>
+                                  <SelectValue placeholder="— Select a deal —" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {deals.map((d: any) => (
+                                    <SelectItem key={d.id} value={d.id}>
+                                      {d.title} {d.expand?.contactId ? `— ${d.expand.contactId.name}` : ''}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="space-y-1"><Label>Due Date</Label><Input type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} /></div>
+                            <div className="space-y-1"><Label>Status</Label>
+                              <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v as Status })}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {(Object.keys(statusLabels) as Status[]).map((s) => (
+                                    <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
+                          {/* Line Items */}
+                          <div className="space-y-2 mt-4">
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                              <Label className="text-sm font-semibold text-slate-700">Line Items</Label>
+                              <Button type="button" variant="outline" size="sm" onClick={addEditLineItem} className="h-8 text-xs">
+                                <Plus className="w-3.5 h-3.5 mr-1" /> Add Item
+                              </Button>
+                            </div>
+                            
+                            {editLineItems.length === 0 ? (
+                              <div className="text-center py-6 border border-dashed border-slate-200 rounded-lg text-slate-400 text-xs">
+                                No items added yet. Click 'Add Item' to start building this invoice.
+                              </div>
+                            ) : (
+                              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                                {editLineItems.map((item, index) => (
+                                  <div key={index} className="grid grid-cols-12 gap-2 items-center">
+                                    <div className="col-span-5">
+                                      <Select value={item.productId} onValueChange={(v) => updateEditLineItem(index, 'productId', v)}>
+                                        <SelectTrigger className="h-9"><SelectValue placeholder="Select Product" /></SelectTrigger>
+                                        <SelectContent>
+                                          {products.map(p => (
+                                            <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="col-span-2">
+                                      <Input type="number" min="1" placeholder="Qty" value={item.quantity} onChange={e => updateEditLineItem(index, 'quantity', parseInt(e.target.value) || 0)} className="h-9" />
+                                    </div>
+                                    <div className="col-span-3">
+                                      <Input type="number" step="0.01" min="0" placeholder="Price" value={item.price} onChange={e => updateEditLineItem(index, 'price', parseFloat(e.target.value) || 0)} className="h-9" />
+                                    </div>
+                                    <div className="col-span-2 flex items-center justify-between gap-1 pl-1">
+                                      <span className="text-xs font-mono font-semibold text-slate-600">${item.total.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+                                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500 hover:bg-red-50" onClick={() => removeEditLineItem(index)}>
+                                        <X className="w-3.5 h-3.5" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex items-center justify-between border-t border-slate-100 pt-4 mt-2">
+                            <span className="text-sm font-semibold text-slate-700">Total Invoice Amount:</span>
+                            <span className="text-lg font-bold text-slate-900">${(parseFloat(editForm.amount) || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                          </div>
+
+                          <DialogFooter className="pt-2"><Button type="submit" disabled={updateInvoice.isPending || !editForm.dealId} className="bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white">Save</Button></DialogFooter>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+                    <Button variant="ghost" size="icon" onClick={() => { if (confirm('Delete this invoice?')) deleteInvoice.mutate(invoice.id) }}>
+                      <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="col-span-2 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Dialog open={editing === invoice.id} onOpenChange={(open) => {
-                    if (open) { setEditing(invoice.id); setEditForm({ title: invoice.title || '', amount: String(invoice.amount || ''), status: invoice.status || 'draft', dueDate: invoice.dueDate || '' }) }
-                    else setEditing(null)
-                  }}>
-                    <DialogTrigger asChild><Button variant="ghost" size="icon"><Pencil className="w-3.5 h-3.5" /></Button></DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader><DialogTitle>Edit Invoice</DialogTitle></DialogHeader>
-                      <form onSubmit={(e) => { e.preventDefault(); updateInvoice.mutate({ id: invoice.id, data: editForm }) }} className="space-y-4">
-                        <div className="space-y-2"><Label>Title</Label><Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required /></div>
-                        <div className="space-y-2"><Label>Amount ($)</Label><Input type="number" step="0.01" value={editForm.amount} onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })} /></div>
-                        <div className="space-y-2"><Label>Status</Label>
-                          <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>{statusOptions.map((s) => <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}</SelectContent>
-                          </Select>
+
+                {expandedInvoices[invoice.id] && (
+                  <div className="px-12 pb-4 pt-1 bg-slate-50/50 border-t border-slate-100/50">
+                    <div className="max-w-2xl mt-2 space-y-2">
+                      <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Line Items Breakdown</div>
+                      {(!invoice.lineItems || invoice.lineItems.length === 0) ? (
+                        <p className="text-xs text-slate-400 italic">No line items added to this invoice.</p>
+                      ) : (
+                        <div className="border border-slate-100 rounded-lg overflow-hidden bg-white shadow-sm">
+                          <table className="min-w-full divide-y divide-slate-100 text-xs">
+                            <thead className="bg-slate-50 text-slate-500 font-medium">
+                              <tr>
+                                <th className="px-4 py-2.5 text-left">Item / Product</th>
+                                <th className="px-4 py-2.5 text-right w-16">Qty</th>
+                                <th className="px-4 py-2.5 text-right w-24">Price</th>
+                                <th className="px-4 py-2.5 text-right w-28">Total</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50 text-slate-700">
+                              {invoice.lineItems.map((item: any, idx: number) => (
+                                <tr key={idx} className="hover:bg-slate-50/30">
+                                  <td className="px-4 py-2 font-medium text-slate-900">{item.name || 'Unknown Item'}</td>
+                                  <td className="px-4 py-2 text-right">{item.quantity}</td>
+                                  <td className="px-4 py-2 text-right">${(item.price || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                  <td className="px-4 py-2 text-right font-semibold text-slate-900">${(item.total || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                </tr>
+                              ))}
+                              <tr className="bg-slate-50/50 font-semibold text-slate-900 border-t border-slate-100">
+                                <td colSpan={3} className="px-4 py-2 text-right text-slate-500">Total:</td>
+                                <td className="px-4 py-2 text-right text-xs font-bold text-[rgb(var(--ns-accent))]">${(invoice.amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                              </tr>
+                            </tbody>
+                          </table>
                         </div>
-                        <div className="space-y-2"><Label>Due Date</Label><Input type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} /></div>
-                        <DialogFooter><Button type="submit" disabled={updateInvoice.isPending}>Save</Button></DialogFooter>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
-                  <Button variant="ghost" size="icon" onClick={() => { if (confirm('Delete this invoice?')) deleteInvoice.mutate(invoice.id) }}>
-                    <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                  </Button>
-                </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             ))
           )}

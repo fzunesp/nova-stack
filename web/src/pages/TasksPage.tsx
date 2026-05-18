@@ -10,58 +10,98 @@ import { usePaginatedQuery } from '@/hooks/usePaginatedQuery'
 import { DataTablePagination } from '@/components/DataTablePagination'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import pb from '@/lib/pocketbase'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useLocation } from 'react-router'
+import { taskService, isAppError } from '@/services'
+import type { Status } from '@/services'
 
-const statusColors: Record<string, string> = {
-  todo: 'bg-gray-100 text-gray-700',
-  in_progress: 'bg-blue-100 text-blue-700',
-  done: 'bg-green-100 text-green-700',
+const statusLabels: Record<Status, string> = {
+  draft: 'Not started',
+  active: 'In progress',
+  pending: 'Waiting',
+  approved: 'Done',
+  rejected: 'Cancelled',
+  archived: 'Archived',
+  lead: 'Lead',
+  inactive: 'Inactive',
 }
-const statusDots: Record<string, string> = {
-  todo: 'bg-gray-400',
-  in_progress: 'bg-blue-500',
-  done: 'bg-green-500',
+
+const statusColors: Record<Status, string> = {
+  draft: 'bg-gray-100 text-gray-700',
+  active: 'bg-blue-100 text-blue-700',
+  pending: 'bg-amber-100 text-amber-700',
+  approved: 'bg-green-100 text-green-700',
+  rejected: 'bg-red-100 text-red-600',
+  archived: 'bg-slate-100 text-slate-500',
+  lead: 'bg-blue-100 text-blue-700',
+  inactive: 'bg-slate-100 text-slate-500',
+}
+
+const statusDots: Record<Status, string> = {
+  draft: 'bg-gray-400',
+  active: 'bg-blue-500',
+  pending: 'bg-amber-500',
+  approved: 'bg-green-500',
+  rejected: 'bg-red-400',
+  archived: 'bg-slate-400',
+  lead: 'bg-blue-500',
+  inactive: 'bg-slate-400',
 }
 
 export function TasksPage() {
   const location = useLocation()
   const queryClient = useQueryClient()
+  const initialSearch = location.state?.search || ''
   const { items, totalItems, totalPages, page, perPage, search, isLoading, toggleSort, goToPage, updateSearch } =
-    usePaginatedQuery({ collection: 'tasks', searchFields: ['title'] })
+    usePaginatedQuery({ collection: 'tasks', searchFields: ['title'], initialSearch })
 
-  const [formData, setFormData] = useState({ title: '', description: '', status: 'todo', dueDate: '' })
+  const [formData, setFormData] = useState({ title: '', description: '', status: 'draft' as Status, dueDate: '', contactId: '', dealId: '' })
   const [creating, setCreating] = useState(location.state?.openCreate === true)
   const [editing, setEditing] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState({ title: '', description: '', status: 'todo', dueDate: '' })
+  const [editForm, setEditForm] = useState({ title: '', description: '', status: 'draft' as Status, dueDate: '', contactId: '', dealId: '' })
+
+  const actorId = pb.authStore.record?.id || ''
+
+  const { data: contacts } = useQuery({
+    queryKey: ['allContacts'],
+    queryFn: () => pb.collection('contacts').getFullList({ sort: 'name' })
+  })
+
+  const { data: deals } = useQuery({
+    queryKey: ['allDeals'],
+    queryFn: () => pb.collection('deals').getFullList({ sort: 'title' })
+  })
 
   const createTask = useMutation({
     mutationFn: (data: typeof formData) =>
-      pb.collection('tasks').create({ ...data, dueDate: data.dueDate || null, userId: pb.authStore.record?.id }),
+      taskService.create({ ...data, dueDate: data.dueDate || undefined, userId: pb.authStore.record?.id }, actorId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
-      setFormData({ title: '', description: '', status: 'todo', dueDate: '' })
+      setFormData({ title: '', description: '', status: 'draft', dueDate: '', contactId: '', dealId: '' })
       setCreating(false)
       toast.success('Task created')
     },
-    onError: () => toast.error('Failed to create task'),
+    onError: (err) => toast.error(isAppError(err) ? err.message : 'Failed to create task'),
   })
 
   const updateTask = useMutation({
     mutationFn: ({ id, data }: { id: string; data: typeof editForm }) =>
-      pb.collection('tasks').update(id, { ...data, dueDate: data.dueDate || null }),
+      taskService.update(id, { ...data, dueDate: data.dueDate || undefined }, actorId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
       setEditing(null)
       toast.success('Task updated')
     },
-    onError: () => toast.error('Failed to update task'),
+    onError: (err) => toast.error(isAppError(err) ? err.message : 'Failed to update task'),
   })
 
   const deleteTask = useMutation({
-    mutationFn: (id: string) => pb.collection('tasks').delete(id),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['tasks'] }); toast.success('Task deleted') },
+    mutationFn: (id: string) => taskService.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      toast.success('Task deleted')
+    },
     onError: () => toast.error('Failed to delete task'),
   })
 
@@ -80,7 +120,36 @@ export function TasksPage() {
               <div className="space-y-2"><Label>Title</Label><Input placeholder="Task title" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} required /></div>
               <div className="space-y-2"><Label>Description</Label><Input placeholder="Description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} /></div>
               <div className="space-y-2"><Label>Due Date</Label><Input type="date" value={formData.dueDate} onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })} /></div>
-              <DialogFooter><Button type="submit" disabled={createTask.isPending}>Add Task</Button></DialogFooter>
+              
+              <div className="space-y-2">
+                <Label>Contact *</Label>
+                <Select value={formData.contactId} onValueChange={(v) => setFormData({ ...formData, contactId: v })} required>
+                  <SelectTrigger className={!formData.contactId ? 'border-red-200' : ''}>
+                    <SelectValue placeholder="Select a contact" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {contacts?.map((c: any) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Deal *</Label>
+                <Select value={formData.dealId} onValueChange={(v) => setFormData({ ...formData, dealId: v })} required>
+                  <SelectTrigger className={!formData.dealId ? 'border-red-200' : ''}>
+                    <SelectValue placeholder="Select a deal" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {deals?.map((d: any) => (
+                      <SelectItem key={d.id} value={d.id}>{d.title}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <DialogFooter><Button type="submit" disabled={createTask.isPending || !formData.contactId || !formData.dealId}>Add Task</Button></DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
@@ -110,19 +179,19 @@ export function TasksPage() {
             items.map((task: any) => (
               <div key={task.id} className="group grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors items-center">
                 <div className="col-span-6">
-                  <p className={`font-medium ${task.status === 'done' ? 'line-through text-slate-400' : 'text-slate-900'}`}>{task.title}</p>
+                  <p className={`font-medium ${task.status === 'approved' ? 'line-through text-slate-400' : 'text-slate-900'}`}>{task.title}</p>
                   {task.description && <p className="text-xs text-slate-400 mt-0.5 truncate">{task.description}</p>}
                 </div>
                 <div className="col-span-2">
-                  <Badge className={`${statusColors[task.status]} inline-flex items-center gap-1.5 text-xs`}>
-                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusDots[task.status]}`} />
-                    {task.status.replace('_', ' ')}
+                  <Badge className={`${statusColors[task.status as Status] || statusColors.draft} inline-flex items-center gap-1.5 text-xs`}>
+                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusDots[task.status as Status] || statusDots.draft}`} />
+                    {statusLabels[task.status as Status] || task.status}
                   </Badge>
                 </div>
                 <div className="col-span-2 text-sm text-slate-400">{task.dueDate || '—'}</div>
                 <div className="col-span-2 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <Dialog open={editing === task.id} onOpenChange={(open) => {
-                    if (open) { setEditing(task.id); setEditForm({ title: task.title || '', description: task.description || '', status: task.status || 'todo', dueDate: task.dueDate || '' }) }
+                    if (open) { setEditing(task.id); setEditForm({ title: task.title || '', description: task.description || '', status: task.status || 'draft', dueDate: task.dueDate || '', contactId: task.contactId || '', dealId: task.dealId || '' }) }
                     else setEditing(null)
                   }}>
                     <DialogTrigger asChild><Button variant="ghost" size="icon"><Pencil className="w-3.5 h-3.5" /></Button></DialogTrigger>
@@ -132,13 +201,46 @@ export function TasksPage() {
                         <div className="space-y-2"><Label>Title</Label><Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required /></div>
                         <div className="space-y-2"><Label>Description</Label><Input value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} /></div>
                         <div className="space-y-2"><Label>Status</Label>
-                          <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
+                          <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v as Status })}>
                             <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent><SelectItem value="todo">To Do</SelectItem><SelectItem value="in_progress">In Progress</SelectItem><SelectItem value="done">Done</SelectItem></SelectContent>
+                            <SelectContent>
+                              {(Object.keys(statusLabels) as Status[]).map((s) => (
+                                <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>
+                              ))}
+                            </SelectContent>
                           </Select>
                         </div>
                         <div className="space-y-2"><Label>Due Date</Label><Input type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} /></div>
-                        <DialogFooter><Button type="submit" disabled={updateTask.isPending}>Save</Button></DialogFooter>
+                        
+                        <div className="space-y-2">
+                          <Label>Contact *</Label>
+                          <Select value={editForm.contactId} onValueChange={(v) => setEditForm({ ...editForm, contactId: v })}>
+                            <SelectTrigger className={!editForm.contactId ? 'border-red-200' : ''}>
+                              <SelectValue placeholder="Select a contact" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {contacts?.map((c: any) => (
+                                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Deal *</Label>
+                          <Select value={editForm.dealId} onValueChange={(v) => setEditForm({ ...editForm, dealId: v })}>
+                            <SelectTrigger className={!editForm.dealId ? 'border-red-200' : ''}>
+                              <SelectValue placeholder="Select a deal" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {deals?.map((d: any) => (
+                                <SelectItem key={d.id} value={d.id}>{d.title}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <DialogFooter><Button type="submit" disabled={updateTask.isPending || !editForm.contactId || !editForm.dealId}>Save</Button></DialogFooter>
                       </form>
                     </DialogContent>
                   </Dialog>

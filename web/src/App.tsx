@@ -5,8 +5,10 @@ import { LoginPage } from '@/pages/LoginPage'
 import { RegisterPage } from '@/pages/RegisterPage'
 import { DashboardLayout } from '@/components/DashboardLayout'
 import { CrmPage } from '@/pages/CrmPage'
+import { CompaniesPage } from '@/pages/CompaniesPage'
 import { TasksPage } from '@/pages/TasksPage'
 import { InvoicesPage } from '@/pages/InvoicesPage'
+import { ProductsPage } from '@/pages/ProductsPage'
 import { IntakePage } from '@/pages/IntakePage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { DashboardPage } from '@/pages/DashboardPage'
@@ -51,8 +53,10 @@ export function AppRouter() {
           >
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="crm" element={<CrmPage />} />
+            <Route path="companies" element={<CompaniesPage />} />
             <Route path="tasks" element={<TasksPage />} />
             <Route path="invoices" element={<InvoicesPage />} />
+            <Route path="products" element={<ProductsPage />} />
             <Route path="intake" element={<IntakePage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="help" element={<HelpPage />} />
