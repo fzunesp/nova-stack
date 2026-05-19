@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { FileText, Search, Trash2, Pencil, ArrowUpDown, Plus, X, ChevronDown, ChevronRight } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { FileText, Search, Trash2, Pencil, ArrowUpDown, Plus, X, ChevronDown, ChevronRight, Download, Send } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -12,9 +12,10 @@ import { TableSkeleton } from '@/components/ui/skeleton'
 import pb from '@/lib/pocketbase'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { useLocation } from 'react-router'
+import { useLocation, useNavigate, useParams } from 'react-router'
 import { invoiceService, isAppError } from '@/services'
 import type { Status } from '@/services'
+import { generateInvoicePdf } from '@/lib/pdf'
 
 const statusLabels: Record<Status, string> = {
   draft: 'Draft',
@@ -59,10 +60,12 @@ interface LineItem {
 
 export function InvoicesPage() {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { id } = useParams<{ id: string }>()
   const queryClient = useQueryClient()
   const initialSearch = location.state?.search || ''
   const { items, totalItems, totalPages, page, perPage, search, isLoading, toggleSort, goToPage, updateSearch } =
-    usePaginatedQuery({ collection: 'invoices', searchFields: ['title'], expand: 'dealId', initialSearch })
+    usePaginatedQuery({ collection: 'invoices', searchFields: ['title'], expand: 'dealId,dealId.contactId,dealId.contactId.companyId', initialSearch })
 
   const [formData, setFormData] = useState({ title: '', amount: '', status: 'draft' as Status, dueDate: '', dealId: '' })
   const [creating, setCreating] = useState(location.state?.openCreate === true)
@@ -72,7 +75,22 @@ export function InvoicesPage() {
   const [editForm, setEditForm] = useState({ title: '', amount: '', status: 'draft' as Status, dueDate: '', dealId: '' })
   const [editLineItems, setEditLineItems] = useState<LineItem[]>([])
   const [expandedInvoices, setExpandedInvoices] = useState<Record<string, boolean>>({})
-  const toggleExpand = (id: string) => setExpandedInvoices(prev => ({ ...prev, [id]: !prev[id] }))
+
+  useEffect(() => {
+    if (id) {
+      setExpandedInvoices(prev => ({ ...prev, [id]: true }))
+    }
+  }, [id])
+
+  const toggleExpand = (invoiceId: string) => {
+    const isCurrentlyExpanded = !!expandedInvoices[invoiceId]
+    setExpandedInvoices(prev => ({ ...prev, [invoiceId]: !prev[invoiceId] }))
+    if (!isCurrentlyExpanded) {
+      navigate(`/invoices/${invoiceId}`)
+    } else if (id === invoiceId) {
+      navigate('/invoices')
+    }
+  }
 
   const actorId = pb.authStore.record?.id || ''
 
@@ -86,7 +104,7 @@ export function InvoicesPage() {
   // Fetch deals for dropdown
   const { data: dealsData } = useQuery({
     queryKey: ['deals-all'],
-    queryFn: () => pb.collection('deals').getFullList({ expand: 'contactId', sort: '-created' })
+    queryFn: () => pb.collection('deals').getFullList({ expand: 'contactId', sort: '-id' })
   })
   const deals = dealsData || []
 
@@ -133,6 +151,32 @@ export function InvoicesPage() {
       toast.success('Invoice deleted')
     },
     onError: () => toast.error('Failed to delete invoice'),
+  })
+
+  const sendInvoice = useMutation({
+    mutationFn: async (id: string) => {
+      const token = pb.authStore.token
+      const res = await fetch(`${pb.baseUrl || 'http://localhost:8090'}/api/send-invoice`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ invoiceId: id })
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.message || 'Failed to send invoice')
+      }
+      return res.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      toast.success('Invoice sent and marked as pending')
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Failed to send invoice')
+    }
   })
 
   const addCreateLineItem = () => {
@@ -354,9 +398,26 @@ export function InvoicesPage() {
                         {invoice.title}
                       </span>
                       {invoice.expand?.dealId && (
-                        <span className="text-xs text-slate-400 block mt-0.5 font-medium truncate">
-                          Project: {invoice.expand.dealId.title} {invoice.expand.dealId.expand?.contactId ? `(${invoice.expand.dealId.expand.contactId.name})` : ''}
-                        </span>
+                        <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5 font-medium truncate">
+                          <span>Project:</span>
+                          <button
+                            onClick={() => navigate(`/crm/deals/${invoice.expand.dealId.id}`)}
+                            className="text-indigo-500 hover:text-indigo-700 hover:underline font-semibold"
+                          >
+                            {invoice.expand.dealId.title}
+                          </button>
+                          {invoice.expand.dealId.expand?.contactId && (
+                            <>
+                              <span className="text-slate-300">|</span>
+                              <button
+                                onClick={() => navigate(`/crm/contacts/${invoice.expand.dealId.expand.contactId.id}`)}
+                                className="text-indigo-500 hover:text-indigo-700 hover:underline font-semibold"
+                              >
+                                ({invoice.expand.dealId.expand.contactId.name})
+                              </button>
+                            </>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -467,6 +528,14 @@ export function InvoicesPage() {
                         </form>
                       </DialogContent>
                     </Dialog>
+                    <Button variant="ghost" size="icon" onClick={() => generateInvoicePdf(invoice)} title="Download PDF">
+                      <Download className="w-3.5 h-3.5 text-slate-400 hover:text-[rgb(var(--ns-accent))]" />
+                    </Button>
+                    {invoice.status === 'draft' && (
+                      <Button variant="ghost" size="icon" onClick={() => { if (confirm('Send this invoice to the client? This will change status to pending.')) sendInvoice.mutate(invoice.id) }} disabled={sendInvoice.isPending} title="Send Invoice">
+                        <Send className="w-3.5 h-3.5 text-indigo-500 hover:text-indigo-600" />
+                      </Button>
+                    )}
                     <Button variant="ghost" size="icon" onClick={() => { if (confirm('Delete this invoice?')) deleteInvoice.mutate(invoice.id) }}>
                       <Trash2 className="w-3.5 h-3.5 text-red-400" />
                     </Button>

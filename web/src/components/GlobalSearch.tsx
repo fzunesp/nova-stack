@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Search, Users, Briefcase, CheckSquare, FileText, Inbox, ArrowRight, Loader2, Package } from 'lucide-react'
+import { Search, Users, Briefcase, CheckSquare, FileText, Inbox, ArrowRight, Loader2, Package, Building2 } from 'lucide-react'
 import { type SearchResult, type GroupedResults } from '@/hooks/useGlobalSearch'
 
 const TYPE_CONFIG = {
+  company:  { label: 'Companies', icon: Building2,    color: 'text-slate-600',  bg: 'bg-slate-100' },
   contact: { label: 'Contacts', icon: Users, color: 'text-blue-500', bg: 'bg-blue-50' },
   deal:    { label: 'Deals',    icon: Briefcase, color: 'text-orange-500', bg: 'bg-orange-50' },
   task:    { label: 'Tasks',    icon: CheckSquare, color: 'text-emerald-500', bg: 'bg-emerald-50' },
@@ -12,8 +13,9 @@ const TYPE_CONFIG = {
   intake:  { label: 'Intake',   icon: Inbox, color: 'text-pink-500', bg: 'bg-pink-50' },
 } as const
 
-const GROUP_ORDER: (keyof GroupedResults)[] = ['contacts', 'deals', 'tasks', 'invoices', 'products', 'intake']
+const GROUP_ORDER: (keyof GroupedResults)[] = ['companies', 'contacts', 'deals', 'tasks', 'invoices', 'products', 'intake']
 const TYPE_MAP: Record<keyof GroupedResults, SearchResult['type']> = {
+  companies: 'company',
   contacts: 'contact',
   deals: 'deal',
   tasks: 'task',

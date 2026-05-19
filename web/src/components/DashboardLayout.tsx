@@ -8,6 +8,7 @@ import {
 import { useState, useRef, useEffect } from 'react'
 import { useGlobalSearch } from '@/hooks/useGlobalSearch'
 import { GlobalSearch } from '@/components/GlobalSearch'
+import { useNotifications } from '@/hooks/useNotifications'
 
 const navSections = [
   {
@@ -20,6 +21,7 @@ const navSections = [
       { to: '/invoices', icon: FileText, label: 'Invoices' },
       { to: '/products', icon: Package, label: 'Products' },
       { to: '/intake', icon: Inbox, label: 'Intake' },
+      { to: '/hr', icon: Briefcase, label: 'HR' },
     ],
   },
   {
@@ -38,6 +40,7 @@ const quickCreateItems = [
   { label: 'Task', icon: CheckSquare, path: '/tasks', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600' },
   { label: 'Invoice', icon: FileText, path: '/invoices', iconBg: 'bg-violet-100', iconColor: 'text-violet-600' },
   { label: 'Intake', icon: Inbox, path: '/intake', iconBg: 'bg-pink-100', iconColor: 'text-pink-600' },
+  { label: 'HR Request', icon: Briefcase, path: '/hr', iconBg: 'bg-slate-100', iconColor: 'text-slate-600' },
 ]
 
 const Logo = () => (
@@ -58,10 +61,17 @@ export function DashboardLayout() {
   const quickCreateRef = useRef<HTMLDivElement>(null)
   const search = useGlobalSearch()
 
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const notificationsRef = useRef<HTMLDivElement>(null)
+  const { notifications, unreadCount, markAsRead, markAllAsRead, clearNotifications } = useNotifications()
+
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (quickCreateRef.current && !quickCreateRef.current.contains(e.target as Node)) {
         setQuickCreateOpen(false)
+      }
+      if (notificationsRef.current && !notificationsRef.current.contains(e.target as Node)) {
+        setNotificationsOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClick)
@@ -201,10 +211,130 @@ export function DashboardLayout() {
               <span className="text-sm text-slate-400 w-36">Search...</span>
               <kbd className="ml-1 px-1.5 py-0.5 text-[10px] font-medium text-slate-400 bg-white border border-slate-200 rounded">⌘K</kbd>
             </button>
-            <button className="relative p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">
-              <Bell className="w-4 h-4" />
-              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-[rgb(var(--ns-accent))] rounded-full" />
-            </button>
+            {/* Notifications Bell */}
+            <div ref={notificationsRef} className="relative">
+              <button
+                onClick={() => setNotificationsOpen(!notificationsOpen)}
+                className="relative p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors"
+                title="Notifications"
+              >
+                <Bell className="w-4 h-4" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 min-w-[14px] h-[14px] px-0.5 bg-[rgb(var(--ns-accent))] text-[9px] font-bold text-white rounded-full flex items-center justify-center border-2 border-white leading-none">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {notificationsOpen && (
+                <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl border border-slate-200 shadow-lg py-2 z-50 overflow-hidden">
+                  <div className="px-4 py-2 border-b border-slate-100 flex items-center justify-between">
+                    <span className="text-sm font-semibold text-slate-900">Notifications</span>
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={() => markAllAsRead()}
+                        className="text-xs text-[rgb(var(--ns-accent))] hover:underline font-medium"
+                      >
+                        Mark all as read
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="max-h-64 overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+                        <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center mb-2">
+                          <Bell className="w-5 h-5 text-slate-400" />
+                        </div>
+                        <p className="text-xs font-medium text-slate-600">All caught up!</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">No notifications yet.</p>
+                      </div>
+                    ) : (
+                      notifications.map((n) => {
+                        const Icon = {
+                          task: CheckSquare,
+                          deal: Briefcase,
+                          contact: Users,
+                          invoice: FileText,
+                          intake: Inbox,
+                        }[n.type]
+
+                        const colorClass = {
+                          task: 'bg-emerald-50 text-emerald-600',
+                          deal: 'bg-orange-50 text-orange-600',
+                          contact: 'bg-blue-50 text-blue-600',
+                          invoice: 'bg-violet-50 text-violet-600',
+                          intake: 'bg-pink-50 text-pink-600',
+                        }[n.type]
+
+                        const timeString = (() => {
+                          const diff = Date.now() - new Date(n.timestamp).getTime()
+                          const mins = Math.floor(diff / 60000)
+                          if (mins < 1) return 'Just now'
+                          if (mins < 60) return `${mins}m ago`
+                          const hrs = Math.floor(mins / 60)
+                          if (hrs < 24) return `${hrs}h ago`
+                          return new Date(n.timestamp).toLocaleDateString()
+                        })()
+
+                        const handleNotificationClick = () => {
+                          markAsRead(n.id)
+                          setNotificationsOpen(false)
+                          if (n.type === 'task') {
+                            navigate('/tasks')
+                          } else if (n.type === 'intake') {
+                            navigate('/intake')
+                          } else if (n.type === 'contact') {
+                            navigate(`/crm/contacts/${n.recordId}`)
+                          } else if (n.type === 'deal') {
+                            navigate(`/crm/deals/${n.recordId}`)
+                          } else if (n.type === 'invoice') {
+                            navigate(`/invoices/${n.recordId}`)
+                          }
+                        }
+
+                        return (
+                          <button
+                            key={n.id}
+                            onClick={handleNotificationClick}
+                            className={`flex items-start gap-3 w-full px-4 py-3 hover:bg-slate-50 border-b border-slate-50 transition-colors text-left ${!n.read ? 'bg-slate-50/50' : ''}`}
+                          >
+                            <span className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${colorClass}`}>
+                              <Icon className="w-4 h-4" />
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className={`text-xs font-semibold ${!n.read ? 'text-slate-900' : 'text-slate-700'}`}>
+                                  {n.title}
+                                </span>
+                                <span className="text-[10px] text-slate-400 flex-shrink-0">{timeString}</span>
+                              </div>
+                              <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">
+                                {n.message}
+                              </p>
+                            </div>
+                            {!n.read && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-red-500 mt-2 flex-shrink-0" />
+                            )}
+                          </button>
+                        )
+                      })
+                    )}
+                  </div>
+
+                  {notifications.length > 0 && (
+                    <div className="px-4 pt-2 pb-1 border-t border-slate-100 flex justify-end">
+                      <button
+                        onClick={() => clearNotifications()}
+                        className="text-[10px] text-slate-400 hover:text-slate-600 font-semibold uppercase tracking-wider"
+                      >
+                        Clear all
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             {/* Quick-create dropdown */}
             <div ref={quickCreateRef} className="relative">
               <button

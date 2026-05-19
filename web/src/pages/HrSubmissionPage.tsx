@@ -1,0 +1,197 @@
+import { useParams, useNavigate } from 'react-router'
+import { useQuery } from '@tanstack/react-query'
+import pb from '@/lib/pocketbase'
+import { Inbox, ArrowLeft, Clock, CheckCircle2, XCircle, FileText, User } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
+
+export function HrSubmissionPage() {
+  const { id } = useParams()
+  const navigate = useNavigate()
+
+  const { data: submission, isLoading } = useQuery({
+    queryKey: ['intake_submission', id],
+    queryFn: async () => {
+      return pb.collection('intake_submissions').getOne(id!, {
+        expand: 'formId,userId',
+      })
+    },
+    enabled: !!id,
+  })
+
+  const { data: tasks = [] } = useQuery({
+    queryKey: ['approval_tasks', 'submission', id],
+    queryFn: () => pb.collection('approval_tasks').getFullList({
+      filter: `submissionId = "${id}"`,
+      expand: 'assignedToId',
+      sort: 'stepOrder',
+    }),
+    enabled: !!id,
+  })
+
+  if (isLoading) return <div className="p-8 text-center text-slate-400">Loading submission details...</div>
+  if (!submission) return <div className="p-8 text-center text-slate-400">Submission not found.</div>
+
+  const formDef = submission.expand?.formId as any
+  const employee = submission.expand?.userId as any
+  const formFields = (() => {
+    try {
+      return JSON.parse(formDef?.fields || '[]')
+    } catch {
+      return []
+    }
+  })()
+  const details = (() => {
+    try {
+      return JSON.parse(submission.details || '{}')
+    } catch {
+      return {}
+    }
+  })()
+
+  const getFieldLabel = (name: string) => {
+    const field = formFields.find((f: any) => f.name === name)
+    return field ? field.label : name
+  }
+
+  const renderValue = (name: string, value: any) => {
+    const field = formFields.find((f: any) => f.name === name)
+    if (!field) return String(value)
+    if (field.type === 'signature' && typeof value === 'string') {
+      return <img src={value} alt="Signature" className="h-12 border border-slate-200 rounded p-1 bg-white" />
+    }
+    if (field.type === 'file' && Array.isArray(value)) {
+      return (
+        <div className="flex flex-col gap-1">
+          {value.map((file: any, idx: number) => (
+            <a key={idx} href={file.url} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline text-xs">
+              {file.name}
+            </a>
+          ))}
+        </div>
+      )
+    }
+    return String(value)
+  }
+
+  return (
+    <div className="px-6 py-8 max-w-4xl mx-auto space-y-6">
+      <div className="flex items-center gap-4 mb-4">
+        <Button variant="ghost" size="icon" onClick={() => navigate('/hr')} className="text-slate-400 hover:text-slate-600">
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <div className="flex-1 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center">
+              <Inbox className="w-5 h-5 text-indigo-600" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-bold text-slate-900">{formDef?.name || submission.type}</h1>
+                <Badge className="font-mono text-[10px] bg-slate-100 text-indigo-700">{submission.formattedId}</Badge>
+              </div>
+              <p className="text-sm text-slate-500">Submitted by {employee?.name || submission.name}</p>
+            </div>
+          </div>
+          <SubmissionStatusBadge status={submission.status} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="md:col-span-2 space-y-6">
+          <Card className="border border-slate-100 shadow-sm">
+            <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-4">
+              <CardTitle className="text-sm font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                <FileText className="h-4 w-4" /> Request Details
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y divide-slate-100">
+                {Object.entries(details).map(([key, value]) => (
+                  <div key={key} className="flex flex-col sm:flex-row sm:items-start justify-between px-6 py-4 gap-2">
+                    <span className="text-sm font-semibold text-slate-600 sm:w-1/3">{getFieldLabel(key)}</span>
+                    <div className="text-sm text-slate-800 sm:w-2/3">{renderValue(key, value)}</div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          <Card className="border border-slate-100 shadow-sm">
+            <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-4">
+              <CardTitle className="text-sm font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                <Clock className="h-4 w-4" /> Approval Timeline
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-5">
+              <div className="space-y-6">
+                <div className="relative flex gap-4">
+                  <div className="absolute left-[11px] top-7 bottom-[-24px] w-0.5 bg-slate-100" />
+                  <div className="relative z-10 w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 mt-1">
+                    <User className="h-3 w-3 text-slate-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-800">Submitted</p>
+                    <p className="text-[10px] text-slate-400">{new Date(submission.created).toLocaleString()}</p>
+                  </div>
+                </div>
+
+                {tasks.map((task: any, idx: number) => {
+                  const isLast = idx === tasks.length - 1
+                  return (
+                    <div key={task.id} className="relative flex gap-4">
+                      {!isLast && <div className="absolute left-[11px] top-7 bottom-[-24px] w-0.5 bg-slate-100" />}
+                      <div className={cn(
+                        "relative z-10 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-1",
+                        task.status === 'approved' ? 'bg-emerald-100 text-emerald-600' :
+                        task.status === 'rejected' ? 'bg-red-100 text-red-600' :
+                        !task.isActive ? 'bg-slate-100 text-slate-300' : 'bg-amber-100 text-amber-600'
+                      )}>
+                        {task.status === 'approved' ? <CheckCircle2 className="h-3 w-3" /> :
+                         task.status === 'rejected' ? <XCircle className="h-3 w-3" /> :
+                         <Clock className="h-3 w-3" />}
+                      </div>
+                      <div className={cn("flex-1", !task.isActive && "opacity-50")}>
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold text-slate-800">{task.expand?.assignedToId?.name || 'Unknown'}</p>
+                          <TaskStatusBadge status={task.status} active={task.isActive} />
+                        </div>
+                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{task.stepLabel}</p>
+                        {task.completedAt && (
+                          <p className="text-[10px] text-slate-400 mt-0.5">{new Date(task.completedAt).toLocaleString()}</p>
+                        )}
+                        {task.comment && (
+                          <div className="mt-2 p-2 bg-slate-50 rounded-md text-xs text-slate-600 italic border border-slate-100">
+                            "{task.comment}"
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SubmissionStatusBadge({ status }: { status: string }) {
+  if (status === 'approved') return <Badge className="bg-emerald-100 text-emerald-700 text-xs px-3 py-1 border-0"><CheckCircle2 className="h-3.5 w-3.5 mr-1" />Approved</Badge>
+  if (status === 'rejected') return <Badge className="bg-red-100 text-red-600 text-xs px-3 py-1 border-0"><XCircle className="h-3.5 w-3.5 mr-1" />Rejected</Badge>
+  return <Badge className="bg-amber-100 text-amber-700 text-xs px-3 py-1 border-0"><Clock className="h-3.5 w-3.5 mr-1" />Pending</Badge>
+}
+
+function TaskStatusBadge({ status, active }: { status: string; active: boolean }) {
+  if (!active) return <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Skipped</span>
+  if (status === 'pending') return <span className="text-[9px] font-bold text-amber-600 uppercase tracking-widest">Pending</span>
+  if (status === 'approved') return <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">Approved</span>
+  if (status === 'rejected') return <span className="text-[9px] font-bold text-red-600 uppercase tracking-widest">Rejected</span>
+  return <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{status}</span>
+}

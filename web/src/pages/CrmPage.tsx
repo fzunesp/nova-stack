@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Users, Search, Trash2, Pencil, ArrowUpDown, Briefcase, FileText, CheckSquare, User, Calendar, Activity, Info, Phone, Mail, Building, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,14 +13,32 @@ import { TableSkeleton } from '@/components/ui/skeleton'
 import pb from '@/lib/pocketbase'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { useLocation } from 'react-router'
+import { useLocation, useNavigate, useParams } from 'react-router'
 import { contactService, dealService, isAppError } from '@/services'
 import type { Status } from '@/services'
 
 export function CrmPage() {
   const location = useLocation()
-  const initialTab = location.state?.tab === 'deals' ? 'deals' : 'contacts'
+  const navigate = useNavigate()
+
+  const isDealsRoute = location.pathname.startsWith('/crm/deals')
+  const isContactsRoute = location.pathname.startsWith('/crm/contacts')
+
+  const initialTab = isDealsRoute ? 'deals' : (isContactsRoute ? 'contacts' : (location.state?.tab === 'deals' ? 'deals' : 'contacts'))
   const [activeTab, setActiveTab] = useState<'contacts' | 'deals'>(initialTab)
+
+  useEffect(() => {
+    if (isDealsRoute && activeTab !== 'deals') {
+      setActiveTab('deals')
+    } else if (isContactsRoute && activeTab !== 'contacts') {
+      setActiveTab('contacts')
+    }
+  }, [location.pathname])
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab as 'contacts' | 'deals')
+    navigate(`/crm/${tab}`)
+  }
 
   return (
     <div>
@@ -28,7 +46,7 @@ export function CrmPage() {
         <h2 className="text-xl font-semibold text-slate-900">CRM</h2>
         <p className="text-sm text-slate-500 mt-0.5">Manage your contacts and pipeline</p>
       </div>
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'contacts' | 'deals')}>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="mb-6">
           <TabsTrigger value="contacts">Contacts</TabsTrigger>
           <TabsTrigger value="deals">Deals</TabsTrigger>
@@ -47,10 +65,28 @@ export function CrmPage() {
 function ContactsTab({ autoOpen = false }: { autoOpen?: boolean }) {
   const queryClient = useQueryClient()
   const location = useLocation()
+  const navigate = useNavigate()
+  const { id } = useParams<{ id: string }>()
+  const isContactsRoute = location.pathname.startsWith('/crm/contacts')
+  
   const initialSearch = location.state?.search || ''
   
   const { items, totalItems, totalPages, page, perPage, search, isLoading, toggleSort, goToPage, updateSearch } =
     usePaginatedQuery({ collection: 'contacts', searchFields: ['name', 'email'], expand: 'companyId', defaultSort: '+companyId', initialSearch })
+
+  const { data: routeContact } = useQuery({
+    queryKey: ['contact', id],
+    queryFn: async () => {
+      try {
+        return await pb.collection('contacts').getOne(id!, { expand: 'companyId' })
+      } catch (err) {
+        toast.error('Contact not found')
+        navigate('/crm/contacts', { replace: true })
+        return null
+      }
+    },
+    enabled: isContactsRoute && !!id,
+  })
 
   const [formData, setFormData] = useState({ name: '', email: '', phone: '', title: '', companyId: '', notes: '', status: 'active' as Status })
   const [creating, setCreating] = useState(autoOpen)
@@ -156,7 +192,7 @@ function ContactsTab({ autoOpen = false }: { autoOpen?: boolean }) {
                 <div className="col-span-3 text-sm font-semibold text-slate-700 truncate">
                   {showCompany ? currentCompany : ''}
                 </div>
-                <div className="col-span-3 cursor-pointer" onClick={() => setSelectedContact(contact)}>
+                <div className="col-span-3 cursor-pointer" onClick={() => navigate(`/crm/contacts/${contact.id}`)}>
                   <div className="flex items-center gap-2.5">
                     <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 text-xs font-bold flex-shrink-0">
                       {contact.name?.charAt(0)?.toUpperCase() || '?'}
@@ -206,10 +242,13 @@ function ContactsTab({ autoOpen = false }: { autoOpen?: boolean }) {
           <DataTablePagination page={page} totalPages={totalPages} totalItems={totalItems} perPage={perPage} onPageChange={goToPage} />
         </div>
       )}
-      {selectedContact && (
+      {(selectedContact || routeContact) && (
         <ContactDetailDialog
-          contact={selectedContact}
-          onClose={() => setSelectedContact(null)}
+          contact={selectedContact || routeContact}
+          onClose={() => {
+            setSelectedContact(null)
+            if (id) navigate('/crm/contacts')
+          }}
         />
       )}
     </div>
@@ -243,6 +282,38 @@ function DealsTab({ autoOpen = false }: { autoOpen?: boolean }) {
   const [creating, setCreating] = useState(autoOpen)
   const [editing, setEditing] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({ title: '', value: '', stage: 'lead' as 'lead' | 'contacted' | 'quoted' | 'won' | 'lost', status: 'active' as Status, contactId: '', companyId: '' })
+
+  const navigate = useNavigate()
+  const { id } = useParams<{ id: string }>()
+  const isDealsRoute = location.pathname.startsWith('/crm/deals')
+
+  const { data: routeDeal } = useQuery({
+    queryKey: ['deal', id],
+    queryFn: async () => {
+      try {
+        return await pb.collection('deals').getOne(id!)
+      } catch (err) {
+        toast.error('Deal not found')
+        navigate('/crm/deals', { replace: true })
+        return null
+      }
+    },
+    enabled: isDealsRoute && !!id,
+  })
+
+  useEffect(() => {
+    if (routeDeal) {
+      setEditing(routeDeal.id)
+      setEditForm({
+        title: routeDeal.title || '',
+        value: String(routeDeal.value || ''),
+        stage: routeDeal.stage || 'lead',
+        status: routeDeal.status || 'active',
+        contactId: routeDeal.contactId || '',
+        companyId: routeDeal.companyId || ''
+      })
+    }
+  }, [routeDeal])
 
   const { data: contacts } = useQuery({
     queryKey: ['allContactsList'],
@@ -338,12 +409,18 @@ function DealsTab({ autoOpen = false }: { autoOpen?: boolean }) {
           ) : (
             items.map((deal: any) => (
               <div key={deal.id} className="group grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors items-center">
-                <div className="col-span-5">
-                  <span className="font-medium text-slate-900">{deal.title}</span>
+                <div className="col-span-5 cursor-pointer" onClick={() => navigate(`/crm/deals/${deal.id}`)}>
+                  <span className="font-medium text-slate-900 group-hover:text-[rgb(var(--ns-accent))] transition-colors">{deal.title}</span>
                   {deal.expand?.contactId && (
-                    <span className="text-xs text-slate-400 block mt-0.5 font-medium truncate">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        navigate(`/crm/contacts/${deal.expand.contactId.id}`)
+                      }}
+                      className="text-xs text-indigo-500 hover:text-indigo-700 hover:underline block mt-0.5 font-medium truncate text-left"
+                    >
                       Client: {deal.expand.contactId.name}
-                    </span>
+                    </button>
                   )}
                 </div>
                 <div className="col-span-2 text-sm font-semibold text-slate-700">${deal.value?.toLocaleString()}</div>
@@ -356,7 +433,7 @@ function DealsTab({ autoOpen = false }: { autoOpen?: boolean }) {
                 <div className="col-span-2 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <Dialog open={editing === deal.id} onOpenChange={(open) => {
                     if (open) { setEditing(deal.id); setEditForm({ title: deal.title || '', value: String(deal.value || ''), stage: deal.stage || 'lead', status: deal.status || 'active', contactId: deal.contactId || '', companyId: deal.companyId || '' }) }
-                    else setEditing(null)
+                    else { setEditing(null); if (id) navigate('/crm/deals') }
                   }}>
                     <DialogTrigger asChild><Button variant="ghost" size="icon"><Pencil className="w-3.5 h-3.5" /></Button></DialogTrigger>
                     <DialogContent>
@@ -402,22 +479,23 @@ function DealsTab({ autoOpen = false }: { autoOpen?: boolean }) {
 }
 
 function ContactDetailDialog({ contact, onClose }: { contact: any; onClose: () => void }) {
+  const navigate = useNavigate()
   const { data, isLoading } = useQuery({
     queryKey: ['contactTimeline', contact.id],
     queryFn: async () => {
       const [deals, tasks, invoices] = await Promise.all([
         pb.collection('deals').getFullList({
           filter: `contactId = "${contact.id}"`,
-          sort: '-created'
+          sort: '-id'
         }),
         pb.collection('tasks').getFullList({
           filter: `contactId = "${contact.id}"`,
-          sort: '-created'
+          sort: '-id'
         }),
         pb.collection('invoices').getFullList({
           filter: `dealId.contactId = "${contact.id}"`,
           expand: 'dealId',
-          sort: '-created'
+          sort: '-id'
         })
       ])
       return { deals, tasks, invoices }
@@ -444,7 +522,19 @@ function ContactDetailDialog({ contact, onClose }: { contact: any; onClose: () =
                 {contact.name?.charAt(0)?.toUpperCase() || '?'}
               </div>
               <h3 className="text-lg font-bold text-slate-900 leading-tight">{contact.name}</h3>
-              <p className="text-sm text-slate-500 mt-1 font-medium">{contact.companyName || 'No Company'}</p>
+              {contact.expand?.companyId ? (
+                <button
+                  onClick={() => {
+                    onClose()
+                    navigate(`/companies/${contact.expand.companyId.id}`)
+                  }}
+                  className="text-sm text-indigo-600 font-semibold hover:underline mt-1"
+                >
+                  {contact.expand.companyId.name}
+                </button>
+              ) : (
+                <p className="text-sm text-slate-500 mt-1 font-medium">{contact.companyName || 'No Company'}</p>
+              )}
             </div>
 
             <div className="space-y-4 text-sm flex-1">
@@ -468,7 +558,19 @@ function ContactDetailDialog({ contact, onClose }: { contact: any; onClose: () =
                 <Building className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
                 <div>
                   <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Company</div>
-                  <div className="text-slate-700 font-medium">{contact.companyName || '—'}</div>
+                  {contact.expand?.companyId ? (
+                    <button
+                      onClick={() => {
+                        onClose()
+                        navigate(`/companies/${contact.expand.companyId.id}`)
+                      }}
+                      className="text-indigo-600 font-semibold hover:underline flex items-center gap-1 text-left mt-0.5"
+                    >
+                      {contact.expand.companyId.name}
+                    </button>
+                  ) : (
+                    <div className="text-slate-700 font-medium">{contact.companyName || '—'}</div>
+                  )}
                 </div>
               </div>
 
@@ -530,7 +632,29 @@ function ContactDetailDialog({ contact, onClose }: { contact: any; onClose: () =
                         {/* Event content */}
                         <div className="space-y-1.5">
                           <div className="flex items-center justify-between gap-4">
-                            <span className="text-xs font-semibold text-slate-900 group-hover/item:text-indigo-600 transition-colors">{event.title}</span>
+                            {event.type === 'deal' ? (
+                              <button
+                                onClick={() => {
+                                  onClose()
+                                  navigate(`/crm/deals/${event.id}`)
+                                }}
+                                className="text-xs font-semibold text-indigo-600 hover:underline text-left"
+                              >
+                                {event.title}
+                              </button>
+                            ) : event.type === 'invoice' ? (
+                              <button
+                                onClick={() => {
+                                  onClose()
+                                  navigate(`/invoices/${event.id}`)
+                                }}
+                                className="text-xs font-semibold text-indigo-600 hover:underline text-left"
+                              >
+                                {event.title}
+                              </button>
+                            ) : (
+                              <span className="text-xs font-semibold text-slate-900 group-hover/item:text-indigo-600 transition-colors">{event.title}</span>
+                            )}
                             <span className="text-[10px] text-slate-400 font-medium">
                               {event.date.toLocaleDateString(undefined, { dateStyle: 'medium' })} @ {event.date.toLocaleTimeString(undefined, { timeStyle: 'short' })}
                             </span>
@@ -569,24 +693,24 @@ function getEventIcon(type: string) {
 function getTimelineEvents(contact: any, data: any) {
   const events: any[] = []
 
-  if (contact?.created) {
-    events.push({
-      id: 'created',
-      type: 'created',
-      date: new Date(contact.created),
-      title: 'Contact Created',
-      description: `Added to CRM list`,
-      status: contact.status || 'active',
-      badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-100'
-    })
-  }
+  const contactDate = contact?.created || contact?.assignedAt
+  events.push({
+    id: 'created',
+    type: 'created',
+    date: contactDate ? new Date(contactDate) : new Date(),
+    title: 'Contact Created',
+    description: `Added to CRM list`,
+    status: contact.status || 'active',
+    badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-100'
+  })
 
   if (data) {
     data.deals?.forEach((deal: any) => {
+      const dealDate = deal.created || deal.expectedCloseDate || deal.assignedAt
       events.push({
         id: deal.id,
         type: 'deal',
-        date: new Date(deal.created),
+        date: dealDate ? new Date(dealDate) : new Date(),
         title: 'Deal Logged',
         description: `${deal.title} — Value: $${(deal.value || 0).toLocaleString()}`,
         status: deal.stage || 'lead',
@@ -595,10 +719,11 @@ function getTimelineEvents(contact: any, data: any) {
     })
 
     data.invoices?.forEach((invoice: any) => {
+      const invoiceDate = invoice.created || invoice.issuedDate || invoice.assignedAt
       events.push({
         id: invoice.id,
         type: 'invoice',
-        date: new Date(invoice.created),
+        date: invoiceDate ? new Date(invoiceDate) : new Date(),
         title: 'Invoice Issued',
         description: `${invoice.title} — Total: $${(invoice.amount || 0).toLocaleString()}`,
         status: invoice.status || 'pending',
@@ -607,10 +732,11 @@ function getTimelineEvents(contact: any, data: any) {
     })
 
     data.tasks?.forEach((task: any) => {
+      const taskDate = task.created || task.dueDate || task.assignedAt
       events.push({
         id: task.id,
         type: 'task',
-        date: new Date(task.created),
+        date: taskDate ? new Date(taskDate) : new Date(),
         title: 'Task Created',
         description: task.title,
         status: task.status || 'draft',

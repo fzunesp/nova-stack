@@ -6,12 +6,13 @@ export interface SearchResult {
   id: string
   title: string
   subtitle: string
-  type: 'contact' | 'deal' | 'task' | 'invoice' | 'intake' | 'product'
+  type: 'contact' | 'deal' | 'task' | 'invoice' | 'intake' | 'product' | 'company'
   link: string
   status?: string
 }
 
 export interface GroupedResults {
+  companies: SearchResult[]
   contacts: SearchResult[]
   deals: SearchResult[]
   tasks: SearchResult[]
@@ -32,7 +33,11 @@ const STATUS_LABELS: Record<string, string> = {
 async function searchAll(query: string): Promise<GroupedResults> {
   const q = query.trim()
 
-  const [contacts, deals, tasks, invoices, intakes, products] = await Promise.allSettled([
+  const [companies, contacts, deals, tasks, invoices, intakes, products] = await Promise.allSettled([
+    pb.collection('companies').getList(1, 5, {
+      filter: `name~"${q}" || industry~"${q}" || city~"${q}"`,
+      sort: '-id',
+    }),
     pb.collection('contacts').getList(1, 5, {
       filter: `name~"${q}" || email~"${q}" || companyName~"${q}"`,
       sort: '-id',
@@ -63,12 +68,20 @@ async function searchAll(query: string): Promise<GroupedResults> {
     r.status === 'fulfilled' ? r.value.items : []
 
   return {
+    companies: get(companies).map((c: any): SearchResult => ({
+      id: c.id,
+      title: c.name,
+      subtitle: [c.industry, c.city, c.country].filter(Boolean).join(' · '),
+      type: 'company',
+      link: `/companies/${c.id}`,
+      status: c.status,
+    })),
     contacts: get(contacts).map((c: any): SearchResult => ({
       id: c.id,
       title: c.name,
       subtitle: [c.companyName, c.email].filter(Boolean).join(' · '),
       type: 'contact',
-      link: '/crm',
+      link: `/crm/contacts/${c.id}`,
       status: STATUS_LABELS[c.status] || c.status,
     })),
     deals: get(deals).map((d: any): SearchResult => ({
@@ -76,7 +89,7 @@ async function searchAll(query: string): Promise<GroupedResults> {
       title: d.title,
       subtitle: `${d.stage} · $${(d.value || 0).toLocaleString()}`,
       type: 'deal',
-      link: '/crm',
+      link: `/crm/deals/${d.id}`,
       status: d.stage,
     })),
     tasks: get(tasks).map((t: any): SearchResult => ({
@@ -92,7 +105,7 @@ async function searchAll(query: string): Promise<GroupedResults> {
       title: i.title,
       subtitle: `$${(i.amount || 0).toLocaleString()} · ${STATUS_LABELS[i.status] || i.status}`,
       type: 'invoice',
-      link: '/invoices',
+      link: `/invoices/${i.id}`,
       status: STATUS_LABELS[i.status] || i.status,
     })),
     intake: get(intakes).map((s: any): SearchResult => ({

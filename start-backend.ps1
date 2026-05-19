@@ -4,6 +4,7 @@
 $pbPath = Join-Path $PSScriptRoot "pb\pocketbase.exe"
 $dataDir = Join-Path $PSScriptRoot "pocketbase\pb_data"
 $migrationsDir = Join-Path $PSScriptRoot "pocketbase\pb_migrations"
+$hooksDir = Join-Path $PSScriptRoot "pocketbase\pb_hooks"
 
 # 1. Stop any previously running pocketbase instances to avoid port conflicts
 $runningPb = Get-Process -Name pocketbase -ErrorAction SilentlyContinue
@@ -16,6 +17,7 @@ if ($runningPb) {
 Write-Host "🚀 Starting PocketBase Server..." -ForegroundColor Green
 Write-Host "📁 Data Folder: $dataDir" -ForegroundColor Cyan
 Write-Host "📦 Migrations: $migrationsDir" -ForegroundColor Cyan
+Write-Host "🪝 Hooks Folder: $hooksDir" -ForegroundColor Cyan
 
 # 2. Start PocketBase server with the correct arguments
-Start-Process -FilePath $pbPath -ArgumentList "serve --dir=`"$dataDir`" --migrationsDir=`"$migrationsDir`"" -NoNewWindow
+Start-Process -FilePath $pbPath -ArgumentList "serve --dir=`"$dataDir`" --migrationsDir=`"$migrationsDir`" --hooksDir=`"$hooksDir`"" -NoNewWindow

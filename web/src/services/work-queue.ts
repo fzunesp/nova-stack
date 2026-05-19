@@ -40,23 +40,23 @@ export async function getMyWorkQueue(): Promise<WorkQueueItem[]> {
   const [tasks, intakes, deals, contacts, invoices] = await Promise.all([
     pb.collection('tasks').getList(1, 50, {
       filter: `assignedToId = "${userId}"`,
-      sort: '-created',
+      sort: '-id',
     }),
     pb.collection('intake_submissions').getList(1, 50, {
       filter: `assignedToId = "${userId}"`,
-      sort: '-created',
+      sort: '-id',
     }),
     pb.collection('deals').getList(1, 50, {
       filter: `assignedToId = "${userId}"`,
-      sort: '-created',
+      sort: '-id',
     }),
     pb.collection('contacts').getList(1, 50, {
       filter: `assignedToId = "${userId}"`,
-      sort: '-created',
+      sort: '-id',
     }),
     pb.collection('invoices').getList(1, 50, {
       filter: `assignedToId = "${userId}"`,
-      sort: '-created',
+      sort: '-id',
     }),
   ])
 

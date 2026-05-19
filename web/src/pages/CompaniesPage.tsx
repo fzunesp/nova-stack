@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Building2, Search, Trash2, Pencil, ArrowUpDown, Plus, Users, Briefcase, FileText, Globe, Phone, MapPin } from 'lucide-react'
+import { Building2, Search, Trash2, Pencil, ArrowUpDown, Plus, Users, Briefcase, FileText, Globe, Phone, MapPin, Activity } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -13,6 +13,7 @@ import pb from '@/lib/pocketbase'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { companyService, isAppError } from '@/services'
+import { useNavigate, useParams } from 'react-router'
 
 type CompanyStatus = 'lead' | 'active' | 'inactive'
 
@@ -29,8 +30,25 @@ const industries = [
 
 export function CompaniesPage() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const { id } = useParams<{ id: string }>()
+
   const { items, totalItems, totalPages, page, perPage, search, isLoading, toggleSort, goToPage, updateSearch } =
     usePaginatedQuery({ collection: 'companies', searchFields: ['name', 'industry', 'city'] })
+
+  const { data: routeCompany } = useQuery({
+    queryKey: ['company', id],
+    queryFn: async () => {
+      try {
+        return await pb.collection('companies').getOne(id!)
+      } catch (err) {
+        toast.error('Company not found')
+        navigate('/companies', { replace: true })
+        return null
+      }
+    },
+    enabled: !!id,
+  })
 
   const emptyForm = { name: '', industry: '', website: '', phone: '', address: '', city: '', country: '', notes: '', status: 'active' as CompanyStatus }
   const [formData, setFormData] = useState(emptyForm)
@@ -147,7 +165,7 @@ export function CompaniesPage() {
           ) : (
             items.map((company: any) => (
               <div key={company.id} className="group grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors items-center">
-                <div className="col-span-4 cursor-pointer" onClick={() => setSelectedCompany(company)}>
+                <div className="col-span-4 cursor-pointer" onClick={() => navigate(`/companies/${company.id}`)}>
                   <div className="flex items-center gap-2.5">
                     <div className="w-7 h-7 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600 text-xs font-bold flex-shrink-0">
                       {company.name?.charAt(0)?.toUpperCase() || '?'}
@@ -190,21 +208,28 @@ export function CompaniesPage() {
       )}
 
       {/* Company Detail Drawer */}
-      {selectedCompany && (
-        <CompanyDetailDialog company={selectedCompany} onClose={() => setSelectedCompany(null)} />
+      {(selectedCompany || routeCompany) && (
+        <CompanyDetailDialog
+          company={selectedCompany || routeCompany}
+          onClose={() => {
+            setSelectedCompany(null)
+            if (id) navigate('/companies')
+          }}
+        />
       )}
     </div>
   )
 }
 
 function CompanyDetailDialog({ company, onClose }: { company: any; onClose: () => void }) {
+  const navigate = useNavigate()
   const { data, isLoading } = useQuery({
     queryKey: ['companyDetail', company.id],
     queryFn: async () => {
       const [contacts, deals, invoices] = await Promise.all([
         pb.collection('contacts').getFullList({ filter: `companyId = "${company.id}"`, sort: 'name' }),
-        pb.collection('deals').getFullList({ filter: `companyId = "${company.id}"`, sort: '-created' }),
-        pb.collection('invoices').getFullList({ filter: `companyId = "${company.id}"`, sort: '-created' }),
+        pb.collection('deals').getFullList({ filter: `companyId = "${company.id}"`, sort: '-id' }),
+        pb.collection('invoices').getFullList({ filter: `companyId = "${company.id}"`, sort: '-id' }),
       ])
       return { contacts, deals, invoices }
     }
@@ -248,68 +273,153 @@ function CompanyDetailDialog({ company, onClose }: { company: any; onClose: () =
             {company.notes && <p className="text-xs text-slate-500 italic border-t border-slate-100 pt-3">{company.notes}</p>}
           </div>
 
-          {/* Right: Linked Contacts & Deals */}
-          <div className="col-span-8 p-5 space-y-5 overflow-y-auto">
-            {/* Contacts */}
-            <div>
-              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> Contacts ({data?.contacts.length || 0})</h4>
-              {isLoading ? <div className="text-xs text-slate-400">Loading...</div> : data?.contacts.length === 0 ? (
-                <p className="text-xs text-slate-400 italic">No contacts linked to this company yet.</p>
-              ) : (
-                <div className="space-y-1.5">
-                  {data?.contacts.map((c: any) => (
-                    <div key={c.id} className="flex items-center gap-2.5 bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
-                      <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 text-xs font-bold flex items-center justify-center flex-shrink-0">{c.name?.charAt(0)?.toUpperCase()}</div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-medium text-slate-800 truncate">{c.name}</div>
-                        {c.title && <div className="text-xs text-slate-400">{c.title}</div>}
-                      </div>
-                      <div className="ml-auto text-xs text-slate-400 truncate">{c.email}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+          {/* Right: Chronological Timeline */}
+          <div className="col-span-8 p-6 space-y-6 overflow-y-auto min-h-0 flex flex-col">
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <Activity className="w-3.5 h-3.5" /> Company Activity Timeline
+            </h4>
+            
+            {isLoading ? (
+              <div className="text-xs text-slate-400">Loading timeline...</div>
+            ) : (() => {
+              const timelineEvents: any[] = []
 
-            {/* Deals */}
-            <div>
-              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Briefcase className="w-3.5 h-3.5" /> Deals ({data?.deals.length || 0})</h4>
-              {isLoading ? <div className="text-xs text-slate-400">Loading...</div> : data?.deals.length === 0 ? (
-                <p className="text-xs text-slate-400 italic">No deals linked yet.</p>
-              ) : (
-                <div className="space-y-1.5">
-                  {data?.deals.map((d: any) => (
-                    <div key={d.id} className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
-                      <span className="text-sm font-medium text-slate-800 truncate">{d.title}</span>
-                      <div className="flex items-center gap-2 ml-2 flex-shrink-0">
-                        <span className="text-xs font-semibold text-slate-600">${(d.value || 0).toLocaleString()}</span>
-                        <Badge className="text-[10px] capitalize px-1.5">{d.stage}</Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+              data?.contacts.forEach((c: any) => {
+                const rawDate = c.created || c.assignedAt
+                timelineEvents.push({
+                  id: c.id,
+                  type: 'contact',
+                  date: rawDate ? new Date(rawDate) : new Date(),
+                  title: c.name,
+                  subtitle: c.title || 'Contact added',
+                  meta: c.email,
+                  badge: null,
+                })
+              })
 
-            {/* Invoices */}
-            <div>
-              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" /> Invoices ({data?.invoices.length || 0})</h4>
-              {isLoading ? <div className="text-xs text-slate-400">Loading...</div> : data?.invoices.length === 0 ? (
-                <p className="text-xs text-slate-400 italic">No invoices linked yet.</p>
-              ) : (
-                <div className="space-y-1.5">
-                  {data?.invoices.map((i: any) => (
-                    <div key={i.id} className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
-                      <span className="text-sm font-medium text-slate-800 truncate">{i.title}</span>
-                      <div className="flex items-center gap-2 ml-2 flex-shrink-0">
-                        <span className="text-xs font-semibold text-slate-600">${(i.amount || 0).toLocaleString()}</span>
-                        <Badge className="text-[10px] capitalize px-1.5">{i.status}</Badge>
+              data?.deals.forEach((d: any) => {
+                const rawDate = d.created || d.expectedCloseDate || d.assignedAt
+                timelineEvents.push({
+                  id: d.id,
+                  type: 'deal',
+                  date: rawDate ? new Date(rawDate) : new Date(),
+                  title: d.title,
+                  subtitle: 'Deal created',
+                  meta: `$${(d.value || 0).toLocaleString()}`,
+                  badge: d.stage,
+                })
+              })
+
+              data?.invoices.forEach((i: any) => {
+                const rawDate = i.created || i.issuedDate || i.assignedAt
+                timelineEvents.push({
+                  id: i.id,
+                  type: 'invoice',
+                  date: rawDate ? new Date(rawDate) : new Date(),
+                  title: i.title,
+                  subtitle: 'Invoice issued',
+                  meta: `$${(i.amount || 0).toLocaleString()}`,
+                  badge: i.status,
+                })
+              })
+
+              timelineEvents.sort((a, b) => b.date.getTime() - a.date.getTime())
+
+              if (timelineEvents.length === 0) {
+                return (
+                  <p className="text-xs text-slate-400 italic py-6">
+                    No activity, contacts, or financial transactions found for this company yet.
+                  </p>
+                )
+              }
+
+              return (
+                <div className="relative pl-6 ml-4 border-l-2 border-slate-100 space-y-6 flex-1 py-2">
+                  {timelineEvents.map((event) => {
+                    const Icon = {
+                      contact: Users,
+                      deal: Briefcase,
+                      invoice: FileText,
+                    }[event.type as 'contact' | 'deal' | 'invoice'] as any
+
+                    const colors = {
+                      contact: 'bg-indigo-50 text-indigo-600 border-indigo-100 hover:border-indigo-300',
+                      deal: 'bg-orange-50 text-orange-600 border-orange-100 hover:border-orange-300',
+                      invoice: 'bg-violet-50 text-violet-600 border-violet-100 hover:border-violet-300',
+                    }[event.type as 'contact' | 'deal' | 'invoice']
+
+                    const dotColors = {
+                      contact: 'bg-indigo-100 text-indigo-600 border-indigo-200',
+                      deal: 'bg-orange-100 text-orange-600 border-orange-200',
+                      invoice: 'bg-violet-100 text-violet-600 border-violet-200',
+                    }[event.type as 'contact' | 'deal' | 'invoice']
+
+                    const dateString = event.date.toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric'
+                    })
+
+                    const handleClick = () => {
+                      onClose()
+                      if (event.type === 'contact') {
+                        navigate(`/crm/contacts/${event.id}`)
+                      } else if (event.type === 'deal') {
+                        navigate(`/crm/deals/${event.id}`)
+                      } else if (event.type === 'invoice') {
+                        navigate(`/invoices/${event.id}`)
+                      }
+                    }
+
+                    return (
+                      <div key={event.id} className="relative group/item">
+                        {/* Timeline Node Icon Dot */}
+                        <div className={`absolute -left-[35px] top-1.5 w-6.5 h-6.5 rounded-full border-2 border-white flex items-center justify-center shadow-sm z-10 transition-transform group-hover/item:scale-110 ${dotColors}`}>
+                          <Icon className="w-3.5 h-3.5" />
+                        </div>
+
+                        {/* Interactive Event Card */}
+                        <div
+                          onClick={handleClick}
+                          className={`p-3.5 rounded-xl border bg-white shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${colors}`}
+                        >
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">
+                                {event.type}
+                              </span>
+                              <span className="text-[10px] opacity-40">•</span>
+                              <span className="text-[10px] opacity-60 font-medium">
+                                {dateString}
+                              </span>
+                            </div>
+                            <h5 className="text-sm font-semibold text-slate-800 truncate mt-1">
+                              {event.title}
+                            </h5>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                              {event.subtitle}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-auto">
+                            {event.meta && (
+                              <span className="text-xs font-bold text-slate-700 bg-slate-100/80 px-2 py-1 rounded-md">
+                                {event.meta}
+                              </span>
+                            )}
+                            {event.badge && (
+                              <Badge className="text-[9px] font-bold capitalize px-2 py-0.5 tracking-wider shadow-none">
+                                {event.badge}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
-              )}
-            </div>
+              )
+            })()}
           </div>
         </div>
       </DialogContent>

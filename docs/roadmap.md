@@ -89,7 +89,7 @@ Examples:
 
 ---
 
-# Phase 5 — HR Operations
+# Phase 5 — HR Operations ✅
 
 Goal:
 Lightweight operational HR.
@@ -97,12 +97,12 @@ Lightweight operational HR.
 NOT:
 enterprise HR suite.
 
-## Planned Features
-- vacation requests
-- reimbursement workflows
-- hardware requests
-- approvals
-- assignment routing
+## Planned Features (Completed 18 May 2026)
+- [x] vacation requests
+- [x] reimbursement workflows
+- [x] hardware requests
+- [x] approvals
+- [x] assignment routing
 
 Potential future:
 - onboarding checklists
