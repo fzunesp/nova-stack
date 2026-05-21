@@ -29,65 +29,71 @@ onModelAfterUpdateSuccess(function(e) {
       console.error("[HR-HOOK-TASK] Error parsing steps: " + err)
     }
 
-    if (newStatus === 'rejected') {
-      // Deactivate all remaining pending tasks
-      var pendingTasks = $app.findRecordsByFilter('approval_tasks', `submissionId = "${submissionId}" && status = "pending"`)
-      for (var i = 0; i < pendingTasks.length; i++) {
-        var t = pendingTasks[i]
-        t.set('isActive', false)
-        $app.save(t)
-      }
-      // Mark submission rejected
-      submission.set('status', 'rejected')
-      submission.set('decidedAt', new Date().toISOString())
-      submission.set('decisionNote', e.model.get('comment'))
-      $app.save(submission)
-    } else if (newStatus === 'approved') {
-      if (isParallel) {
-        // Parallel: check if any pending tasks remain
-        var remaining = $app.findRecordsByFilter('approval_tasks', `submissionId = "${submissionId}" && status = "pending" && isActive = true`)
-        if (remaining.length === 0) {
-          submission.set('status', 'approved')
-          submission.set('decidedAt', new Date().toISOString())
-          $app.save(submission)
-          // Webhook could be triggered here via $http.send
-          var webhookUrl = formDef.get('webhookUrl')
-          if (webhookUrl) {
-            try {
-              $http.send({ url: webhookUrl, method: 'POST', body: JSON.stringify({ event: 'submission.approved', submissionId: submissionId }) })
-            } catch(e){}
+    var triggerWebhook = false;
+
+    // Run all cascading updates in a transaction to guarantee data integrity
+    $app.runInTransaction(function(txApp) {
+      if (newStatus === 'rejected') {
+        // Deactivate all remaining pending tasks
+        var pendingTasks = txApp.findRecordsByFilter('approval_tasks', `submissionId = "${submissionId}" && status = "pending"`)
+        for (var i = 0; i < pendingTasks.length; i++) {
+          var t = pendingTasks[i]
+          t.set('isActive', false)
+          txApp.save(t)
+        }
+        // Mark submission rejected
+        submission.set('status', 'rejected')
+        submission.set('decidedAt', new Date().toISOString())
+        submission.set('decisionNote', e.model.get('comment'))
+        txApp.save(submission)
+      } else if (newStatus === 'approved') {
+        if (isParallel) {
+          // Parallel: check if any pending tasks remain
+          var remaining = txApp.findRecordsByFilter('approval_tasks', `submissionId = "${submissionId}" && status = "pending" && isActive = true`)
+          if (remaining.length === 0) {
+            submission.set('status', 'approved')
+            submission.set('decidedAt', new Date().toISOString())
+            txApp.save(submission)
+            triggerWebhook = true
+          }
+        } else {
+          // Sequential: activate next step if it exists
+          var currentStep = submission.get('currentStep') || 0
+          var nextStepIndex = currentStep + 1
+          if (nextStepIndex < workflowSteps.length) {
+            var nextStep = workflowSteps[nextStepIndex]
+            var tasksColl = txApp.findCollectionByNameOrId('approval_tasks')
+            var taskRecord = new Record(tasksColl)
+            taskRecord.set('submissionId', submissionId)
+            taskRecord.set('assignedToId', nextStep.userId)
+            taskRecord.set('stepLabel', nextStep.label)
+            taskRecord.set('stepOrder', nextStepIndex)
+            taskRecord.set('isActive', nextStep.active !== false)
+            taskRecord.set('status', 'pending')
+            
+            txApp.save(taskRecord)
+            
+            submission.set('currentStep', nextStepIndex)
+            txApp.save(submission)
+          } else {
+            submission.set('status', 'approved')
+            submission.set('decidedAt', new Date().toISOString())
+            txApp.save(submission)
+            triggerWebhook = true
           }
         }
-      } else {
-        // Sequential: activate next step if it exists
-        var currentStep = submission.get('currentStep') || 0
-        var nextStepIndex = currentStep + 1
-        if (nextStepIndex < workflowSteps.length) {
-          var nextStep = workflowSteps[nextStepIndex]
-          var tasksColl = $app.findCollectionByNameOrId('approval_tasks')
-          var taskRecord = new Record(tasksColl)
-          taskRecord.set('submissionId', submissionId)
-          taskRecord.set('assignedToId', nextStep.userId)
-          taskRecord.set('stepLabel', nextStep.label)
-          taskRecord.set('stepOrder', nextStepIndex)
-          taskRecord.set('isActive', nextStep.active !== false)
-          taskRecord.set('status', 'pending')
-          
-          $app.save(taskRecord)
-          
-          submission.set('currentStep', nextStepIndex)
-          $app.save(submission)
-        } else {
-          submission.set('status', 'approved')
-          submission.set('decidedAt', new Date().toISOString())
-          $app.save(submission)
-          
-          var webhookUrl = formDef.get('webhookUrl')
-          if (webhookUrl) {
-            try {
-              $http.send({ url: webhookUrl, method: 'POST', body: JSON.stringify({ event: 'submission.approved', submissionId: submissionId }) })
-            } catch(e){}
-          }
+      }
+    })
+
+    // Webhook execution is done outside the database transaction to prevent locking/blocking issues
+    if (triggerWebhook) {
+      var webhookUrl = formDef.get('webhookUrl')
+      if (webhookUrl) {
+        try {
+          console.log("[HR-HOOK-TASK] Triggering webhook: " + webhookUrl)
+          $http.send({ url: webhookUrl, method: 'POST', body: JSON.stringify({ event: 'submission.approved', submissionId: submissionId }) })
+        } catch(e){
+          console.error("[HR-HOOK-TASK] Webhook call failed: " + e)
         }
       }
     }

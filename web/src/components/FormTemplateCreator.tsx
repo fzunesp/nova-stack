@@ -1,4 +1,4 @@
-import React, { useState, useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -10,7 +10,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Separator } from '@/components/ui/separator'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
@@ -21,7 +20,7 @@ import {
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import {
-  Plus, Trash, ArrowLeft, Loader2, GitMerge, FileJson,
+  Trash, ArrowLeft, Loader2, GitMerge, FileJson,
   Hash, ArrowUp, ArrowDown, AlertTriangle, Info, CheckCircle,
   ShieldCheck, Zap, Layers,
 } from 'lucide-react'
@@ -67,7 +66,7 @@ export default function FormTemplateCreator({ onSaved, onBack, initialData }: Fo
   const [showConfirm, setShowConfirm] = useState(false)
   const [name, setName] = useState(initialData?.name || '')
   const [prefix, setPrefix] = useState(initialData?.prefix || 'REQ')
-  const [description, setDescription] = useState(initialData?.description || '')
+  const [description, _setDescription] = useState(initialData?.description || '')
   const [webhookUrl, setWebhookUrl] = useState(initialData?.webhookUrl || '')
   const [isParallel, setIsParallel] = useState(initialData?.isParallel || false)
   const [fields, setFields] = useState<FieldConfig[]>(

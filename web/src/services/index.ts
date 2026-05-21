@@ -1,11 +1,7 @@
+// Core domain types - consumed across the app
 export * from './types'
-export * from './errors'
-export * from './validation'
-export { BaseService } from './base'
-export { companyService } from './companies'
-export { contactService } from './contacts'
-export { dealService } from './deals'
-export { taskService } from './tasks'
-export { invoiceService } from './invoices'
-export { intakeService } from './intake'
-export { productService } from './products'
+
+// Utility helpers that read from PocketBase and shape data for UI components.
+// These are NOT service classes; they are plain async functions.
+export * from './activity'
+export * from './work-queue'

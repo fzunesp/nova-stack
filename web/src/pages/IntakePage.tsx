@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Inbox, Search, Trash2, Pencil, ArrowUpDown, CheckCircle2, XCircle, Clock, User, MessageSquare } from 'lucide-react'
+import { Inbox, Search, Trash2, Pencil, ArrowUpDown, CheckCircle2, XCircle, Clock, User, MessageSquare, TrendingUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -13,7 +13,6 @@ import pb from '@/lib/pocketbase'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useLocation } from 'react-router'
-import { intakeService, isAppError } from '@/services'
 import type { Status } from '@/services'
 
 const statusLabels: Record<Status, string> = {
@@ -25,6 +24,7 @@ const statusLabels: Record<Status, string> = {
   archived: 'Archived',
   lead: 'Lead',
   inactive: 'Inactive',
+  converted: 'Converted to Deal',
 }
 
 const statusColors: Record<Status, string> = {
@@ -36,6 +36,7 @@ const statusColors: Record<Status, string> = {
   archived: 'bg-slate-100 text-slate-500',
   lead: 'bg-blue-100 text-blue-700',
   inactive: 'bg-slate-100 text-slate-500',
+  converted: 'bg-emerald-100 text-emerald-700',
 }
 
 const statusDots: Record<Status, string> = {
@@ -47,6 +48,7 @@ const statusDots: Record<Status, string> = {
   archived: 'bg-slate-400',
   lead: 'bg-blue-500',
   inactive: 'bg-slate-400',
+  converted: 'bg-emerald-500',
 }
 
 const typeLabels: Record<string, string> = {
@@ -79,33 +81,31 @@ export function IntakePage() {
     status: '' as '' | Status,
   })
 
-  const actorId = pb.authStore.record?.id || ''
-
   const createSub = useMutation({
     mutationFn: (data: typeof formData) =>
-      intakeService.create({ ...data, type: data.type as any, source: data.source as any, status: (data.status || 'draft') as Status, userId: pb.authStore.record?.id }, actorId),
+      pb.collection('intake_submissions').create({ ...data, type: data.type as any, source: data.source as any, status: (data.status || 'draft') as Status, userId: pb.authStore.record?.id }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['intake_submissions'] })
       setFormData({ name: '', email: '', message: '', type: '', source: '', status: '' })
       setCreating(false)
       toast.success('Intake submission added')
     },
-    onError: (err) => toast.error(isAppError(err) ? err.message : 'Failed to add submission'),
+    onError: (err: any) => toast.error(err?.message || 'Failed to add submission'),
   })
 
   const updateSub = useMutation({
     mutationFn: ({ id, data }: { id: string; data: typeof editForm }) =>
-      intakeService.update(id, { ...data, type: data.type as any, source: data.source as any, status: data.status as Status }, actorId),
+      pb.collection('intake_submissions').update(id, { ...data, type: data.type as any, source: data.source as any, status: data.status as Status }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['intake_submissions'] })
       setEditing(null)
       toast.success('Submission updated')
     },
-    onError: (err) => toast.error(isAppError(err) ? err.message : 'Failed to update submission'),
+    onError: (err: any) => toast.error(err?.message || 'Failed to update submission'),
   })
 
   const deleteSub = useMutation({
-    mutationFn: (id: string) => intakeService.delete(id),
+    mutationFn: (id: string) => pb.collection('intake_submissions').delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['intake_submissions'] })
       toast.success('Submission deleted')
@@ -275,6 +275,7 @@ export function IntakePage() {
 function IntakeDetailDialog({ sub, onClose, onUpdate }: { sub: any; onClose: () => void; onUpdate: () => void }) {
   const [decisionNote, setDecisionNote] = useState('')
   const [deciding, setDeciding] = useState(false)
+  const [converting, setConverting] = useState(false)
 
   const handleDecision = async (status: 'approved' | 'rejected') => {
     setDeciding(true)
@@ -291,6 +292,65 @@ function IntakeDetailDialog({ sub, onClose, onUpdate }: { sub: any; onClose: () 
       console.error(e)
     } finally {
       setDeciding(false)
+    }
+  }
+
+  const handleConvertToDeal = async () => {
+    setConverting(true)
+    try {
+      // 1. Find or create contact
+      let contactId = sub.contactId
+      if (!contactId) {
+        const existingContacts = await pb.collection('contacts').getList(1, 1, {
+          filter: `email = "${sub.email}"`
+        })
+        if (existingContacts.items.length > 0) {
+          contactId = existingContacts.items[0].id
+        } else {
+          const newContact = await pb.collection('contacts').create({
+            name: sub.name,
+            email: sub.email,
+            status: 'lead',
+            userId: pb.authStore.record?.id || '',
+            created_by: pb.authStore.record?.id || '',
+          })
+          contactId = newContact.id
+        }
+      }
+
+      // 2. Create Deal
+      const dealTitle = `Opportunity: ${sub.name} (${typeLabels[sub.type] || sub.type})`
+      let budget = 0
+      if (sub.data && typeof sub.data === 'object' && sub.data.budget) {
+        budget = Number(sub.data.budget) || 0
+      }
+
+      const newDeal = await pb.collection('deals').create({
+        title: dealTitle,
+        value: budget || 0,
+        stage: 'lead',
+        contactId: contactId,
+        companyId: sub.companyId || null,
+        userId: pb.authStore.record?.id || '',
+        created_by: pb.authStore.record?.id || '',
+        status: 'active',
+        intakeId: sub.id,
+      })
+
+      // 3. Update Intake
+      await pb.collection('intake_submissions').update(sub.id, {
+        status: 'converted',
+        dealId: newDeal.id,
+        contactId: contactId,
+      })
+
+      toast.success('Successfully converted to Deal!')
+      onUpdate()
+    } catch (e: any) {
+      console.error(e)
+      toast.error(e.message || 'Failed to convert to Deal')
+    } finally {
+      setConverting(false)
     }
   }
 
@@ -368,29 +428,82 @@ function IntakeDetailDialog({ sub, onClose, onUpdate }: { sub: any; onClose: () 
           </div>
 
           {/* Decision Section */}
-          {['approved', 'rejected'].includes(sub.status) ? (
-            <div className={`p-4 rounded-xl border space-y-3 ${sub.status === 'approved' ? 'bg-emerald-50/50 border-emerald-100' : 'bg-red-50/50 border-red-100'}`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {sub.status === 'approved' ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  ) : (
-                    <XCircle className="w-4 h-4 text-red-600" />
+          {['approved', 'rejected', 'converted'].includes(sub.status) ? (
+            <div className="space-y-4">
+              <div className={`p-4 rounded-xl border space-y-3 ${sub.status === 'rejected' ? 'bg-red-50/50 border-red-100' : 'bg-emerald-50/50 border-emerald-100'}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {sub.status === 'rejected' ? (
+                      <XCircle className="w-4 h-4 text-red-600" />
+                    ) : (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    )}
+                    <span className={`text-xs font-bold uppercase tracking-wider ${sub.status === 'rejected' ? 'text-red-800' : 'text-emerald-800'}`}>
+                      Decision Details
+                    </span>
+                  </div>
+                  {decidedDateString && (
+                    <span className="text-[10px] text-slate-400 font-medium">{decidedDateString}</span>
                   )}
-                  <span className={`text-xs font-bold uppercase tracking-wider ${sub.status === 'approved' ? 'text-emerald-800' : 'text-red-800'}`}>
-                    Decision Details
-                  </span>
                 </div>
-                {decidedDateString && (
-                  <span className="text-[10px] text-slate-400 font-medium">{decidedDateString}</span>
-                )}
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Decision Note</p>
-                <div className="bg-white rounded-lg p-3 border border-slate-100 shadow-sm text-slate-700 text-xs leading-relaxed italic whitespace-pre-wrap">
-                  {sub.decisionNote || 'No decision note recorded.'}
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Decision Note</p>
+                  <div className="bg-white rounded-lg p-3 border border-slate-100 shadow-sm text-slate-700 text-xs leading-relaxed italic whitespace-pre-wrap">
+                    {sub.decisionNote || 'No decision note recorded.'}
+                  </div>
                 </div>
               </div>
+
+              {/* Conversion Actions */}
+              {sub.status === 'approved' && !sub.dealId && (
+                <div className="bg-indigo-50/50 border border-indigo-100 p-4 rounded-xl space-y-3 shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-indigo-600" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-indigo-900">
+                      Convert to CRM Opportunity
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    This intake request has been approved. You can instantly convert it into an active Deal in your CRM pipeline to track sales or onboarding activities.
+                  </p>
+                  <div className="flex justify-end pt-1">
+                    <Button
+                      size="sm"
+                      onClick={handleConvertToDeal}
+                      disabled={converting}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1.5 text-xs shadow-sm"
+                    >
+                      {converting ? 'Converting...' : 'Convert to Deal'}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {sub.status === 'converted' && sub.dealId && (
+                <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-3 shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-slate-500" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                      Converted Opportunity Mapped
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    This intake record was successfully converted into a live CRM Deal.
+                  </p>
+                  <div className="flex justify-start">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        window.location.href = `/crm/deals/${sub.dealId}`
+                      }}
+                      className="text-xs border-slate-200 text-slate-600 hover:bg-slate-100"
+                    >
+                      View CRM Deal
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="bg-indigo-50/30 border border-indigo-100/60 p-4 rounded-xl space-y-3.5">

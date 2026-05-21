@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Users, Search, Trash2, Pencil, ArrowUpDown, Briefcase, FileText, CheckSquare, User, Calendar, Activity, Info, Phone, Mail, Building, Loader2 } from 'lucide-react'
+import { Users, Search, Trash2, Pencil, ArrowUpDown, Briefcase, FileText, CheckSquare, User, Calendar, Activity, Info, Phone, Mail, Building, Loader2, Kanban, List } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -14,8 +14,8 @@ import pb from '@/lib/pocketbase'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useLocation, useNavigate, useParams } from 'react-router'
-import { contactService, dealService, isAppError } from '@/services'
 import type { Status } from '@/services'
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 
 export function CrmPage() {
   const location = useLocation()
@@ -94,8 +94,6 @@ function ContactsTab({ autoOpen = false }: { autoOpen?: boolean }) {
   const [editForm, setEditForm] = useState({ name: '', email: '', phone: '', title: '', companyId: '', notes: '', status: 'active' as Status })
   const [selectedContact, setSelectedContact] = useState<any | null>(null)
 
-  const actorId = pb.authStore.record?.id || ''
-
   // Fetch companies for the dropdown
   const { data: companiesList } = useQuery({
     queryKey: ['companies-all'],
@@ -103,28 +101,28 @@ function ContactsTab({ autoOpen = false }: { autoOpen?: boolean }) {
   })
 
   const createContact = useMutation({
-    mutationFn: (data: typeof formData) => contactService.create({ ...data, userId: pb.authStore.record?.id, companyId: data.companyId || undefined }, actorId),
+    mutationFn: (data: typeof formData) => pb.collection('contacts').create({ ...data, userId: pb.authStore.record?.id, companyId: data.companyId || undefined }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] })
       setFormData({ name: '', email: '', phone: '', title: '', companyId: '', notes: '', status: 'active' })
       setCreating(false)
       toast.success('Contact added')
     },
-    onError: (err) => toast.error(isAppError(err) ? err.message : 'Failed to add contact'),
+    onError: (err: any) => toast.error(err?.message || 'Failed to add contact'),
   })
 
   const updateContact = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: typeof editForm }) => contactService.update(id, { ...data, companyId: data.companyId || undefined }, actorId),
+    mutationFn: ({ id, data }: { id: string; data: typeof editForm }) => pb.collection('contacts').update(id, { ...data, companyId: data.companyId || undefined }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] })
       setEditing(null)
       toast.success('Contact updated')
     },
-    onError: (err) => toast.error(isAppError(err) ? err.message : 'Failed to update contact'),
+    onError: (err: any) => toast.error(err?.message || 'Failed to update contact'),
   })
 
   const deleteContact = useMutation({
-    mutationFn: (id: string) => contactService.delete(id),
+    mutationFn: (id: string) => pb.collection('contacts').delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] })
       toast.success('Contact deleted')
@@ -275,8 +273,23 @@ function DealsTab({ autoOpen = false }: { autoOpen?: boolean }) {
   const location = useLocation()
   const initialSearch = location.state?.search || ''
   
+  const [viewMode, setViewMode] = useState<'list' | 'board'>('list')
+
   const { items, totalItems, totalPages, page, perPage, search, isLoading, toggleSort, goToPage, updateSearch } =
     usePaginatedQuery({ collection: 'deals', searchFields: ['title'], expand: 'contactId', initialSearch })
+
+  const { data: allDeals, isLoading: allDealsLoading } = useQuery({
+    queryKey: ['deals-all', search],
+    queryFn: async () => {
+      const filter = search ? `(title ~ "${search.trim()}")` : ''
+      return pb.collection('deals').getFullList({
+        filter: filter || undefined,
+        expand: 'contactId',
+        sort: '-id'
+      })
+    },
+    enabled: viewMode === 'board',
+  })
 
   const [formData, setFormData] = useState({ title: '', value: '', stage: 'lead' as 'lead' | 'contacted' | 'quoted' | 'won' | 'lost', status: 'active' as Status, contactId: '', companyId: '' })
   const [creating, setCreating] = useState(autoOpen)
@@ -321,44 +334,122 @@ function DealsTab({ autoOpen = false }: { autoOpen?: boolean }) {
   })
 
   const stages = ['lead', 'contacted', 'quoted', 'won', 'lost']
-  const actorId = pb.authStore.record?.id || ''
 
   const createDeal = useMutation({
-    mutationFn: (data: typeof formData) => dealService.create({ ...data, value: parseFloat(data.value) || 0, userId: pb.authStore.record?.id, contactId: data.contactId || undefined, companyId: data.companyId || undefined }, actorId),
+    mutationFn: (data: typeof formData) => pb.collection('deals').create({ ...data, value: parseFloat(data.value) || 0, userId: pb.authStore.record?.id, contactId: data.contactId || undefined, companyId: data.companyId || undefined }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['deals'] })
+      queryClient.invalidateQueries({ queryKey: ['deals-all'] })
       setFormData({ title: '', value: '', stage: 'lead', status: 'active', contactId: '', companyId: '' })
       setCreating(false)
       toast.success('Deal added')
     },
-    onError: (err) => toast.error(isAppError(err) ? err.message : 'Failed to add deal'),
+    onError: (err: any) => toast.error(err?.message || 'Failed to add deal'),
   })
 
   const updateDeal = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: typeof editForm }) => dealService.update(id, { ...data, value: parseFloat(data.value) || 0, contactId: data.contactId || undefined, companyId: data.companyId || undefined }, actorId),
+    mutationFn: ({ id, data }: { id: string; data: typeof editForm }) => pb.collection('deals').update(id, { ...data, value: parseFloat(data.value) || 0, contactId: data.contactId || undefined, companyId: data.companyId || undefined }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['deals'] })
+      queryClient.invalidateQueries({ queryKey: ['deals-all'] })
       setEditing(null)
       toast.success('Deal updated')
     },
-    onError: (err) => toast.error(isAppError(err) ? err.message : 'Failed to update deal'),
+    onError: (err: any) => toast.error(err?.message || 'Failed to update deal'),
   })
 
   const deleteDeal = useMutation({
-    mutationFn: (id: string) => dealService.delete(id),
+    mutationFn: (id: string) => pb.collection('deals').delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['deals'] })
+      queryClient.invalidateQueries({ queryKey: ['deals-all'] })
       toast.success('Deal deleted')
     },
     onError: () => toast.error('Failed to delete deal'),
   })
 
+  const handleDragEnd = (result: any) => {
+    const { destination, source, draggableId } = result
+    if (!destination) return
+    if (destination.droppableId === source.droppableId && destination.index === source.index) return
+
+    const deal = (allDeals || []).find((d: any) => d.id === draggableId)
+    if (!deal) return
+
+    // Optimistically update local cache to prevent drag flicker
+    queryClient.setQueryData(['deals-all', search], (prev: any) => {
+      if (!prev) return prev
+      return prev.map((d: any) => {
+        if (d.id === draggableId) {
+          return { ...d, stage: destination.droppableId }
+        }
+        return d
+      })
+    })
+
+    updateDeal.mutate({
+      id: draggableId,
+      data: {
+        title: deal.title || '',
+        value: String(deal.value || ''),
+        stage: destination.droppableId as any,
+        status: deal.status || 'active',
+        contactId: deal.contactId || '',
+        companyId: deal.companyId || ''
+      }
+    })
+  }
+
+  const groupedDeals = stages.reduce((acc, stage) => {
+    acc[stage] = (allDeals || []).filter((d: any) => d.stage === stage)
+    return acc
+  }, {} as Record<string, any[]>)
+
+  const columnColors: Record<string, string> = {
+    lead: 'bg-blue-50/50 border-blue-100 hover:bg-blue-50/70',
+    contacted: 'bg-amber-50/50 border-amber-100 hover:bg-amber-50/70',
+    quoted: 'bg-purple-50/50 border-purple-100 hover:bg-purple-50/70',
+    won: 'bg-green-50/50 border-green-100 hover:bg-green-50/70',
+    lost: 'bg-red-50/50 border-red-100 hover:bg-red-50/70',
+  }
+
+  const columnHeaderStyles: Record<string, string> = {
+    lead: 'text-blue-700 bg-blue-100/60 border-blue-200',
+    contacted: 'text-amber-700 bg-amber-100/60 border-amber-200',
+    quoted: 'text-purple-700 bg-purple-100/60 border-purple-200',
+    won: 'text-green-700 bg-green-100/60 border-green-200',
+    lost: 'text-red-700 bg-red-100/60 border-red-200',
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4 gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <Input value={search} onChange={(e) => updateSearch(e.target.value)} placeholder="Search deals..." className="pl-10" />
+        <div className="relative flex-1 max-w-md flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Input value={search} onChange={(e) => updateSearch(e.target.value)} placeholder="Search deals..." className="pl-10" />
+          </div>
+          {/* Toggle buttons */}
+          <div className="flex items-center border border-slate-200 rounded-lg p-0.5 bg-slate-50">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-1.5 rounded-md transition-all ${
+                viewMode === 'list' ? 'bg-white text-slate-800 shadow-sm border border-slate-200/50' : 'text-slate-400 hover:text-slate-600'
+              }`}
+              title="Table View"
+            >
+              <List className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('board')}
+              className={`p-1.5 rounded-md transition-all ${
+                viewMode === 'board' ? 'bg-white text-slate-800 shadow-sm border border-slate-200/50' : 'text-slate-400 hover:text-slate-600'
+              }`}
+              title="Kanban Board"
+            >
+              <Kanban className="w-4 h-4" />
+            </button>
+          </div>
         </div>
         <Dialog open={creating} onOpenChange={setCreating}>
           <DialogTrigger asChild><Button>Add Deal</Button></DialogTrigger>
@@ -392,87 +483,273 @@ function DealsTab({ autoOpen = false }: { autoOpen?: boolean }) {
         </Dialog>
       </div>
 
-      {isLoading ? <TableSkeleton rows={5} /> : (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-          <div className="grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wide">
-            <button className="col-span-5 flex items-center gap-1 hover:text-slate-600" onClick={() => toggleSort('title')}>Title <ArrowUpDown className="w-3 h-3" /></button>
-            <button className="col-span-2 flex items-center gap-1 hover:text-slate-600" onClick={() => toggleSort('value')}>Value <ArrowUpDown className="w-3 h-3" /></button>
-            <div className="col-span-3">Stage</div>
-            <div className="col-span-2 text-right">Actions</div>
-          </div>
-          {items.length === 0 ? (
-            <div className="text-center py-16">
-              <Briefcase className="w-10 h-10 mx-auto mb-3 text-slate-200" />
-              <p className="text-sm font-medium text-slate-500 mb-4">No deals yet</p>
-              <Button size="sm" variant="outline" onClick={() => setCreating(true)}>Add your first deal</Button>
+      {viewMode === 'list' ? (
+        isLoading ? <TableSkeleton rows={5} /> : (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+            <div className="grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wide">
+              <button className="col-span-5 flex items-center gap-1 hover:text-slate-600" onClick={() => toggleSort('title')}>Title <ArrowUpDown className="w-3 h-3" /></button>
+              <button className="col-span-2 flex items-center gap-1 hover:text-slate-600" onClick={() => toggleSort('value')}>Value <ArrowUpDown className="w-3 h-3" /></button>
+              <div className="col-span-3">Stage</div>
+              <div className="col-span-2 text-right">Actions</div>
             </div>
-          ) : (
-            items.map((deal: any) => (
-              <div key={deal.id} className="group grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors items-center">
-                <div className="col-span-5 cursor-pointer" onClick={() => navigate(`/crm/deals/${deal.id}`)}>
-                  <span className="font-medium text-slate-900 group-hover:text-[rgb(var(--ns-accent))] transition-colors">{deal.title}</span>
-                  {deal.expand?.contactId && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        navigate(`/crm/contacts/${deal.expand.contactId.id}`)
-                      }}
-                      className="text-xs text-indigo-500 hover:text-indigo-700 hover:underline block mt-0.5 font-medium truncate text-left"
-                    >
-                      Client: {deal.expand.contactId.name}
-                    </button>
-                  )}
-                </div>
-                <div className="col-span-2 text-sm font-semibold text-slate-700">${deal.value?.toLocaleString()}</div>
-                <div className="col-span-3">
-                  <Badge className={`${stageColors[deal.stage] || ''} inline-flex items-center gap-1.5 text-xs`}>
-                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${stageDots[deal.stage] || 'bg-gray-400'}`} />
-                    {deal.stage}
-                  </Badge>
-                </div>
-                <div className="col-span-2 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Dialog open={editing === deal.id} onOpenChange={(open) => {
-                    if (open) { setEditing(deal.id); setEditForm({ title: deal.title || '', value: String(deal.value || ''), stage: deal.stage || 'lead', status: deal.status || 'active', contactId: deal.contactId || '', companyId: deal.companyId || '' }) }
-                    else { setEditing(null); if (id) navigate('/crm/deals') }
-                  }}>
-                    <DialogTrigger asChild><Button variant="ghost" size="icon"><Pencil className="w-3.5 h-3.5" /></Button></DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader><DialogTitle>Edit Deal</DialogTitle></DialogHeader>
-                      <form onSubmit={(e) => { e.preventDefault(); updateDeal.mutate({ id: deal.id, data: editForm }) }} className="space-y-4">
-                        <div className="space-y-2"><Label>Title</Label><Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required /></div>
-                        <div className="space-y-2"><Label>Value ($)</Label><Input type="number" value={editForm.value} onChange={(e) => setEditForm({ ...editForm, value: e.target.value })} /></div>
-                        <div className="space-y-2"><Label>Stage</Label>
-                          <Select value={editForm.stage} onValueChange={(v) => setEditForm({ ...editForm, stage: v as any })}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>{stages.map((s) => <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}</SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Contact / Client *</Label>
-                          <Select value={editForm.contactId} onValueChange={(v) => setEditForm({ ...editForm, contactId: v })}>
-                            <SelectTrigger className={!editForm.contactId ? 'border-red-200' : ''}>
-                              <SelectValue placeholder="— Select a contact —" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {contacts?.map((c: any) => (
-                                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <DialogFooter><Button type="submit" disabled={updateDeal.isPending || !editForm.contactId}>Save</Button></DialogFooter>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
-                  <Button variant="ghost" size="icon" onClick={() => { if (confirm('Delete this deal?')) deleteDeal.mutate(deal.id) }}>
-                    <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                  </Button>
-                </div>
+            {items.length === 0 ? (
+              <div className="text-center py-16">
+                <Briefcase className="w-10 h-10 mx-auto mb-3 text-slate-200" />
+                <p className="text-sm font-medium text-slate-500 mb-4">No deals yet</p>
+                <Button size="sm" variant="outline" onClick={() => setCreating(true)}>Add your first deal</Button>
               </div>
-            ))
-          )}
-          <DataTablePagination page={page} totalPages={totalPages} totalItems={totalItems} perPage={perPage} onPageChange={goToPage} />
-        </div>
+            ) : (
+              items.map((deal: any) => (
+                <div key={deal.id} className="group grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors items-center">
+                  <div className="col-span-5 cursor-pointer" onClick={() => navigate(`/crm/deals/${deal.id}`)}>
+                    <span className="font-medium text-slate-900 group-hover:text-[rgb(var(--ns-accent))] transition-colors">{deal.title}</span>
+                    {deal.expand?.contactId && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          navigate(`/crm/contacts/${deal.expand.contactId.id}`)
+                        }}
+                        className="text-xs text-indigo-500 hover:text-indigo-700 hover:underline block mt-0.5 font-medium truncate text-left"
+                      >
+                        Client: {deal.expand.contactId.name}
+                      </button>
+                    )}
+                  </div>
+                  <div className="col-span-2 text-sm font-semibold text-slate-700">${deal.value?.toLocaleString()}</div>
+                  <div className="col-span-3">
+                    <Badge className={`${stageColors[deal.stage] || ''} inline-flex items-center gap-1.5 text-xs`}>
+                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${stageDots[deal.stage] || 'bg-gray-400'}`} />
+                      {deal.stage}
+                    </Badge>
+                  </div>
+                  <div className="col-span-2 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Dialog open={editing === deal.id} onOpenChange={(open) => {
+                      if (open) { setEditing(deal.id); setEditForm({ title: deal.title || '', value: String(deal.value || ''), stage: deal.stage || 'lead', status: deal.status || 'active', contactId: deal.contactId || '', companyId: deal.companyId || '' }) }
+                      else { setEditing(null); if (id) navigate('/crm/deals') }
+                    }}>
+                      <DialogTrigger asChild><Button variant="ghost" size="icon"><Pencil className="w-3.5 h-3.5" /></Button></DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader><DialogTitle>Edit Deal</DialogTitle></DialogHeader>
+                        <form onSubmit={(e) => { e.preventDefault(); updateDeal.mutate({ id: deal.id, data: editForm }) }} className="space-y-4">
+                          <div className="space-y-2"><Label>Title</Label><Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required /></div>
+                          <div className="space-y-2"><Label>Value ($)</Label><Input type="number" value={editForm.value} onChange={(e) => setEditForm({ ...editForm, value: e.target.value })} /></div>
+                          <div className="space-y-2"><Label>Stage</Label>
+                            <Select value={editForm.stage} onValueChange={(v) => setEditForm({ ...editForm, stage: v as any })}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>{stages.map((s) => <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}</SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Contact / Client *</Label>
+                            <Select value={editForm.contactId} onValueChange={(v) => setEditForm({ ...editForm, contactId: v })}>
+                              <SelectTrigger className={!editForm.contactId ? 'border-red-200' : ''}>
+                                <SelectValue placeholder="— Select a contact —" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {contacts?.map((c: any) => (
+                                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <DialogFooter className="flex items-center justify-between gap-2 w-full">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => {
+                                navigate('/invoices', {
+                                  state: {
+                                    openCreate: true,
+                                    dealId: deal.id,
+                                    dealTitle: deal.title,
+                                    dealValue: deal.value,
+                                  }
+                                })
+                              }}
+                              className="text-xs border-indigo-200 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-1.5"
+                            >
+                              <FileText className="w-3.5 h-3.5" /> Create Invoice
+                            </Button>
+                            <Button type="submit" disabled={updateDeal.isPending || !editForm.contactId}>Save</Button>
+                          </DialogFooter>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+                    <Button variant="ghost" size="icon" onClick={() => { if (confirm('Delete this deal?')) deleteDeal.mutate(deal.id) }}>
+                      <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+            <DataTablePagination page={page} totalPages={totalPages} totalItems={totalItems} perPage={perPage} onPageChange={goToPage} />
+          </div>
+        )
+      ) : (
+        allDealsLoading ? <TableSkeleton rows={5} /> : (
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 overflow-x-auto pb-4 items-start min-h-[500px]">
+              {stages.map((stage) => {
+                const stageDeals = groupedDeals[stage] || []
+                const totalValue = stageDeals.reduce((sum, d) => sum + (d.value || 0), 0)
+
+                return (
+                  <div key={stage} className={`flex flex-col rounded-xl border p-3 min-w-[220px] transition-all min-h-[500px] ${columnColors[stage]}`}>
+                    {/* Column Header */}
+                    <div className={`flex items-center justify-between px-3 py-1.5 rounded-lg border text-xs font-bold uppercase tracking-wider mb-3 ${columnHeaderStyles[stage]}`}>
+                      <div className="flex items-center gap-1.5">
+                        <span>{stage}</span>
+                        <span className="bg-white/90 px-1.5 py-0.5 rounded-full text-[10px]">{stageDeals.length}</span>
+                      </div>
+                      <span>${totalValue.toLocaleString()}</span>
+                    </div>
+
+                    {/* Droppable Area */}
+                    <Droppable droppableId={stage}>
+                      {(provided, snapshot) => (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.droppableProps}
+                          className={`flex-1 flex flex-col gap-2 rounded-lg p-1 transition-colors min-h-[400px] ${
+                            snapshot.isDraggingOver ? 'bg-slate-100/50' : ''
+                          }`}
+                        >
+                          {stageDeals.map((deal, index) => (
+                            <Draggable key={deal.id} draggableId={deal.id} index={index}>
+                              {(provided, snapshot) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                  style={{
+                                    ...provided.draggableProps.style,
+                                  }}
+                                  className={`bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:shadow-md hover:border-slate-300 transition-all flex flex-col gap-2 relative ${
+                                    snapshot.isDragging ? 'shadow-lg border-indigo-400 rotate-1' : ''
+                                  }`}
+                                >
+                                  <div className="flex justify-between items-start gap-2 pr-6">
+                                    <span
+                                      onClick={() => navigate(`/crm/deals/${deal.id}`)}
+                                      className="font-semibold text-sm text-slate-800 cursor-pointer hover:text-[rgb(var(--ns-accent))] transition-colors line-clamp-2"
+                                    >
+                                      {deal.title}
+                                    </span>
+                                    
+                                    {/* Actions dropdown or quick buttons absolute right */}
+                                    <div className="absolute top-2 right-2 flex items-center gap-0.5">
+                                      <Dialog open={editing === deal.id} onOpenChange={(open) => {
+                                        if (open) {
+                                          setEditing(deal.id)
+                                          setEditForm({
+                                            title: deal.title || '',
+                                            value: String(deal.value || ''),
+                                            stage: deal.stage || 'lead',
+                                            status: deal.status || 'active',
+                                            contactId: deal.contactId || '',
+                                            companyId: deal.companyId || ''
+                                          })
+                                        } else {
+                                          setEditing(null)
+                                          if (id) navigate('/crm/deals')
+                                        }
+                                      }}>
+                                        <DialogTrigger asChild>
+                                          <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-slate-600">
+                                            <Pencil className="w-3 h-3" />
+                                          </Button>
+                                        </DialogTrigger>
+                                        <DialogContent>
+                                          <DialogHeader><DialogTitle>Edit Deal</DialogTitle></DialogHeader>
+                                          <form onSubmit={(e) => { e.preventDefault(); updateDeal.mutate({ id: deal.id, data: editForm }) }} className="space-y-4">
+                                            <div className="space-y-2"><Label>Title</Label><Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required /></div>
+                                            <div className="space-y-2"><Label>Value ($)</Label><Input type="number" value={editForm.value} onChange={(e) => setEditForm({ ...editForm, value: e.target.value })} /></div>
+                                            <div className="space-y-2"><Label>Stage</Label>
+                                              <Select value={editForm.stage} onValueChange={(v) => setEditForm({ ...editForm, stage: v as any })}>
+                                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                                <SelectContent>{stages.map((s) => <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}</SelectContent>
+                                              </Select>
+                                            </div>
+                                            <div className="space-y-2">
+                                              <Label>Contact / Client *</Label>
+                                              <Select value={editForm.contactId} onValueChange={(v) => setEditForm({ ...editForm, contactId: v })}>
+                                                <SelectTrigger className={!editForm.contactId ? 'border-red-200' : ''}>
+                                                  <SelectValue placeholder="— Select a contact —" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                  {contacts?.map((c: any) => (
+                                                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                                  ))}
+                                                </SelectContent>
+                                              </Select>
+                                            </div>
+                                            <DialogFooter className="flex items-center justify-between gap-2 w-full">
+                                              <Button
+                                                type="button"
+                                                variant="outline"
+                                                onClick={() => {
+                                                  navigate('/invoices', {
+                                                    state: {
+                                                      openCreate: true,
+                                                      dealId: deal.id,
+                                                      dealTitle: deal.title,
+                                                      dealValue: deal.value,
+                                                    }
+                                                  })
+                                                }}
+                                                className="text-xs border-indigo-200 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-1.5"
+                                              >
+                                                <FileText className="w-3.5 h-3.5" /> Create Invoice
+                                              </Button>
+                                              <Button type="submit" disabled={updateDeal.isPending || !editForm.contactId}>Save</Button>
+                                            </DialogFooter>
+                                          </form>
+                                        </DialogContent>
+                                      </Dialog>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 text-slate-400 hover:text-red-500"
+                                        onClick={() => { if (confirm('Delete this deal?')) deleteDeal.mutate(deal.id) }}
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </Button>
+                                    </div>
+                                  </div>
+
+                                  {deal.expand?.contactId && (
+                                    <span
+                                      onClick={() => navigate(`/crm/contacts/${deal.expand.contactId.id}`)}
+                                      className="text-xs text-indigo-500 hover:text-indigo-700 hover:underline font-medium block truncate max-w-full cursor-pointer"
+                                    >
+                                      Client: {deal.expand.contactId.name}
+                                    </span>
+                                  )}
+
+                                  <div className="flex items-center justify-between mt-1 pt-1.5 border-t border-slate-100">
+                                    <span className="text-xs font-bold text-slate-700">
+                                      ${deal.value?.toLocaleString()}
+                                    </span>
+                                    {deal.created && (
+                                      <span className="text-[10px] text-slate-400">
+                                        {new Date(deal.created).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </Draggable>
+                          ))}
+                          {provided.placeholder}
+                        </div>
+                      )}
+                    </Droppable>
+                  </div>
+                )
+              })}
+            </div>
+          </DragDropContext>
+        )
       )}
     </div>
   )

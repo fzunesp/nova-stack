@@ -105,7 +105,7 @@ export function MyWorkQueue({ grouped, isLoading }: MyWorkQueueProps) {
     return (
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
         <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-slate-900">My Work</h3>
+          <h3 className="text-sm font-semibold text-slate-900">Your Signals</h3>
         </div>
         <div className="divide-y divide-slate-50">
           {Array.from({ length: 5 }).map((_, i) => (
@@ -124,7 +124,7 @@ export function MyWorkQueue({ grouped, isLoading }: MyWorkQueueProps) {
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
       <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-900">My Work</h3>
+        <h3 className="text-sm font-semibold text-slate-900">Your Signals</h3>
         <span className="text-xs text-slate-400">{total} item{total !== 1 ? 's' : ''}</span>
       </div>
       <div className="divide-y divide-slate-100">

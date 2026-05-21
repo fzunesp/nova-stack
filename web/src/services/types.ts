@@ -1,10 +1,11 @@
-export type Status = 'draft' | 'active' | 'pending' | 'approved' | 'rejected' | 'archived' | 'lead' | 'inactive'
+export type Status = 'draft' | 'active' | 'pending' | 'approved' | 'rejected' | 'archived' | 'lead' | 'inactive' | 'converted'
 
 export interface UserRecord {
   id: string
   name: string
   email: string
   role: 'admin' | 'hr' | 'user'
+  companyName?: string
   created?: string
   updated?: string
 }
@@ -59,6 +60,7 @@ export interface DealRecord {
   assignedAt?: string
   created_by: string
   status: Status
+  intakeId?: string
   created?: string
   updated?: string
 }
@@ -115,6 +117,15 @@ export interface ProductRecord {
   updated?: string
 }
 
+export interface WebhookRecord {
+  id: string
+  url: string
+  event: 'deal.won' | 'invoice.paid' | 'intake.approved' | 'contact.created'
+  isActive: boolean
+  created?: string
+  updated?: string
+}
+
 export interface IntakeRecord {
   id: string
   name: string
@@ -129,6 +140,7 @@ export interface IntakeRecord {
   decidedAt?: string
   companyId?: string
   contactId?: string
+  dealId?: string
   userId: string
   assignedToId?: string
   assignedAt?: string

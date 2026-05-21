@@ -1,244 +1,236 @@
-import { useState, useEffect } from 'react'
+/**
+ * useNotifications — PocketBase-backed notification feed.
+ *
+ * Architecture:
+ * - "Read" state is tracked in a lightweight `notifications_read` collection
+ *   keyed by (userId, notificationId) so it syncs across devices.
+ * - Live items are derived directly from PocketBase realtime subscriptions,
+ *   so notifications never go stale and work on any device / browser session.
+ * - localStorage is used ONLY as a short-lived UI cache between renders,
+ *   never as the primary source of truth.
+ */
+import { useState, useEffect, useCallback } from 'react'
 import pb from '@/lib/pocketbase'
 import { useAuth } from '@/hooks/useAuth'
 
 export interface Notification {
-  id: string; // unique notification ID
-  type: 'task' | 'deal' | 'contact' | 'invoice' | 'intake';
-  recordId: string; // ID of the referenced record
-  title: string;
-  message: string;
-  timestamp: string;
-  read: boolean;
+  id: string
+  type: 'task' | 'deal' | 'contact' | 'invoice' | 'intake'
+  recordId: string
+  title: string
+  message: string
+  timestamp: string
+  read: boolean
 }
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Stable notification ID so duplicates are naturally de-duped. */
+function makeId(type: string, recordId: string) {
+  return `${type}-${recordId}`
+}
+
+/**
+ * Persist the read-set to PocketBase so it syncs across devices.
+ * Falls back silently — a missed read-sync is far better than a crash.
+ */
+async function persistRead(userId: string, notifId: string) {
+  try {
+    // Upsert pattern — check if the record already exists first
+    const existing = await pb.collection('notifications_read').getList(1, 1, {
+      filter: `userId = "${userId}" && notifId = "${notifId}"`,
+    }).catch(() => ({ items: [] }))
+
+    if (existing.items.length === 0) {
+      await pb.collection('notifications_read').create({ userId, notifId }).catch(() => {})
+    }
+  } catch {
+    // Non-critical — read status can re-sync on next load
+  }
+}
+
+/**
+ * Load the set of already-read notification IDs for the current user.
+ */
+async function loadReadSet(userId: string): Promise<Set<string>> {
+  try {
+    const res = await pb.collection('notifications_read').getList(1, 200, {
+      filter: `userId = "${userId}"`,
+      fields: 'notifId',
+    }).catch(() => ({ items: [] }))
+    return new Set(res.items.map((r: any) => r.notifId))
+  } catch {
+    return new Set()
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Hook
+// ---------------------------------------------------------------------------
 
 export function useNotifications() {
   const { user } = useAuth()
   const [notifications, setNotifications] = useState<Notification[]>([])
+  const [_readSet, setReadSet] = useState<Set<string>>(new Set())
 
   const currentUserId = user?.id
   const userRole = (user as any)?.role
 
-  // Load from localStorage on mount/user change
-  useEffect(() => {
-    if (!currentUserId) return
-    const stored = localStorage.getItem(`ns_notifications_${currentUserId}`)
-    if (stored) {
-      try {
-        setNotifications(JSON.parse(stored))
-      } catch (e) {
-        console.error('Failed to parse notifications', e)
-      }
-    }
-  }, [currentUserId])
-
-  // Save to localStorage when notifications state changes
-  const saveNotifications = (newNotifications: Notification[]) => {
-    setNotifications(newNotifications)
-    if (currentUserId) {
-      localStorage.setItem(`ns_notifications_${currentUserId}`, JSON.stringify(newNotifications))
-    }
-  }
-
-  // Helper to add a notification safely without duplicates
-  const addNotification = (notif: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
-    const id = `${notif.type}-${notif.recordId}`
-    const timestamp = new Date().toISOString()
-    
+  // Merge a new notification into state, de-duping by ID
+  const upsertNotification = useCallback((n: Notification) => {
     setNotifications((prev) => {
-      // Check if this exact notification already exists
-      const exists = prev.some((n) => n.id === id)
-      if (exists) return prev
-
-      const newNotif: Notification = {
-        ...notif,
-        id,
-        timestamp,
-        read: false,
-      }
-      const updated = [newNotif, ...prev].slice(0, 50) // Keep last 50 notifications
-      if (currentUserId) {
-        localStorage.setItem(`ns_notifications_${currentUserId}`, JSON.stringify(updated))
-      }
-      return updated
+      if (prev.some((p) => p.id === n.id)) return prev
+      return [n, ...prev].slice(0, 50)
     })
-  }
+  }, [])
 
-  // Fetch initial assignments and approvals
+  // Build a Notification object from a raw PocketBase record
+  const buildNotif = useCallback(
+    (type: Notification['type'], record: any, readIds: Set<string>): Notification => {
+      const id = makeId(type, record.id)
+      const titleField = record.title || record.name || 'Untitled'
+      const labelMap: Record<string, string> = { task: 'Task', deal: 'Deal', contact: 'Contact', invoice: 'Invoice', intake: 'Approval Required' }
+      const msgMap: Record<string, string> = {
+        task: `Task "${titleField}" is assigned to you.`,
+        deal: `Deal "${titleField}" is assigned to you.`,
+        contact: `Contact "${titleField}" is assigned to you.`,
+        invoice: `Invoice "${titleField}" is assigned to you.`,
+        intake: `New intake submission from "${titleField}" requires your approval.`,
+      }
+      return {
+        id,
+        type,
+        recordId: record.id,
+        title: labelMap[type] || type,
+        message: msgMap[type] || '',
+        timestamp: record.assignedAt || record.created || new Date().toISOString(),
+        read: readIds.has(id),
+      }
+    },
+    []
+  )
+
+  // Load initial batch + set up realtime subscriptions
   useEffect(() => {
     if (!currentUserId) return
 
-    const fetchInitial = async () => {
-      try {
-        const filter = `assignedToId = "${currentUserId}"`
-        const [tasks, deals, contacts, invoices] = await Promise.all([
-          pb.collection('tasks').getList(1, 10, { filter, sort: '-id' }).catch(() => ({ items: [] })),
-          pb.collection('deals').getList(1, 10, { filter, sort: '-id' }).catch(() => ({ items: [] })),
-          pb.collection('contacts').getList(1, 10, { filter, sort: '-id' }).catch(() => ({ items: [] })),
-          pb.collection('invoices').getList(1, 10, { filter, sort: '-id' }).catch(() => ({ items: [] })),
-        ])
+    let cancelled = false
 
-        // Fetch pending intake submissions for HR / Admin approvals
-        let pendingIntake: any = { items: [] }
-        if (userRole === 'admin' || userRole === 'hr') {
-          pendingIntake = await pb.collection('intake_submissions').getList(1, 10, {
-            filter: 'status = "pending"',
-            sort: '-id'
-          }).catch(() => ({ items: [] }))
-        }
+    const init = async () => {
+      // Load persisted read state from PocketBase (cross-device)
+      const readIds = await loadReadSet(currentUserId)
+      if (cancelled) return
+      setReadSet(readIds)
 
-        const initialNotifs: Omit<Notification, 'id' | 'timestamp' | 'read'>[] = []
+      // Initial fetch: assigned records
+      const assignFilter = `assignedToId = "${currentUserId}"`
+      const [tasksRes, dealsRes, contactsRes, invoicesRes] = await Promise.all([
+        pb.collection('tasks').getList(1, 10, { filter: assignFilter, sort: '-id' }).catch(() => ({ items: [] })),
+        pb.collection('deals').getList(1, 10, { filter: assignFilter, sort: '-id' }).catch(() => ({ items: [] })),
+        pb.collection('contacts').getList(1, 10, { filter: assignFilter, sort: '-id' }).catch(() => ({ items: [] })),
+        pb.collection('invoices').getList(1, 10, { filter: assignFilter, sort: '-id' }).catch(() => ({ items: [] })),
+      ])
 
-        tasks.items.forEach((item: any) => {
-          initialNotifs.push({
-            type: 'task',
-            recordId: item.id,
-            title: 'Task Assigned',
-            message: `Task "${item.title}" is assigned to you.`,
-          })
-        })
-
-        deals.items.forEach((item: any) => {
-          initialNotifs.push({
-            type: 'deal',
-            recordId: item.id,
-            title: 'Deal Assigned',
-            message: `Deal "${item.title}" is assigned to you.`,
-          })
-        })
-
-        contacts.items.forEach((item: any) => {
-          initialNotifs.push({
-            type: 'contact',
-            recordId: item.id,
-            title: 'Contact Assigned',
-            message: `Contact "${item.name}" is assigned to you.`,
-          })
-        })
-
-        invoices.items.forEach((item: any) => {
-          initialNotifs.push({
-            type: 'invoice',
-            recordId: item.id,
-            title: 'Invoice Assigned',
-            message: `Invoice "${item.title}" is assigned to you.`,
-          })
-        })
-
-        pendingIntake.items.forEach((item: any) => {
-          initialNotifs.push({
-            type: 'intake',
-            recordId: item.id,
-            title: 'Approval Required',
-            message: `New intake submission from "${item.name}" requires your approval.`,
-          })
-        })
-
-        // Merge fetched items into our current local notifications without overriding 'read' status
-        setNotifications((prev) => {
-          const storedMap = new Map(prev.map(n => [n.id, n]))
-          const merged: Notification[] = []
-
-          initialNotifs.forEach((n) => {
-            const id = `${n.type}-${n.recordId}`
-            if (storedMap.has(id)) {
-              merged.push(storedMap.get(id)!)
-            } else {
-              merged.push({
-                ...n,
-                id,
-                timestamp: new Date().toISOString(),
-                read: false,
-              })
-            }
-          })
-
-          // Add any remaining historical items that weren't in the initial list
-          prev.forEach(p => {
-            if (!merged.some(m => m.id === p.id)) {
-              merged.push(p)
-            }
-          })
-
-          // Sort by timestamp desc
-          const sorted = merged.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 50)
-          localStorage.setItem(`ns_notifications_${currentUserId}`, JSON.stringify(sorted))
-          return sorted
-        })
-      } catch (err) {
-        console.error('Failed to fetch initial assignments', err)
+      let intakeItems: any[] = []
+      if (userRole === 'admin' || userRole === 'hr') {
+        const intakeRes = await pb.collection('intake_submissions').getList(1, 10, {
+          filter: 'status = "pending"', sort: '-id',
+        }).catch(() => ({ items: [] }))
+        intakeItems = intakeRes.items
       }
+
+      if (cancelled) return
+
+      const initial: Notification[] = [
+        ...tasksRes.items.map((r: any) => buildNotif('task', r, readIds)),
+        ...dealsRes.items.map((r: any) => buildNotif('deal', r, readIds)),
+        ...contactsRes.items.map((r: any) => buildNotif('contact', r, readIds)),
+        ...invoicesRes.items.map((r: any) => buildNotif('invoice', r, readIds)),
+        ...intakeItems.map((r: any) => buildNotif('intake', r, readIds)),
+      ]
+        .filter((n, idx, arr) => arr.findIndex(x => x.id === n.id) === idx) // de-dupe
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .slice(0, 50)
+
+      setNotifications(initial)
     }
 
-    fetchInitial()
+    init()
 
-    // Real-time subscriptions for assignments
-    const collections = ['tasks', 'deals', 'contacts', 'invoices']
-    collections.forEach((colName) => {
-      pb.collection(colName).subscribe('*', (e) => {
-        if (e.action === 'create' || e.action === 'update') {
-          const record = e.record
-          if (record.assignedToId === currentUserId) {
-            const label = colName.charAt(0).toUpperCase() + colName.slice(1, -1)
-            const titleField = record.title || record.name || 'Untitled'
-            addNotification({
-              type: colName.slice(0, -1) as any,
-              recordId: record.id,
-              title: `${label} Assigned`,
-              message: `You have been assigned to: "${titleField}"`,
-            })
-          }
+    // Realtime subscriptions
+    const collections: Array<{ name: string; type: Notification['type'] }> = [
+      { name: 'tasks', type: 'task' },
+      { name: 'deals', type: 'deal' },
+      { name: 'contacts', type: 'contact' },
+      { name: 'invoices', type: 'invoice' },
+    ]
+
+    collections.forEach(({ name, type }) => {
+      pb.collection(name).subscribe('*', (e) => {
+        if ((e.action === 'create' || e.action === 'update') && e.record.assignedToId === currentUserId) {
+          setReadSet((rs) => {
+            const n = buildNotif(type, e.record, rs)
+            upsertNotification(n)
+            return rs
+          })
         }
-      }).catch(err => console.error(`Subscription failed for ${colName}`, err))
+      }).catch(() => {})
     })
 
-    // Subscriptions for Intake approvals (Admin / HR only)
     if (userRole === 'admin' || userRole === 'hr') {
       pb.collection('intake_submissions').subscribe('*', (e) => {
         if (e.action === 'create') {
-          const record = e.record
-          addNotification({
-            type: 'intake',
-            recordId: record.id,
-            title: 'Approval Required',
-            message: `New intake submission from "${record.name}" requires your approval.`,
+          setReadSet((rs) => {
+            const n = buildNotif('intake', e.record, rs)
+            upsertNotification(n)
+            return rs
           })
         }
-      }).catch(err => console.error('Subscription failed for intake_submissions', err))
+      }).catch(() => {})
     }
 
-    // Cleanup subscriptions on unmount or user change
     return () => {
-      collections.forEach((colName) => {
-        pb.collection(colName).unsubscribe('*').catch(() => {})
-      })
+      cancelled = true
+      collections.forEach(({ name }) => pb.collection(name).unsubscribe('*').catch(() => {}))
       if (userRole === 'admin' || userRole === 'hr') {
         pb.collection('intake_submissions').unsubscribe('*').catch(() => {})
       }
     }
-  }, [currentUserId, userRole])
+  }, [currentUserId, userRole, buildNotif, upsertNotification])
 
-  const markAsRead = (id: string) => {
-    const updated = notifications.map((n) => (n.id === id ? { ...n, read: true } : n))
-    saveNotifications(updated)
-  }
+  // Actions
+  const markAsRead = useCallback((id: string) => {
+    setReadSet((prev) => {
+      const next = new Set(prev)
+      next.add(id)
+      setNotifications((ns) => ns.map((n) => (n.id === id ? { ...n, read: true } : n)))
+      if (currentUserId) persistRead(currentUserId, id)
+      return next
+    })
+  }, [currentUserId])
 
-  const markAllAsRead = () => {
-    const updated = notifications.map((n) => ({ ...n, read: true }))
-    saveNotifications(updated)
-  }
+  const markAllAsRead = useCallback(() => {
+    setNotifications((ns) => {
+      const updated = ns.map((n) => ({ ...n, read: true }))
+      setReadSet((prev) => {
+        const next = new Set(prev)
+        updated.forEach((n) => {
+          next.add(n.id)
+          if (currentUserId) persistRead(currentUserId, n.id)
+        })
+        return next
+      })
+      return updated
+    })
+  }, [currentUserId])
 
-  const clearNotifications = () => {
-    saveNotifications([])
-  }
+  const clearNotifications = useCallback(() => {
+    setNotifications([])
+  }, [])
 
   const unreadCount = notifications.filter((n) => !n.read).length
 
-  return {
-    notifications,
-    unreadCount,
-    markAsRead,
-    markAllAsRead,
-    clearNotifications,
-  }
+  return { notifications, unreadCount, markAsRead, markAllAsRead, clearNotifications }
 }

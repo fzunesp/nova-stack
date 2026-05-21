@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { FileText, Search, Trash2, Pencil, ArrowUpDown, Plus, X, ChevronDown, ChevronRight, Download, Send } from 'lucide-react'
+import { FileText, Search, Trash2, Pencil, ArrowUpDown, Plus, X, ChevronDown, ChevronRight, Download, Send, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -13,7 +13,6 @@ import pb from '@/lib/pocketbase'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useLocation, useNavigate, useParams } from 'react-router'
-import { invoiceService, isAppError } from '@/services'
 import type { Status } from '@/services'
 import { generateInvoicePdf } from '@/lib/pdf'
 
@@ -26,6 +25,7 @@ const statusLabels: Record<Status, string> = {
   archived: 'Archived',
   lead: 'Lead',
   inactive: 'Inactive',
+  converted: 'Converted',
 }
 
 const statusColors: Record<Status, string> = {
@@ -37,6 +37,7 @@ const statusColors: Record<Status, string> = {
   archived: 'bg-slate-100 text-slate-500',
   lead: 'bg-blue-100 text-blue-700',
   inactive: 'bg-slate-100 text-slate-500',
+  converted: 'bg-violet-100 text-violet-700',
 }
 
 const statusDots: Record<Status, string> = {
@@ -48,6 +49,7 @@ const statusDots: Record<Status, string> = {
   archived: 'bg-slate-400',
   lead: 'bg-blue-500',
   inactive: 'bg-slate-400',
+  converted: 'bg-violet-500',
 }
 
 interface LineItem {
@@ -82,6 +84,30 @@ export function InvoicesPage() {
     }
   }, [id])
 
+  useEffect(() => {
+    if (location.state?.openCreate && location.state?.dealId) {
+      setFormData({
+        title: `Invoice for Deal: ${location.state.dealTitle || 'Opportunity'}`,
+        amount: String(location.state.dealValue || ''),
+        status: 'draft',
+        dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        dealId: location.state.dealId,
+      })
+      setCreateLineItems([
+        {
+          productId: '',
+          name: location.state.dealTitle || 'Project Delivery',
+          price: Number(location.state.dealValue) || 0,
+          quantity: 1,
+          total: Number(location.state.dealValue) || 0,
+        }
+      ])
+      setCreating(true)
+      // Clean up the state so the dialog doesn't re-trigger on subsequent re-renders/navs
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, [location.state])
+
   const toggleExpand = (invoiceId: string) => {
     const isCurrentlyExpanded = !!expandedInvoices[invoiceId]
     setExpandedInvoices(prev => ({ ...prev, [invoiceId]: !prev[invoiceId] }))
@@ -91,8 +117,6 @@ export function InvoicesPage() {
       navigate('/invoices')
     }
   }
-
-  const actorId = pb.authStore.record?.id || ''
 
   // Fetch active products
   const { data: productsData } = useQuery({
@@ -110,13 +134,13 @@ export function InvoicesPage() {
 
   const createInvoice = useMutation({
     mutationFn: (data: typeof formData & { lineItems: LineItem[] }) =>
-      invoiceService.create({ 
+      pb.collection('invoices').create({ 
         ...data, 
         amount: parseFloat(data.amount) || 0, 
         userId: pb.authStore.record?.id,
         lineItems: data.lineItems,
         dealId: data.dealId || undefined
-      }, actorId),
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] })
       setFormData({ title: '', amount: '', status: 'draft', dueDate: '', dealId: '' })
@@ -124,28 +148,28 @@ export function InvoicesPage() {
       setCreating(false)
       toast.success('Invoice created')
     },
-    onError: (err) => toast.error(isAppError(err) ? err.message : 'Failed to create invoice'),
+    onError: (err: any) => toast.error(err?.message || 'Failed to create invoice'),
   })
 
   const updateInvoice = useMutation({
     mutationFn: ({ id, data, lineItems }: { id: string; data: typeof editForm; lineItems: LineItem[] }) =>
-      invoiceService.update(id, { 
+      pb.collection('invoices').update(id, { 
         ...data, 
         amount: parseFloat(data.amount) || 0,
         lineItems,
         dealId: data.dealId || undefined
-      }, actorId),
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] })
       setEditing(null)
       setEditLineItems([])
       toast.success('Invoice updated')
     },
-    onError: (err) => toast.error(isAppError(err) ? err.message : 'Failed to update invoice'),
+    onError: (err: any) => toast.error(err?.message || 'Failed to update invoice'),
   })
 
   const deleteInvoice = useMutation({
-    mutationFn: (id: string) => invoiceService.delete(id),
+    mutationFn: (id: string) => pb.collection('invoices').delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] })
       toast.success('Invoice deleted')
@@ -153,8 +177,84 @@ export function InvoicesPage() {
     onError: () => toast.error('Failed to delete invoice'),
   })
 
+  // Templates query
+  const { data: templates = [] } = useQuery({
+    queryKey: ['templates'],
+    queryFn: () => pb.collection('templates').getFullList({ sort: '-created' })
+  })
+
+  // Send Invoice Dialog States
+  const [sendingInvoice, setSendingInvoice] = useState<any>(null)
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('')
+  const [emailSubject, setEmailSubject] = useState<string>('')
+  const [emailBody, setEmailBody] = useState<string>('')
+
+  // Template Formatter Helper
+  const formatTemplate = (templateSubject: string, templateContent: string, invoice: any) => {
+    if (!invoice) return { subject: '', content: '' }
+
+    const contactName = invoice.expand?.dealId?.expand?.contactId?.name || invoice.expand?.contactId?.name || 'Valued Client'
+    const companyName = invoice.expand?.dealId?.expand?.contactId?.expand?.companyId?.name || invoice.expand?.contactId?.expand?.companyId?.name || ''
+    const dealTitle = invoice.expand?.dealId?.title || ''
+    const invoiceNumber = invoice.title || invoice.id
+    const invoiceAmount = invoice.amount ? `$${invoice.amount.toLocaleString(undefined, {minimumFractionDigits: 2})}` : '$0.00'
+    const dueDate = invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : '—'
+    const senderName = pb.authStore.record?.name || 'Our Team'
+
+    const replacements: Record<string, string> = {
+      '{client_name}': contactName,
+      '{contact_name}': contactName,
+      '{company_name}': companyName,
+      '{deal_title}': dealTitle,
+      '{invoice_number}': invoiceNumber,
+      '{invoice_amount}': invoiceAmount,
+      '{due_date}': dueDate,
+      '{sender_name}': senderName,
+    }
+
+    let sub = templateSubject
+    let body = templateContent
+
+    Object.entries(replacements).forEach(([placeholder, value]) => {
+      sub = sub.replaceAll(placeholder, value)
+      body = body.replaceAll(placeholder, value)
+    })
+
+    return { subject: sub, content: body }
+  }
+
+  const handleSendInvoiceInit = (invoice: any) => {
+    setSendingInvoice(invoice)
+    const defaultTemplate = templates.find((t: any) => t.category === 'invoice_reminder')
+    if (defaultTemplate) {
+      setSelectedTemplateId(defaultTemplate.id)
+      const formatted = formatTemplate(defaultTemplate.subject || '', defaultTemplate.content || '', invoice)
+      setEmailSubject(formatted.subject)
+      setEmailBody(formatted.content)
+    } else {
+      setSelectedTemplateId('__default__')
+      setEmailSubject(`Invoice ${invoice.title || invoice.id} from Nova Stack`)
+      setEmailBody(`Hi,\n\nPlease find attached our invoice ${invoice.title || invoice.id} for $${invoice.amount?.toLocaleString()}.\n\nBest regards,\n${pb.authStore.record?.name || 'Our Team'}`)
+    }
+  }
+
+  const handleTemplateChange = (templateId: string) => {
+    setSelectedTemplateId(templateId)
+    if (templateId === '__default__') {
+      setEmailSubject(`Invoice ${sendingInvoice.title || sendingInvoice.id} from Nova Stack`)
+      setEmailBody(`Hi,\n\nPlease find attached our invoice ${sendingInvoice.title || sendingInvoice.id} for $${sendingInvoice.amount?.toLocaleString()}.\n\nBest regards,\n${pb.authStore.record?.name || 'Our Team'}`)
+      return
+    }
+    const template = templates.find((t: any) => t.id === templateId)
+    if (template) {
+      const formatted = formatTemplate(template.subject || '', template.content || '', sendingInvoice)
+      setEmailSubject(formatted.subject)
+      setEmailBody(formatted.content)
+    }
+  }
+
   const sendInvoice = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, subject, body }: { id: string; subject?: string; body?: string }) => {
       const token = pb.authStore.token
       const res = await fetch(`${pb.baseUrl || 'http://localhost:8090'}/api/send-invoice`, {
         method: 'POST',
@@ -162,7 +262,7 @@ export function InvoicesPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ invoiceId: id })
+        body: JSON.stringify({ invoiceId: id, subject, body })
       })
       if (!res.ok) {
         const err = await res.json()
@@ -173,6 +273,7 @@ export function InvoicesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] })
       toast.success('Invoice sent and marked as pending')
+      setSendingInvoice(null)
     },
     onError: (err: any) => {
       toast.error(err.message || 'Failed to send invoice')
@@ -532,7 +633,7 @@ export function InvoicesPage() {
                       <Download className="w-3.5 h-3.5 text-slate-400 hover:text-[rgb(var(--ns-accent))]" />
                     </Button>
                     {invoice.status === 'draft' && (
-                      <Button variant="ghost" size="icon" onClick={() => { if (confirm('Send this invoice to the client? This will change status to pending.')) sendInvoice.mutate(invoice.id) }} disabled={sendInvoice.isPending} title="Send Invoice">
+                      <Button variant="ghost" size="icon" onClick={() => handleSendInvoiceInit(invoice)} disabled={sendInvoice.isPending} title="Send Invoice">
                         <Send className="w-3.5 h-3.5 text-indigo-500 hover:text-indigo-600" />
                       </Button>
                     )}
@@ -585,6 +686,126 @@ export function InvoicesPage() {
           <DataTablePagination page={page} totalPages={totalPages} totalItems={totalItems} perPage={perPage} onPageChange={goToPage} />
         </div>
       )}
+      {/* Send Invoice Dialog with Template Selector */}
+      <Dialog open={sendingInvoice !== null} onOpenChange={(o) => { if (!o) setSendingInvoice(null) }}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="w-4 h-4 text-[rgb(var(--ns-accent))]" />
+              Send Invoice & Email Notification
+            </DialogTitle>
+          </DialogHeader>
+
+          {sendingInvoice && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                sendInvoice.mutate({
+                  id: sendingInvoice.id,
+                  subject: emailSubject,
+                  body: emailBody
+                })
+              }}
+              className="space-y-4 pt-2"
+            >
+              {/* Info Banner */}
+              <div className="p-3 bg-slate-50 border border-slate-100 rounded-lg text-xs text-slate-600 space-y-1">
+                <div className="flex justify-between">
+                  <span className="font-semibold text-slate-500">Invoice:</span>
+                  <span className="font-semibold text-slate-800">{sendingInvoice.title || sendingInvoice.id}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-semibold text-slate-500">Amount:</span>
+                  <span className="font-semibold text-slate-800">${sendingInvoice.amount?.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                </div>
+                {sendingInvoice.expand?.dealId?.expand?.contactId && (
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-slate-500">Recipient:</span>
+                    <span className="font-semibold text-indigo-600">
+                      {sendingInvoice.expand.dealId.expand.contactId.name} ({sendingInvoice.expand.dealId.expand.contactId.email})
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Template Selector */}
+              <div className="space-y-1.5">
+                <Label>Choose Message Template</Label>
+                <Select value={selectedTemplateId} onValueChange={handleTemplateChange}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="— Select a template —" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__default__">— Use Default System Notification —</SelectItem>
+                    {templates
+                      .filter((t: any) => ['invoice_reminder', 'email', 'other'].includes(t.category))
+                      .map((t: any) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.title} ({t.category === 'invoice_reminder' ? 'Reminder' : 'Email'})
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Email Subject */}
+              <div className="space-y-1.5">
+                <Label>Email Subject *</Label>
+                <input
+                  type="text"
+                  required
+                  value={emailSubject}
+                  onChange={(e) => setEmailSubject(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ns-accent))] focus:border-transparent bg-white placeholder-slate-400"
+                />
+              </div>
+
+              {/* Email Body */}
+              <div className="space-y-1.5">
+                <Label>Email Body *</Label>
+                <textarea
+                  required
+                  value={emailBody}
+                  onChange={(e) => setEmailBody(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ns-accent))] focus:border-transparent bg-white placeholder-slate-400 min-h-[160px] resize-y font-mono"
+                />
+              </div>
+
+              <DialogFooter className="pt-2 flex flex-col sm:flex-row gap-2 sm:justify-between items-center w-full">
+                {/* Copy Button */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const text = `Subject: ${emailSubject}\n\n${emailBody}`
+                    navigator.clipboard.writeText(text)
+                    toast.success('Subject and body copied to clipboard!')
+                  }}
+                  className="w-full sm:w-auto h-9 text-xs flex items-center gap-1.5 border-slate-200 text-slate-700 hover:bg-slate-50"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  Copy Email Text
+                </Button>
+
+                {/* Cancel & Send Action Buttons */}
+                <div className="flex gap-2 w-full sm:w-auto sm:justify-end">
+                  <Button type="button" variant="ghost" onClick={() => setSendingInvoice(null)} className="h-9 text-xs">
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={sendInvoice.isPending || !emailSubject || !emailBody}
+                    className="bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white h-9 text-xs font-semibold px-4"
+                  >
+                    {sendInvoice.isPending ? 'Sending...' : 'Send Invoice'}
+                  </Button>
+                </div>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

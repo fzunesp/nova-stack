@@ -64,7 +64,18 @@ routerAdd("POST", "/api/send-invoice", (c) => {
             name:    senderName,
         }
         message.to = [{ address: email }]
-        message.subject = `Invoice ${invoice.id.slice(0,8).toUpperCase()} - ${invoice.getString("title")}`
+        message.subject = data.subject || `Invoice ${invoice.id.slice(0,8).toUpperCase()} - ${invoice.getString("title")}`
+        
+        let contentHtml = ""
+        if (data.body) {
+            contentHtml = `<div class="lead" style="white-space: pre-wrap; font-family: inherit; font-size: 14.5px; color: #475569; line-height: 1.6; margin-bottom: 24px;">${data.body.replace(/\n/g, '<br>')}</div>`
+        } else {
+            contentHtml = `
+                <div class="greeting" style="font-size: 16px; font-weight: 600; color: #0f172a; margin-bottom: 16px;">Hello ${clientName},</div>
+                <p class="lead" style="font-size: 15px; color: #475569; margin-bottom: 24px; line-height: 1.6;">We have generated a new invoice for you regarding your recent project / deal <strong>"${deal.getString("title")}"</strong>${companyName ? " with " + companyName : ""}. Please review the payment summary details below.</p>
+            `
+        }
+
         message.html = `
             <!DOCTYPE html>
             <html>
@@ -192,8 +203,7 @@ routerAdd("POST", "/api/send-invoice", (c) => {
                         <p>PREMIUM ENTERPRISE CRM</p>
                     </div>
                     <div class="content">
-                        <div class="greeting">Hello ${clientName},</div>
-                        <p class="lead">We have generated a new invoice for you regarding your recent project / deal <strong>"${deal.getString("title")}"</strong>${companyName ? " with " + companyName : ""}. Please review the payment summary details below.</p>
+                        ${contentHtml}
                         
                         <div class="invoice-card">
                             <table class="invoice-table">

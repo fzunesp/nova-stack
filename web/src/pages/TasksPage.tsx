@@ -13,7 +13,6 @@ import pb from '@/lib/pocketbase'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useLocation } from 'react-router'
-import { taskService, isAppError } from '@/services'
 import type { Status } from '@/services'
 
 const statusLabels: Record<Status, string> = {
@@ -25,6 +24,7 @@ const statusLabels: Record<Status, string> = {
   archived: 'Archived',
   lead: 'Lead',
   inactive: 'Inactive',
+  converted: 'Converted',
 }
 
 const statusColors: Record<Status, string> = {
@@ -36,6 +36,7 @@ const statusColors: Record<Status, string> = {
   archived: 'bg-slate-100 text-slate-500',
   lead: 'bg-blue-100 text-blue-700',
   inactive: 'bg-slate-100 text-slate-500',
+  converted: 'bg-violet-100 text-violet-700',
 }
 
 const statusDots: Record<Status, string> = {
@@ -47,6 +48,7 @@ const statusDots: Record<Status, string> = {
   archived: 'bg-slate-400',
   lead: 'bg-blue-500',
   inactive: 'bg-slate-400',
+  converted: 'bg-violet-500',
 }
 
 export function TasksPage() {
@@ -61,8 +63,6 @@ export function TasksPage() {
   const [editing, setEditing] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({ title: '', description: '', status: 'draft' as Status, dueDate: '', contactId: '', dealId: '' })
 
-  const actorId = pb.authStore.record?.id || ''
-
   const { data: contacts } = useQuery({
     queryKey: ['allContacts'],
     queryFn: () => pb.collection('contacts').getFullList({ sort: 'name' })
@@ -75,34 +75,44 @@ export function TasksPage() {
 
   const createTask = useMutation({
     mutationFn: (data: typeof formData) =>
-      taskService.create({ ...data, dueDate: data.dueDate || undefined, userId: pb.authStore.record?.id }, actorId),
+      pb.collection('tasks').create({ ...data, dueDate: data.dueDate || undefined, userId: pb.authStore.record?.id }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
       setFormData({ title: '', description: '', status: 'draft', dueDate: '', contactId: '', dealId: '' })
       setCreating(false)
       toast.success('Task created')
     },
-    onError: (err) => toast.error(isAppError(err) ? err.message : 'Failed to create task'),
+    onError: (err: any) => toast.error(err?.message || 'Failed to create task'),
   })
 
   const updateTask = useMutation({
     mutationFn: ({ id, data }: { id: string; data: typeof editForm }) =>
-      taskService.update(id, { ...data, dueDate: data.dueDate || undefined }, actorId),
+      pb.collection('tasks').update(id, { ...data, dueDate: data.dueDate || undefined }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
       setEditing(null)
       toast.success('Task updated')
     },
-    onError: (err) => toast.error(isAppError(err) ? err.message : 'Failed to update task'),
+    onError: (err: any) => toast.error(err?.message || 'Failed to update task'),
   })
 
   const deleteTask = useMutation({
-    mutationFn: (id: string) => taskService.delete(id),
+    mutationFn: (id: string) => pb.collection('tasks').delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
       toast.success('Task deleted')
     },
     onError: () => toast.error('Failed to delete task'),
+  })
+
+  const cycleStatus = useMutation({
+    mutationFn: ({ id, currentStatus }: { id: string; currentStatus: Status }) => {
+      const cycle: Status[] = ['draft', 'active', 'approved']
+      const next = cycle[(cycle.indexOf(currentStatus) + 1) % cycle.length] ?? 'draft'
+      return pb.collection('tasks').update(id, { status: next })
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+    onError: () => toast.error('Failed to update status'),
   })
 
   return (
@@ -163,7 +173,8 @@ export function TasksPage() {
       {isLoading ? <TableSkeleton rows={6} /> : (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
           <div className="grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wide">
-            <button className="col-span-6 flex items-center gap-1 hover:text-slate-600" onClick={() => toggleSort('title')}>Task <ArrowUpDown className="w-3 h-3" /></button>
+            <div className="col-span-1" />
+            <button className="col-span-5 flex items-center gap-1 hover:text-slate-600" onClick={() => toggleSort('title')}>Task <ArrowUpDown className="w-3 h-3" /></button>
             <button className="col-span-2 flex items-center gap-1 hover:text-slate-600" onClick={() => toggleSort('status')}>Status <ArrowUpDown className="w-3 h-3" /></button>
             <div className="col-span-2">Due</div>
             <div className="col-span-2 text-right">Actions</div>
@@ -178,7 +189,22 @@ export function TasksPage() {
           ) : (
             items.map((task: any) => (
               <div key={task.id} className="group grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors items-center">
-                <div className="col-span-6">
+                {/* Circular quick-status toggle */}
+                <div className="col-span-1 flex items-center">
+                  <button
+                    title="Cycle status: To Do → In Progress → Done"
+                    onClick={() => cycleStatus.mutate({ id: task.id, currentStatus: task.status as Status })}
+                    className={`w-5 h-5 rounded-full border-2 flex-shrink-0 transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-1 ${
+                      task.status === 'approved'
+                        ? 'bg-green-500 border-green-500'
+                        : task.status === 'active'
+                        ? 'border-blue-500 bg-transparent'
+                        : 'border-slate-300 bg-transparent'
+                    }`}
+                    style={task.status === 'approved' ? {} : task.status === 'active' ? { boxShadow: 'inset 0 0 0 2px rgb(59 130 246 / 0.3)' } : {}}
+                  />
+                </div>
+                <div className="col-span-5">
                   <p className={`font-medium ${task.status === 'approved' ? 'line-through text-slate-400' : 'text-slate-900'}`}>{task.title}</p>
                   {task.description && <p className="text-xs text-slate-400 mt-0.5 truncate">{task.description}</p>}
                 </div>

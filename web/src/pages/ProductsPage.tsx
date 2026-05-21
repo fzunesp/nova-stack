@@ -13,7 +13,6 @@ import pb from '@/lib/pocketbase'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useLocation } from 'react-router'
-import { productService, isAppError } from '@/services'
 import type { Status } from '@/services'
 
 export function ProductsPage() {
@@ -29,38 +28,36 @@ export function ProductsPage() {
   const [editing, setEditing] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({ name: '', description: '', price: '', sku: '', status: 'active' as Status })
 
-  const actorId = pb.authStore.record?.id || ''
-
   const createMutation = useMutation({
     mutationFn: (data: typeof formData) =>
-      productService.create({ ...data, price: Number(data.price) }, actorId),
+      pb.collection('products').create({ ...data, price: Number(data.price) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] })
       toast.success('Product created')
       setCreating(false)
       setFormData({ name: '', description: '', price: '', sku: '', status: 'active' })
     },
-    onError: (err: any) => toast.error(isAppError(err) ? err.message : 'Failed to create product'),
+    onError: (err: any) => toast.error(err?.message || 'Failed to create product'),
   })
 
   const updateMutation = useMutation({
     mutationFn: (data: typeof editForm) =>
-      productService.update(editing!, { ...data, price: Number(data.price) }, actorId),
+      pb.collection('products').update(editing!, { ...data, price: Number(data.price) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] })
       toast.success('Product updated')
       setEditing(null)
     },
-    onError: (err: any) => toast.error(isAppError(err) ? err.message : 'Failed to update product'),
+    onError: (err: any) => toast.error(err?.message || 'Failed to update product'),
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => productService.delete(id),
+    mutationFn: (id: string) => pb.collection('products').delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] })
       toast.success('Product deleted')
     },
-    onError: (err: any) => toast.error(isAppError(err) ? err.message : 'Failed to delete product'),
+    onError: (err: any) => toast.error(err?.message || 'Failed to delete product'),
   })
 
   const handleCreate = (e: React.FormEvent) => { e.preventDefault(); createMutation.mutate(formData) }

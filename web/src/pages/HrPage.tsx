@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import {
   Inbox, Plus, Settings2, FileText, CheckCircle2, Clock, XCircle,
-  LayoutDashboard, ArrowLeft, Eye, ToggleLeft, ToggleRight, Pencil, Loader2,
+  ToggleLeft, ToggleRight, Pencil, Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -22,24 +22,7 @@ const isApproverOrAdmin = () => {
   return role === 'admin' || role === 'hr' || role === 'manager'
 }
 
-// ─── Helper: generate formattedId (e.g. VAC-001) ─────────────────────────────
-async function generateFormattedId(prefix: string): Promise<string> {
-  try {
-    const existing = await pb.collection('intake_submissions').getFullList({
-      filter: `formattedId ~ "${prefix}-"`,
-      sort: '-formattedId',
-      fields: 'formattedId',
-    })
-    let seq = 1
-    if (existing.length > 0) {
-      const match = (existing[0].formattedId || '').match(/-(\d+)$/)
-      if (match) seq = parseInt(match[1]) + 1
-    }
-    return `${prefix}-${String(seq).padStart(3, '0')}`
-  } catch {
-    return `${prefix}-001`
-  }
-}
+// Sequence ID is now safely generated server-side in onModelBeforeCreate hook.
 
 // ─── Main HR Page ─────────────────────────────────────────────────────────────
 export function HrPage() {
@@ -127,14 +110,11 @@ function EmployeeView() {
     mutationFn: async (values: Record<string, any>) => {
       const form = submitting
       const formDef = await pb.collection('form_definitions').getOne(form.id)
-      const formattedId = await generateFormattedId(formDef.prefix || 'REQ')
-      const workflowSteps: any[] = formDef.workflowSteps || []
 
       const submission = await pb.collection('intake_submissions').create({
         name: pb.authStore.record?.name || 'Unknown',
         email: pb.authStore.record?.email || '',
         formId: form.id,
-        formattedId,
         type: formDef.key || 'general',
         source: 'internal',
         status: 'pending',
@@ -143,13 +123,10 @@ function EmployeeView() {
         userId: pb.authStore.record?.id,
       })
 
-      // Note: Approval tasks are generated automatically by the backend
-      // pocketbase JSVM hook (intake_on_create.pb.js) based on form_definitions.
-
-      return { formattedId }
+      return submission
     },
-    onSuccess: ({ formattedId }) => {
-      toast.success(`Request ${formattedId} submitted successfully!`)
+    onSuccess: (submission: any) => {
+      toast.success(`Request ${submission.formattedId || submission.id.slice(0, 8)} submitted successfully!`)
       setSubmitting(null)
       queryClient.invalidateQueries({ queryKey: ['my_submissions'] })
       queryClient.invalidateQueries({ queryKey: ['approval_tasks'] })
@@ -261,7 +238,6 @@ function EmployeeView() {
 
 // ─── Admin View: Decision Queue + Template Manager ─────────────────────────────
 function AdminView({ onNewTemplate, onEditTemplate }: { onNewTemplate: () => void; onEditTemplate: (t: any) => void }) {
-  const queryClient = useQueryClient()
 
   const { data: pendingTasks = [] } = useQuery({
     queryKey: ['approval_tasks', 'pending'],

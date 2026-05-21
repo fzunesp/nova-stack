@@ -38,27 +38,20 @@ export interface MoneyAtRisk {
   totalAtRisk: number
 }
 
-export interface SignalItem {
-  id: string
-  type: 'task' | 'intake' | 'deal'
-  title: string
-  status: string
-  link: string
-  timestamp: string
-  isNew: boolean
-}
-
 export interface DashboardData {
   metrics: BusinessMetrics
   radar: RadarData
   today: TodaySummary
   moneyAtRisk: MoneyAtRisk
-  mySignals: SignalItem[]
 }
 
 function daysBetween(a: Date, b: Date): number {
   return Math.ceil(Math.abs(a.getTime() - b.getTime()) / (1000 * 60 * 60 * 24))
 }
+
+// A safe upper-bound for any single collection fetch in the dashboard.
+// At 500 records the SQLite query + network is still fast. getFullList with no cap is the real danger.
+const DASH_CAP = 500
 
 export function useDashboardData() {
   return useQuery({
@@ -69,14 +62,32 @@ export function useDashboardData() {
       const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
       const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000)
 
-      // Fetch all required data
-      const [tasks, deals, invoices, contacts, intakes] = await Promise.all([
-        pb.collection('tasks').getFullList(),
-        pb.collection('deals').getFullList(),
-        pb.collection('invoices').getFullList(),
-        pb.collection('contacts').getFullList(),
-        pb.collection('intake_submissions').getFullList({ sort: '-id' }),
+      // Bounded queries — always page-capped, always field-projected.
+      // We never request the full table; DASH_CAP covers any realistic business dataset.
+      const [tasksRes, dealsRes, invoicesRes, contactsRes] = await Promise.all([
+        pb.collection('tasks').getList(1, DASH_CAP, {
+          filter: 'status != "approved"',
+          fields: 'id,title,dueDate,status,assignedToId,created',
+          sort: '-created',
+        }),
+        pb.collection('deals').getList(1, DASH_CAP, {
+          fields: 'id,title,stage,expectedCloseDate,created,value,contactId,assignedToId',
+          sort: '-created',
+        }),
+        pb.collection('invoices').getList(1, DASH_CAP, {
+          fields: 'id,title,status,amount,paidAt,issuedDate,dealId',
+          sort: '-created',
+        }),
+        pb.collection('contacts').getList(1, 100, {
+          sort: '-created',
+          fields: 'id,name,created',
+        }),
       ])
+
+      const tasks = tasksRes.items
+      const deals = dealsRes.items
+      const invoices = invoicesRes.items
+      const contacts = contactsRes.items
 
       // 1. Business Metrics
       const totalRevenue = invoices
@@ -162,23 +173,9 @@ export function useDashboardData() {
           if (due >= now && due <= threeDaysFromNow && t.status !== 'done') {
             const daysLeft = daysBetween(now, due)
             if (daysLeft <= 0) {
-              attention.push({
-                id: t.id,
-                title: t.title,
-                context: 'Due today — start working',
-                link: `/tasks`,
-                level: 'task',
-                sortKey: 0,
-              })
+              attention.push({ id: t.id, title: t.title, context: 'Due today — start working', link: `/tasks`, level: 'task', sortKey: 0 })
             } else {
-              attention.push({
-                id: t.id,
-                title: t.title,
-                context: `Due in ${daysLeft} day${daysLeft !== 1 ? 's' : ''} — plan ahead`,
-                link: `/tasks`,
-                level: 'task',
-                sortKey: daysLeft,
-              })
+              attention.push({ id: t.id, title: t.title, context: `Due in ${daysLeft} day${daysLeft !== 1 ? 's' : ''} — plan ahead`, link: `/tasks`, level: 'task', sortKey: daysLeft })
             }
           }
         }
@@ -188,14 +185,7 @@ export function useDashboardData() {
         const created = d.created ? new Date(d.created) : new Date()
         if ((d.stage === 'contacted' || d.stage === 'quoted') && created < fourteenDaysAgo) {
           const daysInStage = daysBetween(created, now)
-          attention.push({
-            id: d.id,
-            title: d.title,
-            context: `In ${d.stage} for ${daysInStage} days — follow up`,
-            link: `/crm`,
-            level: 'deal',
-            sortKey: daysInStage,
-          })
+          attention.push({ id: d.id, title: d.title, context: `In ${d.stage} for ${daysInStage} days — follow up`, link: `/crm`, level: 'deal', sortKey: daysInStage })
         }
       }
 
@@ -204,61 +194,31 @@ export function useDashboardData() {
           const issued = new Date(i.issuedDate)
           if (issued >= sevenDaysAgo) {
             const daysAgo = daysBetween(issued, now)
-            attention.push({
-              id: i.id,
-              title: i.title,
-              context: `Sent ${daysAgo} days ago — awaiting payment`,
-              link: `/invoices`,
-              level: 'invoice',
-              sortKey: daysAgo,
-            })
+            attention.push({ id: i.id, title: i.title, context: `Sent ${daysAgo} days ago — awaiting payment`, link: `/invoices`, level: 'invoice', sortKey: daysAgo })
           }
         }
       }
 
       // === OPPORTUNITIES ===
       for (const d of deals) {
-        // Find if this deal has any invoices
         const dealInvoices = invoices.filter(i => i.dealId === d.id)
         if (d.value && d.value > 0 && dealInvoices.length === 0 && d.stage !== 'won' && d.stage !== 'lost') {
-          // Find contact name if any
           const contact = d.contactId ? contacts.find(c => c.id === d.contactId) : null
           const contactSuffix = contact?.name ? ` with ${contact.name}` : ''
-          opportunities.push({
-            id: d.id,
-            title: d.title,
-            context: `Valued at $${d.value.toLocaleString()}${contactSuffix} — create invoice`,
-            link: `/crm`,
-            level: 'deal',
-            sortKey: -d.value,
-          })
+          opportunities.push({ id: d.id, title: d.title, context: `Valued at $${d.value.toLocaleString()}${contactSuffix} — create invoice`, link: `/crm`, level: 'deal', sortKey: -d.value })
         }
       }
 
       for (const i of invoices) {
         if (i.status === 'draft') {
-          opportunities.push({
-            id: i.id,
-            title: i.title,
-            context: 'Draft — send to client',
-            link: `/invoices`,
-            level: 'invoice',
-            sortKey: 0,
-          })
+          opportunities.push({ id: i.id, title: i.title, context: 'Draft — send to client', link: `/invoices`, level: 'invoice', sortKey: 0 })
         }
       }
 
       for (const c of contacts) {
         const contactDeals = deals.filter(d => d.contactId === c.id)
         if (contactDeals.length === 0) {
-          opportunities.push({
-            id: c.id,
-            title: c.name,
-            context: 'New contact — create a deal',
-            link: `/crm`,
-            level: 'contact',
-            sortKey: c.created ? -new Date(c.created).getTime() : 0,
-          })
+          opportunities.push({ id: c.id, title: c.name, context: 'New contact — create a deal', link: `/crm`, level: 'contact', sortKey: c.created ? -new Date(c.created).getTime() : 0 })
         }
       }
 
@@ -283,68 +243,14 @@ export function useDashboardData() {
       const overdueInvoicesItems = invoices.filter(i => i.status === 'pending' && i.issuedDate && new Date(i.issuedDate) < sevenDaysAgo)
       const openDealsItems = deals.filter(d => !['won', 'lost'].includes(d.stage) && d.value > 0)
 
-      const overdueInvoicesTotal = overdueInvoicesItems.reduce((sum, i) => sum + (i.amount || 0), 0)
-      const openDealsValue = openDealsItems.reduce((sum, d) => sum + (d.value || 0), 0)
-
       const moneyAtRisk: MoneyAtRisk = {
-        overdueInvoicesTotal,
-        openDealsValue,
-        totalAtRisk: overdueInvoicesTotal + openDealsValue,
+        overdueInvoicesTotal: overdueInvoicesItems.reduce((sum, i) => sum + (i.amount || 0), 0),
+        openDealsValue: openDealsItems.reduce((sum, d) => sum + (d.value || 0), 0),
+        totalAtRisk: overdueInvoicesItems.reduce((sum, i) => sum + (i.amount || 0), 0) + openDealsItems.reduce((sum, d) => sum + (d.value || 0), 0),
       }
 
-      // 5. My Signals
-      // Get the current user
-      const userId = pb.authStore.record?.id
-      
-      const myTasks = tasks.filter(t => t.assignedToId === userId && t.status !== 'approved')
-        .sort((a, b) => (b.created ? new Date(b.created).getTime() : 0) - (a.created ? new Date(a.created).getTime() : 0))
-        .slice(0, 5)
-        
-      const myIntakes = intakes.filter(i => i.assignedToId === userId && !['approved', 'rejected', 'archived'].includes(i.status))
-        .sort((a, b) => (b.created ? new Date(b.created).getTime() : 0) - (a.created ? new Date(a.created).getTime() : 0))
-        .slice(0, 5)
-        
-      const myDeals = deals.filter(d => d.assignedToId === userId && !['won', 'lost'].includes(d.stage))
-        .sort((a, b) => (b.created ? new Date(b.created).getTime() : 0) - (a.created ? new Date(a.created).getTime() : 0))
-        .slice(0, 3)
-
-      const mySignals: SignalItem[] = [
-        ...myTasks.map((t): SignalItem => ({
-          id: t.id,
-          type: 'task',
-          title: t.title,
-          status: t.status,
-          link: `/tasks`,
-          timestamp: t.created || '',
-          isNew: t.status === 'draft',
-        })),
-        ...myIntakes.map((i): SignalItem => ({
-          id: i.id,
-          type: 'intake',
-          title: i.name,
-          status: i.status,
-          link: `/intake`,
-          timestamp: i.created || '',
-          isNew: i.status === 'draft',
-        })),
-        ...myDeals.map((d): SignalItem => ({
-          id: d.id,
-          type: 'deal',
-          title: d.title,
-          status: d.stage,
-          link: `/crm`,
-          timestamp: d.created || '',
-          isNew: d.stage === 'lead',
-        })),
-      ].sort((a, b) => (b.timestamp ? new Date(b.timestamp).getTime() : 0) - (a.timestamp ? new Date(a.timestamp).getTime() : 0))
-
-      return {
-        metrics,
-        radar,
-        today,
-        moneyAtRisk,
-        mySignals,
-      }
+      return { metrics, radar, today, moneyAtRisk }
     },
+    staleTime: 60_000, // Cache for 60s — dashboard doesn't need to refetch on every focus
   })
 }

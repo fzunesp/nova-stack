@@ -12,7 +12,7 @@ import { TableSkeleton } from '@/components/ui/skeleton'
 import pb from '@/lib/pocketbase'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { companyService, isAppError } from '@/services'
+
 import { useNavigate, useParams } from 'react-router'
 
 type CompanyStatus = 'lead' | 'active' | 'inactive'
@@ -57,33 +57,31 @@ export function CompaniesPage() {
   const [editForm, setEditForm] = useState(emptyForm)
   const [selectedCompany, setSelectedCompany] = useState<any | null>(null)
 
-  const actorId = pb.authStore.record?.id || ''
-
   const createCompany = useMutation({
     mutationFn: (data: typeof formData) =>
-      companyService.create({ ...data, userId: pb.authStore.record?.id }, actorId),
+      pb.collection('companies').create({ ...data, userId: pb.authStore.record?.id }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['companies'] })
       setFormData(emptyForm)
       setCreating(false)
       toast.success('Company added')
     },
-    onError: (err) => toast.error(isAppError(err) ? err.message : 'Failed to add company'),
+    onError: (err: any) => toast.error(err?.message || 'Failed to add company'),
   })
 
   const updateCompany = useMutation({
     mutationFn: ({ id, data }: { id: string; data: typeof editForm }) =>
-      companyService.update(id, data, actorId),
+      pb.collection('companies').update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['companies'] })
       setEditing(null)
       toast.success('Company updated')
     },
-    onError: (err) => toast.error(isAppError(err) ? err.message : 'Failed to update company'),
+    onError: (err: any) => toast.error(err?.message || 'Failed to update company'),
   })
 
   const deleteCompany = useMutation({
-    mutationFn: (id: string) => companyService.delete(id),
+    mutationFn: (id: string) => pb.collection('companies').delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['companies'] })
       toast.success('Company deleted')

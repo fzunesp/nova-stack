@@ -50,7 +50,9 @@ export function AppRouter() {
           >
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="crm" element={<CrmPage />} />
+            <Route path="crm/contacts" element={<CrmPage />} />
             <Route path="crm/contacts/:id" element={<CrmPage />} />
+            <Route path="crm/deals" element={<CrmPage />} />
             <Route path="crm/deals/:id" element={<CrmPage />} />
             <Route path="companies" element={<CompaniesPage />} />
             <Route path="companies/:id" element={<CompaniesPage />} />

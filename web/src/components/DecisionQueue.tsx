@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Check, X, Eye, Timer, ArrowUpDown, Loader2 } from 'lucide-react'
+import { Check, X, Timer, ArrowUpDown, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import pb from '@/lib/pocketbase'
@@ -68,8 +68,8 @@ export default function DecisionQueue({ tasks: initialTasks }: DecisionQueueProp
   }, [initialTasks, sort])
 
   const decisionMutation = useMutation({
-    mutationFn: async ({ submissionId, taskId, type, comment }: {
-      submissionId: string; taskId: string; type: 'approved' | 'rejected'; comment: string
+    mutationFn: async ({ taskId, type, comment }: {
+      submissionId: string; taskId: string; type: 'approved' | 'rejected'; comment: string; formattedId: string
     }) => {
       // Set status to the actual decision ('approved' or 'rejected') so the
       // backend JSVM hook (task_on_update.pb.js) fires and advances the workflow.
@@ -124,6 +124,7 @@ export default function DecisionQueue({ tasks: initialTasks }: DecisionQueueProp
                 taskId: confirm.taskId!,
                 type: confirm.type!,
                 comment,
+                formattedId: confirm.formattedId,
               })}
               disabled={decisionMutation.isPending}
               className={cn('font-bold', confirm.type === 'approved' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-red-600 hover:bg-red-700 text-white')}

@@ -1,10 +1,11 @@
 # start-backend.ps1
 # Starts PocketBase backend with the correct data and migrations directories.
 
-$pbPath = Join-Path $PSScriptRoot "pb\pocketbase.exe"
-$dataDir = Join-Path $PSScriptRoot "pocketbase\pb_data"
-$migrationsDir = Join-Path $PSScriptRoot "pocketbase\pb_migrations"
-$hooksDir = Join-Path $PSScriptRoot "pocketbase\pb_hooks"
+$pbDir = Join-Path $PSScriptRoot "pocketbase"
+$pbPath = Join-Path $pbDir "pocketbase.exe"
+$dataDir = Join-Path $pbDir "pb_data"
+$migrationsDir = Join-Path $pbDir "pb_migrations"
+$hooksDir = Join-Path $pbDir "pb_hooks"
 
 # 1. Stop any previously running pocketbase instances to avoid port conflicts
 $runningPb = Get-Process -Name pocketbase -ErrorAction SilentlyContinue

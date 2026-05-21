@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import { useMemo } from 'react'
 import {
   PieChart,
   Pie,
@@ -165,7 +165,7 @@ export function HrAnalyticsDashboard() {
                   paddingAngle={5}
                   dataKey="value"
                 >
-                  {requestsByType.map((entry, index) => (
+                  {requestsByType.map((_entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>

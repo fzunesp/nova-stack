@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import pb from '@/lib/pocketbase'
-import { User, Mail, Building2, Lock, Save, Palette, Check, Shield, Trash2, UserPlus, Loader2, Database, Download } from 'lucide-react'
+import { User, Mail, Building2, Lock, Save, Palette, Check, Shield, Trash2, UserPlus, Loader2, Database, Download, Webhook, Plus, Play, Copy, FileText, Edit, MessageSquare } from 'lucide-react'
 import { useTheme, type ThemeName } from '@/contexts/ThemeContext'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -31,11 +31,13 @@ export function SettingsPage() {
     { id: 'profile', label: 'Profile' },
     { id: 'security', label: 'Security' },
     { id: 'appearance', label: 'Appearance' },
+    { id: 'templates', label: 'Templates' },
     ...(isAdmin ? [
       { id: 'users', label: 'Users' },
-      { id: 'data', label: 'Data & Export' }
+      { id: 'data', label: 'Data & Export' },
+      { id: 'webhooks', label: 'Webhooks' }
     ] : []),
-  ] as const
+  ] as any // Use as any to prevent strict const enum mismatch with dynamically updated TabId type
   type TabId = typeof tabs[number]['id']
 
   const [activeTab, setActiveTab] = useState<TabId>('profile')
@@ -93,7 +95,7 @@ export function SettingsPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-6 w-fit">
-        {tabs.map((tab) => (
+        {tabs.map((tab: { id: string; label: string }) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as TabId)}
@@ -215,11 +217,17 @@ export function SettingsPage() {
         </div>
       )}
 
+      {/* Templates Tab */}
+      {activeTab === 'templates' && <TemplatesTab />}
+
       {/* Users Tab — Admin Only */}
       {activeTab === 'users' && isAdmin && <UsersTab currentUserId={(user as any)?.id} />}
 
       {/* Data Tab — Admin Only */}
       {activeTab === 'data' && isAdmin && <DataTab />}
+
+      {/* Webhooks Tab — Admin Only */}
+      {activeTab === 'webhooks' && isAdmin && <WebhooksTab />}
     </div>
   )
 }
@@ -621,4 +629,673 @@ function DataTab() {
     </div>
   )
 }
+
+// ─── Webhooks Tab ────────────────────────────────────────────────────────────
+
+const EVENT_COLORS: Record<string, string> = {
+  'contact.created': 'bg-indigo-50 text-indigo-700 border-indigo-100',
+  'intake.approved': 'bg-purple-50 text-purple-700 border-purple-100',
+  'deal.won':        'bg-emerald-50 text-emerald-700 border-emerald-100',
+  'invoice.paid':    'bg-amber-50 text-amber-700 border-amber-100',
+}
+
+function WebhooksTab() {
+  const queryClient = useQueryClient()
+  const [open, setOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  
+  const [url, setUrl] = useState('')
+  const [event, setEvent] = useState('contact.created')
+  const [isActive, setIsActive] = useState(true)
+  const [testingId, setTestingId] = useState<string | null>(null)
+
+  const { data: webhooks, isLoading } = useQuery({
+    queryKey: ['webhooks'],
+    queryFn: () => pb.collection('webhooks').getFullList({ sort: '-created' })
+  })
+
+  const createWebhook = useMutation({
+    mutationFn: (data: { url: string; event: string; isActive: boolean }) =>
+      pb.collection('webhooks').create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['webhooks'] })
+      setOpen(false)
+      setUrl('')
+      setEvent('contact.created')
+      setIsActive(true)
+      toast.success('Webhook created successfully')
+    },
+    onError: (err: any) => toast.error(err.message || 'Failed to create webhook')
+  })
+
+  const updateWebhook = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: { url: string; event: string; isActive: boolean } }) =>
+      pb.collection('webhooks').update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['webhooks'] })
+      setEditingId(null)
+      setUrl('')
+      setEvent('contact.created')
+      setIsActive(true)
+      toast.success('Webhook updated successfully')
+    },
+    onError: (err: any) => toast.error(err.message || 'Failed to update webhook')
+  })
+
+  const deleteWebhook = useMutation({
+    mutationFn: (id: string) => pb.collection('webhooks').delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['webhooks'] })
+      toast.success('Webhook deleted successfully')
+    },
+    onError: (err: any) => toast.error(err.message || 'Failed to delete webhook')
+  })
+
+  const handleTestWebhook = async (wh: any) => {
+    setTestingId(wh.id)
+    try {
+      const samplePayload = {
+        event: wh.event,
+        timestamp: new Date().toISOString(),
+        isTest: true,
+        payload: getSamplePayload(wh.event)
+      }
+      
+      await fetch(wh.url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'Nova-CRM-Webhook-Tester/1.0'
+        },
+        body: JSON.stringify(samplePayload),
+        mode: 'no-cors'
+      })
+      
+      toast.success(`Simulated event sent successfully to: ${wh.url}`)
+    } catch (err: any) {
+      toast.error(`Webhook target unreachable: ${err.message || 'Connection refused'}`)
+    } finally {
+      setTestingId(null)
+    }
+  }
+
+  const handleEditInit = (wh: any) => {
+    setEditingId(wh.id)
+    setUrl(wh.url)
+    setEvent(wh.event)
+    setIsActive(wh.isActive)
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!url.trim()) return
+    
+    if (editingId) {
+      updateWebhook.mutate({ id: editingId, data: { url, event, isActive } })
+    } else {
+      createWebhook.mutate({ url, event, isActive })
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <Webhook className="w-4 h-4 text-slate-400" />
+              <h3 className="font-semibold text-slate-900">Outbound Webhooks</h3>
+            </div>
+            <p className="text-sm text-slate-500 mt-1">Configure endpoints to receive automated POST requests on workspace events.</p>
+          </div>
+          <Button 
+            onClick={() => { setEditingId(null); setUrl(''); setEvent('contact.created'); setIsActive(true); setOpen(true) }}
+            className="flex items-center gap-1.5 text-xs h-9 bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white font-medium"
+          >
+            <Plus className="w-4 h-4" /> Add Webhook
+          </Button>
+        </div>
+
+        {isLoading ? (
+          <div className="p-12 text-center text-slate-400 text-sm flex flex-col items-center justify-center gap-2">
+            <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+            Loading webhooks...
+          </div>
+        ) : !webhooks || webhooks.length === 0 ? (
+          <div className="p-12 text-center text-slate-400 text-sm flex flex-col items-center justify-center max-w-md mx-auto">
+            <Webhook className="w-10 h-10 text-slate-200 mb-3" />
+            <p className="font-medium text-slate-700">No webhooks registered</p>
+            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+              Connect external services like n8n, Make, or custom API endpoints to trigger automated flows on contacts, won deals, paid invoices, and approvals.
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {webhooks.map((wh) => (
+              <div key={wh.id} className="p-5 flex items-start justify-between gap-6 hover:bg-slate-50/50 transition-colors">
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  <div className="flex items-center gap-2.5">
+                    <Badge className={`${EVENT_COLORS[wh.event] || 'bg-slate-50 text-slate-700 border-slate-100'} text-[10px] px-1.5 py-0.5 font-bold uppercase tracking-wider shadow-none border`}>
+                      {wh.event}
+                    </Badge>
+                    {!wh.isActive && (
+                      <Badge className="bg-slate-100 text-slate-400 border-slate-200 text-[10px] px-1.5 py-0.5 font-bold uppercase tracking-wider shadow-none border">
+                        Inactive
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs font-mono text-slate-600 bg-slate-50 border border-slate-100 rounded px-2 py-1 select-all break-all w-fit max-w-full">
+                    {wh.url}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleTestWebhook(wh)}
+                    disabled={testingId === wh.id}
+                    className="h-8 text-xs border-slate-200 text-slate-600 flex items-center gap-1 hover:bg-slate-100"
+                  >
+                    {testingId === wh.id ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Play className="w-3 h-3 text-slate-400 group-hover:text-slate-600" />
+                    )}
+                    Test
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { handleEditInit(wh); setOpen(true) }}
+                    className="h-8 text-xs text-slate-500 hover:text-slate-800"
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { if (confirm('Delete this webhook?')) deleteWebhook.mutate(wh.id) }}
+                    className="h-8 text-xs text-red-500 hover:text-red-700 hover:bg-red-50"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Webhook Add/Edit Dialog */}
+      <Dialog open={open} onOpenChange={(o) => { if (!o) setOpen(false); setEditingId(null) }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingId ? 'Edit Webhook' : 'Add Webhook'}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Target URL *</Label>
+              <input
+                type="url"
+                required
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://n8n.yourdomain.com/webhook/..."
+                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ns-accent))] focus:border-transparent bg-white placeholder-slate-400 transition-shadow"
+              />
+              <p className="text-[10px] text-slate-400">The destination URL that gets notified via POST requests with event payloads.</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Trigger Event *</Label>
+              <Select value={event} onValueChange={setEvent}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="contact.created">contact.created (Contact created)</SelectItem>
+                  <SelectItem value="deal.won">deal.won (Deal stage won)</SelectItem>
+                  <SelectItem value="invoice.paid">invoice.paid (Invoice approved/paid)</SelectItem>
+                  <SelectItem value="intake.approved">intake.approved (Intake submission approved)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-100">
+              <div className="space-y-0.5">
+                <Label className="text-xs font-semibold text-slate-800">Active Status</Label>
+                <p className="text-[10px] text-slate-400">Enable or disable this webhook trigger instantly.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsActive(!isActive)}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  isActive ? 'bg-[rgb(var(--ns-accent))]' : 'bg-slate-200'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    isActive ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={createWebhook.isPending || updateWebhook.isPending}>
+                {editingId ? 'Save Changes' : 'Create Webhook'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+function getSamplePayload(event: string) {
+  switch (event) {
+    case 'contact.created':
+      return { id: 'test_contact_123', name: 'John Doe', email: 'john@example.com', phone: '+1234567890', title: 'Director', companyId: 'test_company_456' }
+    case 'intake.approved':
+      return { id: 'test_intake_123', name: 'Sarah Smith', email: 'sarah@example.com', type: 'demo', source: 'landing_page', decidedAt: new Date().toISOString() }
+    case 'deal.won':
+      return { id: 'test_deal_123', title: 'Enterprise SLA Renewal', value: 25000, stage: 'won', contactId: 'test_contact_123' }
+    case 'invoice.paid':
+      return { id: 'test_invoice_123', title: 'Invoice #NS-1024', invoiceNumber: 'NS-1024', amount: 8400, status: 'paid', dueDate: new Date().toISOString().split('T')[0] }
+    default:
+      return { msg: 'Test payload' }
+  }
+}
+
+// ─── Templates Tab ────────────────────────────────────────────────────────────
+
+function TemplatesTab() {
+  const queryClient = useQueryClient()
+  const [open, setOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  
+  // Form states
+  const [title, setTitle] = useState('')
+  const [subject, setSubject] = useState('')
+  const [content, setContent] = useState('')
+  const [category, setCategory] = useState<string>('email')
+  
+  // Filter/Search states
+  const [search, setSearch] = useState('')
+  const [activeCategory, setActiveCategory] = useState<string>('all')
+
+  // Fetch templates
+  const { data: templates = [], isLoading } = useQuery({
+    queryKey: ['templates'],
+    queryFn: async () => {
+      return await pb.collection('templates').getFullList({
+        sort: '-created',
+      })
+    },
+  })
+
+  // Mutations
+  const createTemplate = useMutation({
+    mutationFn: async (data: any) => {
+      return await pb.collection('templates').create(data)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['templates'] })
+      toast.success('Template created successfully')
+      handleClose()
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Failed to create template')
+    }
+  })
+
+  const updateTemplate = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      return await pb.collection('templates').update(id, data)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['templates'] })
+      toast.success('Template updated successfully')
+      handleClose()
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Failed to update template')
+    }
+  })
+
+  const deleteTemplate = useMutation({
+    mutationFn: async (id: string) => {
+      return await pb.collection('templates').delete(id)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['templates'] })
+      toast.success('Template deleted')
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Failed to delete template')
+    }
+  })
+
+  const handleClose = () => {
+    setOpen(false)
+    setEditingId(null)
+    setTitle('')
+    setSubject('')
+    setContent('')
+    setCategory('email')
+  }
+
+  const handleEditInit = (tmpl: any) => {
+    setEditingId(tmpl.id)
+    setTitle(tmpl.title || '')
+    setSubject(tmpl.subject || '')
+    setContent(tmpl.content || '')
+    setCategory(tmpl.category || 'email')
+    setOpen(true)
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!title || !content || !category) {
+      toast.error('Title, Content, and Category are required')
+      return
+    }
+
+    const payload = {
+      title,
+      subject: ['email', 'invoice_reminder', 'proposal'].includes(category) ? subject : '',
+      content,
+      category,
+    }
+
+    if (editingId) {
+      updateTemplate.mutate({ id: editingId, data: payload })
+    } else {
+      createTemplate.mutate(payload)
+    }
+  }
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text)
+    toast.success('Template content copied to clipboard!')
+  }
+
+  // Filter templates
+  const filteredTemplates = templates.filter((tmpl: any) => {
+    const matchesSearch = 
+      tmpl.title?.toLowerCase().includes(search.toLowerCase()) ||
+      tmpl.subject?.toLowerCase().includes(search.toLowerCase()) ||
+      tmpl.content?.toLowerCase().includes(search.toLowerCase())
+    
+    const matchesCategory = activeCategory === 'all' || tmpl.category === activeCategory
+
+    return matchesSearch && matchesCategory
+  })
+
+  const categoryColors: Record<string, string> = {
+    email: 'bg-blue-50 text-blue-700 border-blue-100',
+    invoice_reminder: 'bg-orange-50 text-orange-700 border-orange-100',
+    proposal: 'bg-purple-50 text-purple-700 border-purple-100',
+    sms: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+    other: 'bg-slate-100 text-slate-600 border-slate-200',
+  }
+
+  const categoryLabels: Record<string, string> = {
+    email: 'Email',
+    invoice_reminder: 'Invoice Reminder',
+    proposal: 'Proposal',
+    sms: 'SMS',
+    other: 'Other',
+  }
+
+  const categories = ['all', 'email', 'invoice_reminder', 'proposal', 'sms', 'other']
+
+  const inputClass = 'w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ns-accent))] focus:border-transparent bg-white placeholder-slate-400 transition-shadow'
+  const textareaClass = 'w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ns-accent))] focus:border-transparent bg-white placeholder-slate-400 transition-shadow min-h-[140px] resize-y font-mono text-xs'
+
+  return (
+    <div className="space-y-4">
+      {/* Header and Add Button */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-slate-500" />
+            Canned Responses & Templates
+          </h3>
+          <p className="text-xs text-slate-500 mt-0.5">Quickly copy canned messages or use them to send invoices.</p>
+        </div>
+        <Button onClick={() => setOpen(true)} className="flex items-center gap-1.5 self-start bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white text-xs font-semibold px-3 py-1.5 h-8">
+          <Plus className="w-3.5 h-3.5" />
+          Add Template
+        </Button>
+      </div>
+
+      {/* Filter and Search Bar */}
+      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between">
+        {/* Category Pills */}
+        <div className="flex flex-wrap gap-1 w-full md:w-auto">
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setActiveCategory(cat)}
+              className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-all ${
+                activeCategory === cat
+                  ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                  : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              {cat === 'all' ? 'All' : categoryLabels[cat] || cat}
+            </button>
+          ))}
+        </div>
+
+        {/* Search Input */}
+        <div className="relative w-full md:w-64">
+          <input
+            type="text"
+            placeholder="Search templates..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ns-accent))] focus:border-transparent bg-white placeholder-slate-400"
+          />
+          <span className="absolute left-2.5 top-2 text-slate-400">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </span>
+        </div>
+      </div>
+
+      {/* Templates List */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12 bg-white rounded-xl border border-slate-200 shadow-sm">
+          <Loader2 className="w-6 h-6 animate-spin text-slate-300" />
+        </div>
+      ) : filteredTemplates.length === 0 ? (
+        <div className="text-center py-12 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col items-center justify-center">
+          <FileText className="w-10 h-10 text-slate-200 mb-2" />
+          <p className="text-sm font-semibold text-slate-500">No templates found</p>
+          <p className="text-xs text-slate-400 max-w-xs mt-1">
+            {search || activeCategory !== 'all' 
+              ? 'No templates match your filters. Try clearing your search.' 
+              : 'Create your first canned response template to get started!'}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {filteredTemplates.map((tmpl: any) => (
+            <div key={tmpl.id} className="bg-white rounded-xl border border-slate-200 shadow-sm hover:border-slate-300 transition-all flex flex-col justify-between overflow-hidden group">
+              <div className="p-4 space-y-3">
+                {/* Card Title & Category */}
+                <div className="flex items-start justify-between gap-2">
+                  <h4 className="font-semibold text-slate-900 text-sm group-hover:text-[rgb(var(--ns-accent))] transition-colors truncate">
+                    {tmpl.title}
+                  </h4>
+                  <Badge className={`${categoryColors[tmpl.category] || categoryColors.other} text-[9px] px-1.5 py-0.5 whitespace-nowrap`}>
+                    {categoryLabels[tmpl.category] || tmpl.category}
+                  </Badge>
+                </div>
+
+                {/* Subject (if applicable) */}
+                {tmpl.subject && (
+                  <div className="text-[11px] bg-slate-50 border border-slate-100 p-2 rounded-lg text-slate-600 font-medium truncate">
+                    <span className="text-slate-400 font-semibold mr-1.5">Subject:</span>
+                    {tmpl.subject}
+                  </div>
+                )}
+
+                {/* Content Area */}
+                <div className="relative">
+                  <pre className="text-xs text-slate-500 font-mono whitespace-pre-wrap line-clamp-4 bg-slate-50/50 p-2.5 rounded-lg border border-slate-100/50 min-h-[80px] break-words">
+                    {tmpl.content}
+                  </pre>
+                  <div className="absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-white to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+              </div>
+
+              {/* Action Buttons Footer */}
+              <div className="bg-slate-50 px-4 py-2 border-t border-slate-100 flex items-center justify-between">
+                {/* Variable Placeholder Hints */}
+                <div className="text-[9px] text-slate-400 font-mono truncate max-w-[120px]" title="Supports template placeholders like {client_name}, {invoice_number}">
+                  Supports {`{...}`} tags
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleCopy(tmpl.content)}
+                    className="h-7 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-100 px-2 flex items-center gap-1"
+                    title="Copy to clipboard"
+                  >
+                    <Copy className="w-3 h-3" />
+                    Copy
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleEditInit(tmpl)}
+                    className="h-7 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-100 px-2 flex items-center gap-1"
+                  >
+                    <Edit className="w-3 h-3" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      if (confirm('Delete this template?')) {
+                        deleteTemplate.mutate(tmpl.id)
+                      }
+                    }}
+                    className="h-7 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 flex items-center gap-1"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add/Edit Dialog */}
+      <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose() }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-[rgb(var(--ns-accent))]" />
+              {editingId ? 'Edit Message Template' : 'Create Message Template'}
+            </DialogTitle>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+            {/* Title */}
+            <div className="space-y-1.5">
+              <Label>Template Title *</Label>
+              <input
+                type="text"
+                required
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. Invoice Overdue Follow-up"
+                className={inputClass}
+              />
+              <p className="text-[10px] text-slate-400">Descriptive name for internal search/lookup.</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {/* Category */}
+              <div className="space-y-1.5 col-span-2 sm:col-span-1">
+                <Label>Category *</Label>
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="email">Email</SelectItem>
+                    <SelectItem value="invoice_reminder">Invoice Reminder</SelectItem>
+                    <SelectItem value="proposal">Proposal</SelectItem>
+                    <SelectItem value="sms">SMS</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Template Tags Hint */}
+              <div className="p-3 bg-slate-50 border border-slate-100 rounded-lg col-span-2 sm:col-span-1 flex flex-col justify-center">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Available Auto-tags:</span>
+                <span className="text-[9px] text-slate-500 font-mono leading-relaxed">
+                  {`{client_name}, {invoice_number}, {invoice_amount}, {due_date}, {sender_name}, {contact_name}, {company_name}, {deal_title}`}
+                </span>
+              </div>
+            </div>
+
+            {/* Subject (Conditional) */}
+            {['email', 'invoice_reminder', 'proposal'].includes(category) && (
+              <div className="space-y-1.5">
+                <Label>Email Subject Line</Label>
+                <input
+                  type="text"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  placeholder="e.g. Reminder: Invoice {invoice_number} is past due"
+                  className={inputClass}
+                />
+              </div>
+            )}
+
+            {/* Message Body */}
+            <div className="space-y-1.5">
+              <Label>Message Content *</Label>
+              <textarea
+                required
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="Write your canned message content here. Use {tags} to automatically inject client or invoice variables."
+                className={textareaClass}
+              />
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="ghost" onClick={handleClose}>Cancel</Button>
+              <Button 
+                type="submit" 
+                disabled={createTemplate.isPending || updateTemplate.isPending}
+                className="bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white"
+              >
+                {editingId ? 'Save Changes' : 'Create Template'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
 

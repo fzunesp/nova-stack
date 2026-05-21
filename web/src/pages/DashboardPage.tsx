@@ -1,9 +1,9 @@
+import { useState } from 'react'
 import { useDashboardData } from '@/hooks/useDashboardData'
 import { useActivityFeed } from '@/hooks/useActivityFeed'
 import { useMyWorkQueue } from '@/hooks/useMyWorkQueue'
 import { useAuth } from '@/hooks/useAuth'
 import { TodayStrip } from '@/components/dashboard/TodayStrip'
-import { MySignalsPanel } from '@/components/dashboard/MySignalsPanel'
 import { MoneyAtRiskStrip } from '@/components/dashboard/MoneyAtRiskStrip'
 import { RadarPanel } from '@/components/dashboard/RadarPanel'
 import { BusinessKpiGrid } from '@/components/dashboard/BusinessKpiGrid'
@@ -11,12 +11,19 @@ import { ActivityFeed } from '@/components/dashboard/ActivityFeed'
 import { MyWorkQueue } from '@/components/dashboard/MyWorkQueue'
 import { groupWorkQueue } from '@/services/work-queue'
 import { Loader2 } from 'lucide-react'
+import { FirstRunSetupWizard } from '@/components/FirstRunSetupWizard'
 
 export function DashboardPage() {
   const { data, isLoading, error } = useDashboardData()
   const { data: feedEvents, isLoading: feedLoading } = useActivityFeed()
   const { data: workItems, isLoading: workLoading } = useMyWorkQueue()
-  const { isHrOrAdmin } = useAuth()
+  const { user, isAdmin, isHrOrAdmin } = useAuth()
+
+  const [showSetup, setShowSetup] = useState(() => {
+    if (!isAdmin || !user) return false
+    const firstRunDone = localStorage.getItem(`novastack_first_run_completed_${user.id}`)
+    return !user.companyName && firstRunDone !== 'true'
+  })
 
   if (isLoading) {
     return (
@@ -34,7 +41,7 @@ export function DashboardPage() {
     )
   }
 
-  const { metrics, radar, today, moneyAtRisk, mySignals } = data
+  const { metrics, radar, today, moneyAtRisk } = data
   const grouped = workItems ? groupWorkQueue(workItems) : { needsAttention: [], recentlyUpdated: [], waiting: [] }
 
   return (
@@ -47,10 +54,20 @@ export function DashboardPage() {
       <TodayStrip summary={today} />
       {isHrOrAdmin && <ActivityFeed events={feedEvents || []} isLoading={feedLoading} />}
       <MyWorkQueue grouped={grouped} isLoading={workLoading} />
-      <MySignalsPanel items={mySignals} />
       <MoneyAtRiskStrip data={moneyAtRisk} />
       <RadarPanel data={radar} />
       <BusinessKpiGrid metrics={metrics} />
+
+      {showSetup && (
+        <FirstRunSetupWizard 
+          user={user} 
+          onComplete={() => {
+            setShowSetup(false)
+            window.location.reload()
+          }} 
+        />
+      )}
     </div>
   )
 }
+
