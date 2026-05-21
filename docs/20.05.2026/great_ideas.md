@@ -27,10 +27,10 @@
 * **Description**:
   A centralized registry of message templates. Business owners and salespeople often write the same follow-ups or pitch messages. Storing them locally allows copying templates (e.g., "Invoice Overdue Reminder", "Introductory Pitch") to the clipboard with a single click.
 * **Key Tasks**:
-  - [ ] Create a `templates` or `canned_responses` collection in PocketBase.
-  - [ ] Build a "Templates" tab in settings or a floating sidebar widget.
-  - [ ] Add quick-copy buttons to copy text instantly to the clipboard.
-  - [ ] Integrate a template selector directly into the "Send Invoice" dialogue.
+  - [x] Create a `templates` or `canned_responses` collection in PocketBase.
+  - [x] Build a "Templates" tab in settings or a floating sidebar widget.
+  - [x] Add quick-copy buttons to copy text instantly to the clipboard.
+  - [x] Integrate a template selector directly into the "Send Invoice" dialogue.
 
 ---
 
@@ -63,8 +63,8 @@
 | Feature | Category | Complexity | Priority | Status |
 |:---|:---:|:---:|:---:|:---:|
 | **Kanban Board View** | CRM & Sales | Medium | High | ✅ Complete |
-| **Canned Responses** | Productivity | Low | Medium | ⚪ Proposed |
+| **Canned Responses** | Productivity | Low | Medium | ✅ Complete |
 | **Customer Interaction Log** | CRM & CRM History | Medium | High | ⚪ Proposed |
 | **Floating Scratchpad** | Dashboard | Low | Low | ⚪ Proposed |
 
-*Overall Roadmap Completion: **25%** (1/4 features shipped)*
+*Overall Roadmap Completion: **50%** (2/4 features shipped)*
