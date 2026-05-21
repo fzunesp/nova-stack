@@ -149,6 +149,18 @@ export interface IntakeRecord {
   updated?: string
 }
 
+export type InteractionType = 'call' | 'email' | 'meeting' | 'note' | 'sms' | 'proposal'
+
+export interface ContactInteraction {
+  id: string
+  contactId: string
+  userId: string
+  content: string
+  type: InteractionType
+  created?: string
+  updated?: string
+}
+
 export interface AuditLogRecord {
   id: string
   entityType: string

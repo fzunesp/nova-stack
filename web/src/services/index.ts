@@ -5,3 +5,4 @@ export * from './types'
 // These are NOT service classes; they are plain async functions.
 export * from './activity'
 export * from './work-queue'
+export * from './contact-interactions'

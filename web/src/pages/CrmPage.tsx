@@ -16,6 +16,7 @@ import { toast } from 'sonner'
 import { useLocation, useNavigate, useParams } from 'react-router'
 import type { Status } from '@/services'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
+import { ContactInteractionsTimeline } from '@/components/ContactInteractionsTimeline'
 
 export function CrmPage() {
   const location = useLocation()
@@ -861,16 +862,12 @@ function ContactDetailDialog({ contact, onClose }: { contact: any; onClose: () =
                 </div>
               </div>
 
-              {contact.notes && (
-                <div className="pt-3 border-t border-slate-100 mt-4">
-                  <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5 flex items-center gap-1">
-                    <Info className="w-3.5 h-3.5" /> Notes
-                  </div>
-                  <p className="text-xs text-slate-600 bg-white border border-slate-100 rounded-lg p-2.5 italic leading-relaxed whitespace-pre-wrap">
-                    {contact.notes}
-                  </p>
+              <div className="pt-3 border-t border-slate-100 mt-4">
+                <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-1">
+                  <Info className="w-3.5 h-3.5" /> Interaction Log
                 </div>
-              )}
+                <ContactInteractionsTimeline contactId={contact.id} />
+              </div>
             </div>
           </div>
 
