@@ -39,10 +39,10 @@
 * **Description**:
   Currently, contacts only have a single `notes` text field. A true timeline logs every client interaction ("Sent proposal", "Had call", "Met for coffee"). This adds a chronological log of notes under the contact detail sheet.
 * **Key Tasks**:
-  - [ ] Create an `interaction_logs` collection linked to contacts.
-  - [ ] Replace or extend the contact detail notes pane with a message log input.
-  - [ ] Render notes as a timeline showing who posted it, when it was posted, and its contents.
-  - [ ] Add tags (e.g. `call`, `email`, `meeting`, `note`) for quick categorization.
+  - [x] Create an `interaction_logs` collection linked to contacts.
+  - [x] Replace or extend the contact detail notes pane with a message log input.
+  - [x] Render notes as a timeline showing who posted it, when it was posted, and its contents.
+  - [x] Add tags (e.g. `call`, `email`, `meeting`, `note`) for quick categorization.
 
 ---
 
@@ -64,7 +64,7 @@
 |:---|:---:|:---:|:---:|:---:|
 | **Kanban Board View** | CRM & Sales | Medium | High | ✅ Complete |
 | **Canned Responses** | Productivity | Low | Medium | ✅ Complete |
-| **Customer Interaction Log** | CRM & CRM History | Medium | High | ⚪ Proposed |
+| *| **Customer Interaction Log** | CRM & CRM History | Medium | High | ✅ Complete |
 | **Floating Scratchpad** | Dashboard | Low | Low | ⚪ Proposed |
 
-*Overall Roadmap Completion: **50%** (2/4 features shipped)*
+*Overall Roadmap Completion: **75%** (3/4 features shipped)*
