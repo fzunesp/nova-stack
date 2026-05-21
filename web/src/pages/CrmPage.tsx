@@ -784,7 +784,7 @@ function ContactDetailDialog({ contact, onClose }: { contact: any; onClose: () =
 
   return (
     <Dialog open={true} onOpenChange={(open) => { if (!open) onClose() }}>
-      <DialogContent className="sm:max-w-4xl max-h-[85vh] flex flex-col p-0 overflow-hidden">
+      <DialogContent className="max-w-[95vw] sm:max-w-6xl min-w-[640px] max-h-[92vh] flex flex-col p-0 overflow-hidden" style={{ resize: 'both' }}>
         <DialogHeader className="px-6 py-4 border-b border-slate-100 flex-shrink-0">
           <DialogTitle className="flex items-center gap-2 text-slate-900 text-lg font-semibold">
             <Activity className="w-5 h-5 text-indigo-500" />
@@ -793,8 +793,8 @@ function ContactDetailDialog({ contact, onClose }: { contact: any; onClose: () =
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto grid grid-cols-12 divide-y md:divide-y-0 md:divide-x divide-slate-100 min-h-0">
-          {/* Left Column: Contact Details */}
-          <div className="col-span-12 md:col-span-4 p-6 bg-slate-50/50 flex flex-col">
+          {/* Left Column: Contact Details & Interaction Log */}
+          <div className="col-span-12 md:col-span-5 p-6 bg-slate-50/50 flex flex-col">
             <div className="text-center mb-6">
               <div className="w-16 h-16 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xl font-bold mx-auto mb-3 border-2 border-white shadow-sm">
                 {contact.name?.charAt(0)?.toUpperCase() || '?'}
@@ -864,15 +864,21 @@ function ContactDetailDialog({ contact, onClose }: { contact: any; onClose: () =
 
               <div className="pt-3 border-t border-slate-100 mt-4">
                 <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-1">
-                  <Info className="w-3.5 h-3.5" /> Interaction Log
+                  <Info className="w-3.5 h-3.5" /> Interaction Log <span className="bg-red-500 text-white text-[9px] px-1 rounded ml-1">v5</span>
                 </div>
-                <ContactInteractionsTimeline contactId={contact.id} />
+                <style>{`
+                  .interaction-log-tight * { margin-top: 0 !important; margin-bottom: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; }
+                  .interaction-log-tight > div > div { margin-bottom: 2px !important; }
+                `}</style>
+                <div className="interaction-log-tight" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2px' }}>
+                  <ContactInteractionsTimeline contactId={contact.id} />
+                </div>
               </div>
             </div>
           </div>
 
           {/* Right Column: Unified Timeline */}
-          <div className="col-span-12 md:col-span-8 p-6 flex flex-col min-h-0 bg-white">
+          <div className="col-span-12 md:col-span-7 p-6 flex flex-col min-h-0 bg-white">
             <h4 className="text-sm font-semibold text-slate-800 mb-4 flex items-center gap-2">
               <Activity className="w-4 h-4 text-slate-400" />
               Unified Activity History

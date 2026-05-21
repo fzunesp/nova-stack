@@ -34,6 +34,7 @@ function formatTime(iso: string) {
 }
 
 export function ContactInteractionsTimeline({ contactId }: { contactId: string }) {
+  console.log(' ContactInteractionsTimeline v3 loaded - space-y-0 tight spacing')
   const { data: interactions, isLoading } = useContactInteractions(contactId)
   const createMutation = useCreateInteraction()
   const updateMutation = useUpdateInteraction()
@@ -77,7 +78,7 @@ export function ContactInteractionsTimeline({ contactId }: { contactId: string }
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-2">
         {[...Array(3)].map((_, i) => (
           <div key={i} className="flex gap-3 animate-pulse">
             <div className="w-8 h-8 rounded-full bg-slate-100 flex-shrink-0" />
@@ -93,23 +94,23 @@ export function ContactInteractionsTimeline({ contactId }: { contactId: string }
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {(!interactions || interactions.length === 0) ? (
         <p className="text-xs text-slate-400 italic py-2">No interactions yet.</p>
       ) : (
-        <div className="border-l-2 border-slate-100 pl-4 space-y-4">
+        <div className="border-l-2 border-slate-100 pl-2" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2px' }}>
           {interactions!.map((entry) => {
             const config = TYPE_CONFIG[entry.type]
             const Icon = config.icon
             const isEditing = editingId === entry.id
 
             return (
-              <div key={entry.id} className="relative pl-6">
-                <div className="absolute -left-[29px] top-0 w-5 h-5 rounded-full bg-white border-2 border-slate-200 flex items-center justify-center">
+              <div key={entry.id} className="relative pl-4">
+                <div className="absolute -left-[25px] top-0 w-5 h-5 rounded-full bg-white border-2 border-slate-200 flex items-center justify-center">
                   <Icon className="w-2.5 h-2.5 text-slate-400" />
                 </div>
 
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-2">
                   <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${config.color}`}>
                     {config.label}
                   </span>
@@ -117,7 +118,7 @@ export function ContactInteractionsTimeline({ contactId }: { contactId: string }
                 </div>
 
                 {isEditing ? (
-                  <div className="space-y-2">
+                  <div className="space-y-1 mt-1">
                     <Textarea
                       value={editContent}
                       onChange={(e) => setEditContent(e.target.value)}
@@ -135,10 +136,10 @@ export function ContactInteractionsTimeline({ contactId }: { contactId: string }
                   </div>
                 ) : (
                   <>
-                    <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">
+                    <p className="text-xs text-slate-600 leading-tight whitespace-pre-wrap m-0">
                       {entry.content}
                     </p>
-                    <div className="flex gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex gap-1 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button
                         size="sm"
                         variant="ghost"
@@ -167,7 +168,7 @@ export function ContactInteractionsTimeline({ contactId }: { contactId: string }
         </div>
       )}
 
-      <div className="pt-3 border-t border-slate-100">
+      <div className="pt-1 border-t border-slate-100">
         <div className="flex gap-2 mb-2">
           {TYPE_OPTIONS.map((t) => {
             const config = TYPE_CONFIG[t]
