@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Building2, Search, Trash2, Pencil, ArrowUpDown, Plus, Users, Briefcase, FileText, Globe, Phone, MapPin, Activity } from 'lucide-react'
+import { Building2, Search, Trash2, Pencil, ArrowUpDown, Plus, Users, Briefcase, FileText, Globe, Phone, MapPin, Activity, HelpCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -130,13 +130,22 @@ export function CompaniesPage() {
           <h2 className="text-xl font-semibold text-slate-900">Companies</h2>
           <p className="text-sm text-slate-500 mt-0.5">{totalItems} compan{totalItems !== 1 ? 'ies' : 'y'} total</p>
         </div>
-        <Dialog open={creating} onOpenChange={setCreating}>
-          <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-1.5" />Add Company</Button></DialogTrigger>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader><DialogTitle>Add New Company</DialogTitle></DialogHeader>
-            <CompanyForm data={formData} onChange={setFormData} onSubmit={() => createCompany.mutate(formData)} isPending={createCompany.isPending} label="Add Company" />
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/help?tab=companies')}
+            className="cursor-pointer flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-lg px-3 py-2 transition-colors"
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+            Help
+          </button>
+          <Dialog open={creating} onOpenChange={setCreating}>
+            <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-1.5" />Add Company</Button></DialogTrigger>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader><DialogTitle>Add New Company</DialogTitle></DialogHeader>
+              <CompanyForm data={formData} onChange={setFormData} onSubmit={() => createCompany.mutate(formData)} isPending={createCompany.isPending} label="Add Company" />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <div className="relative mb-4 max-w-md">

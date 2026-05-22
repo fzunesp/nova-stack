@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { FileText, Search, Trash2, Pencil, ArrowUpDown, Plus, X, ChevronDown, ChevronRight, Download, Send, Copy } from 'lucide-react'
+import { FileText, Search, Trash2, Pencil, ArrowUpDown, Plus, X, ChevronDown, ChevronRight, Download, Send, Copy, HelpCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -351,7 +351,15 @@ export function InvoicesPage() {
           <h2 className="text-xl font-semibold text-slate-900">Invoices</h2>
           <p className="text-sm text-slate-500 mt-0.5">{totalItems} invoice{totalItems !== 1 ? 's' : ''} total</p>
         </div>
-        <Dialog open={creating} onOpenChange={setCreating}>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/help?tab=invoices')}
+            className="cursor-pointer flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-lg px-3 py-2 transition-colors"
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+            Help
+          </button>
+          <Dialog open={creating} onOpenChange={setCreating}>
           <DialogTrigger asChild><Button>Add Invoice</Button></DialogTrigger>
           <DialogContent className="sm:max-w-2xl">
             <DialogHeader><DialogTitle>Add New Invoice</DialogTitle></DialogHeader>
@@ -443,6 +451,7 @@ export function InvoicesPage() {
           </DialogContent>
         </Dialog>
       </div>
+    </div>
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 gap-4 mb-6">

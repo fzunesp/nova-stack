@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Inbox, Search, Trash2, Pencil, ArrowUpDown, CheckCircle2, XCircle, Clock, User, MessageSquare, TrendingUp } from 'lucide-react'
+import { Inbox, Search, Trash2, Pencil, ArrowUpDown, CheckCircle2, XCircle, Clock, User, MessageSquare, TrendingUp, HelpCircle } from 'lucide-react'
+import { useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -59,6 +60,7 @@ const typeLabels: Record<string, string> = {
 }
 
 export function IntakePage() {
+  const navigate = useNavigate()
   const location = useLocation()
   const queryClient = useQueryClient()
   const initialSearch = location.state?.search || ''
@@ -120,7 +122,15 @@ export function IntakePage() {
           <h2 className="text-xl font-semibold text-slate-900">Intake</h2>
           <p className="text-sm text-slate-500 mt-0.5">{totalItems} submission{totalItems !== 1 ? 's' : ''}</p>
         </div>
-        <Dialog open={creating} onOpenChange={setCreating}>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/help?tab=intake')}
+            className="cursor-pointer flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-lg px-3 py-2 transition-colors"
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+            Help
+          </button>
+          <Dialog open={creating} onOpenChange={setCreating}>
           <DialogTrigger asChild><Button>Add Submission</Button></DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>Add Intake Submission</DialogTitle></DialogHeader>
@@ -160,6 +170,7 @@ export function IntakePage() {
           </DialogContent>
         </Dialog>
       </div>
+    </div>
 
       <div className="relative mb-4 max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />

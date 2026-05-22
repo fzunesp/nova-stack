@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Package, Search, Plus, Pencil, Trash2, Tag, Archive, CheckCircle } from 'lucide-react'
+import { Package, Search, Plus, Pencil, Trash2, Tag, Archive, CheckCircle, HelpCircle } from 'lucide-react'
+import { useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -16,6 +17,7 @@ import { useLocation } from 'react-router'
 import type { Status } from '@/services'
 
 export function ProductsPage() {
+  const navigate = useNavigate()
   const location = useLocation()
   const queryClient = useQueryClient()
   const initialSearch = location.state?.search || ''
@@ -77,6 +79,13 @@ export function ProductsPage() {
             </div>
           </div>
           <div className="flex items-center gap-3 w-full sm:w-auto">
+            <button
+              onClick={() => navigate('/help?tab=products')}
+              className="cursor-pointer flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-lg px-3 py-2 transition-colors"
+            >
+              <HelpCircle className="w-3.5 h-3.5" />
+              Help
+            </button>
             <Button onClick={() => setCreating(true)} className="flex-shrink-0 bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white shadow-sm">
               <Plus className="w-4 h-4 mr-2" /> Add
             </Button>

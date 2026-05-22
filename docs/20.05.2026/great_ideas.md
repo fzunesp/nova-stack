@@ -51,10 +51,10 @@
 * **Description**:
   A sticky-note widget placed directly on the Command Center (Dashboard) so users can write down immediate thoughts, reminders, or copy-paste text. The notepad autosaves dynamically to PocketBase so it is persisted across sessions and devices.
 * **Key Tasks**:
-  - [ ] Create a `user_settings` or `scratchpad` table to persist text per user.
-  - [ ] Design a beautiful sticky note/notepad card component with clean typography.
-  - [ ] Wire up debounced auto-saving to prevent layout lag on keystrokes.
-  - [ ] Add a "Clear Note" button.
+  - [x] Create a `scratchpad` table to persist text per user.
+  - [x] Design a beautiful sticky note/notepad card component with clean typography.
+  - [x] Wire up debounced auto-saving to prevent layout lag on keystrokes.
+  - [x] Add a "Clear Note" button.
 
 ---
 
@@ -64,7 +64,7 @@
 |:---|:---:|:---:|:---:|:---:|
 | **Kanban Board View** | CRM & Sales | Medium | High | ✅ Complete |
 | **Canned Responses** | Productivity | Low | Medium | ✅ Complete |
-| *| **Customer Interaction Log** | CRM & CRM History | Medium | High | ✅ Complete |
-| **Floating Scratchpad** | Dashboard | Low | Low | ⚪ Proposed |
+| **Customer Interaction Log** | CRM & CRM History | Medium | High | ✅ Complete |
+| **Floating Scratchpad** | Dashboard | Low | Low | ✅ Complete |
 
-*Overall Roadmap Completion: **75%** (3/4 features shipped)*
+*Overall Roadmap Completion: **100%** (4/4 features shipped)*

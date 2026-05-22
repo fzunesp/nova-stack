@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import pb from '@/lib/pocketbase'
-import { User, Mail, Building2, Lock, Save, Palette, Check, Shield, Trash2, UserPlus, Loader2, Database, Download, Webhook, Plus, Play, Copy, FileText, Edit, MessageSquare } from 'lucide-react'
+import { User, Users, Mail, Building2, Lock, Save, Palette, Check, Shield, Trash2, UserPlus, Loader2, Database, Download, Webhook, Plus, Play, Copy, FileText, Edit, MessageSquare, HelpCircle, Keyboard, ArrowUpRight, ChevronRight, Settings } from 'lucide-react'
+import { useNavigate } from 'react-router'
 import { useTheme, type ThemeName } from '@/contexts/ThemeContext'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -25,17 +26,18 @@ const ROLE_COLORS: Record<string, string> = {
 }
 
 export function SettingsPage() {
+  const navigate = useNavigate()
   const { user, isAdmin } = useAuth()
   const { theme, setTheme } = useTheme()
   const tabs = [
-    { id: 'profile', label: 'Profile' },
-    { id: 'security', label: 'Security' },
-    { id: 'appearance', label: 'Appearance' },
-    { id: 'templates', label: 'Templates' },
+    { id: 'profile', label: 'Profile', icon: User },
+    { id: 'security', label: 'Security', icon: Lock },
+    { id: 'appearance', label: 'Appearance', icon: Palette },
+    { id: 'templates', label: 'Templates', icon: FileText },
     ...(isAdmin ? [
-      { id: 'users', label: 'Users' },
-      { id: 'data', label: 'Data & Export' },
-      { id: 'webhooks', label: 'Webhooks' }
+      { id: 'users', label: 'Users', icon: Users },
+      { id: 'data', label: 'Data & Export', icon: Database },
+      { id: 'webhooks', label: 'Webhooks', icon: Webhook }
     ] : []),
   ] as any // Use as any to prevent strict const enum mismatch with dynamically updated TabId type
   type TabId = typeof tabs[number]['id']
@@ -86,148 +88,264 @@ export function SettingsPage() {
 
   const inputClass = 'w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ns-accent))] focus:border-transparent bg-white placeholder-slate-400 transition-shadow'
 
+  const tabHeadings: Record<string, string[]> = {
+    profile: ['Profile Information', 'Full name', 'Email address', 'Company name'],
+    security: ['Change Password', 'Current password', 'New password', 'Confirm password'],
+    appearance: ['Accent Colour'],
+    templates: ['Templates', 'Create Template'],
+    users: ['User Management', 'Add User', 'Role Permissions'],
+    data: ['System Backup', 'Data Export (CSV)'],
+    webhooks: ['Outbound Webhooks', 'Add Webhook'],
+  }
+
+  const currentHeadings = tabHeadings[activeTab] || []
+  const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+
   return (
-    <div className="max-w-2xl">
-      <div className="mb-6">
-        <h1 className="text-xl font-semibold text-slate-900">Settings</h1>
-        <p className="text-sm text-slate-500 mt-0.5">Manage your account preferences</p>
-      </div>
+    <div className="flex gap-6 h-full">
+      {/* LEFT SIDEBAR */}
+      <aside className="w-56 flex-shrink-0">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden sticky top-0">
+          <div className="px-4 py-3 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <Settings className="w-4 h-4 text-slate-400" />
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Settings</p>
+            </div>
+          </div>
+          <nav className="p-2 space-y-0.5">
+            {tabs.map((tab: { id: string; label: string; icon: any }) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as TabId)}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-left transition-all cursor-pointer ${
+                  activeTab === tab.id
+                    ? 'text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                }`}
+                style={activeTab === tab.id ? { backgroundColor: 'rgb(var(--ns-accent))' } : undefined}
+              >
+                <tab.icon className="w-4 h-4 flex-shrink-0" />
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+      </aside>
 
-      {/* Tabs */}
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-6 w-fit">
-        {tabs.map((tab: { id: string; label: string }) => (
+      {/* CENTER CONTENT */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        <div className="mb-6 flex items-start justify-between">
+          <div>
+            <h1 className="text-xl font-semibold text-slate-900">Settings</h1>
+            <p className="text-sm text-slate-500 mt-0.5">Manage your account preferences</p>
+          </div>
           <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as TabId)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
-              activeTab === tab.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-            }`}
+            onClick={() => navigate('/help?tab=settings')}
+            className="cursor-pointer flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-lg px-3 py-2 transition-colors"
           >
-            {tab.label}
+            <HelpCircle className="w-3.5 h-3.5" />
+            Help
           </button>
-        ))}
+        </div>
+
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 flex-1 overflow-y-auto">
+          {/* Profile Tab */}
+          {activeTab === 'profile' && (
+            <div className="space-y-8">
+              <div id="profile-information" className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="px-6 py-5 border-b border-slate-100 flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-full bg-[rgb(var(--ns-accent))] flex items-center justify-center text-white text-xl font-bold flex-shrink-0">
+                    {(user as any)?.name?.charAt(0)?.toUpperCase() || 'U'}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-slate-900">{(user as any)?.name || 'User'}</p>
+                    <p className="text-sm text-slate-500">{(user as any)?.email || ''}</p>
+                  </div>
+                </div>
+                <form onSubmit={handleSaveProfile} className="p-6 space-y-5">
+                  <div id="full-name">
+                    <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 mb-1.5"><User className="w-3.5 h-3.5" /> Full name</label>
+                    <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="Your full name" />
+                  </div>
+                  <div id="email-address">
+                    <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 mb-1.5"><Mail className="w-3.5 h-3.5" /> Email address</label>
+                    <input type="email" value={(user as any)?.email || ''} disabled className={`${inputClass} bg-slate-50 text-slate-400 cursor-not-allowed`} />
+                    <p className="text-xs text-slate-400 mt-1">Email cannot be changed</p>
+                  </div>
+                  <div id="company-name">
+                    <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 mb-1.5"><Building2 className="w-3.5 h-3.5" /> Company name</label>
+                    <input type="text" value={company} onChange={(e) => setCompany(e.target.value)} className={inputClass} placeholder="Your company" />
+                  </div>
+                  <div className="flex items-center gap-3 pt-1">
+                    <button type="submit" disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 shadow-sm">
+                      <Save className="w-3.5 h-3.5" />
+                      {saving ? 'Saving...' : 'Save changes'}
+                    </button>
+                    {saved && <span className="text-sm text-green-600 font-medium">✓ Saved!</span>}
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Security Tab */}
+          {activeTab === 'security' && (
+            <div className="space-y-8">
+              <div id="change-password" className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="px-6 py-5 border-b border-slate-100">
+                  <div className="flex items-center gap-2"><Lock className="w-4 h-4 text-slate-400" /><h3 className="font-semibold text-slate-900">Change password</h3></div>
+                  <p className="text-sm text-slate-500 mt-1">Use a strong password you don't use elsewhere.</p>
+                </div>
+                <form onSubmit={handleChangePassword} className="p-6 space-y-4">
+                  {pwError && <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">{pwError}</div>}
+                  <div id="current-password">
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Current password</label>
+                    <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required className={inputClass} placeholder="••••••••" />
+                  </div>
+                  <div id="new-password">
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">New password</label>
+                    <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required className={inputClass} placeholder="Min. 8 characters" />
+                  </div>
+                  <div id="confirm-password">
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Confirm new password</label>
+                    <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required className={inputClass} placeholder="••••••••" />
+                  </div>
+                  <div className="flex items-center gap-3 pt-1">
+                    <button type="submit" disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 shadow-sm">
+                      <Lock className="w-3.5 h-3.5" />
+                      {saving ? 'Updating...' : 'Update password'}
+                    </button>
+                    {saved && <span className="text-sm text-green-600 font-medium">✓ Updated!</span>}
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Appearance Tab */}
+          {activeTab === 'appearance' && (
+            <div className="space-y-8">
+              <div id="accent-colour" className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="px-6 py-5 border-b border-slate-100">
+                  <div className="flex items-center gap-2"><Palette className="w-4 h-4 text-slate-400" /><h3 className="font-semibold text-slate-900">Accent colour</h3></div>
+                  <p className="text-sm text-slate-500 mt-1">Changes the sidebar highlight, buttons, and interactive elements across the entire app.</p>
+                </div>
+                <div className="p-6">
+                  <div className="grid grid-cols-2 gap-3">
+                    {THEMES.map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => setTheme(t.id)}
+                        className={`relative flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all ${
+                          theme === t.id ? 'border-[rgb(var(--ns-accent))] bg-slate-50' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex-shrink-0 flex gap-1">
+                          <div className="w-8 h-8 rounded-lg shadow-sm" style={{ backgroundColor: t.hex }} />
+                          <div className="w-3 h-8 rounded-r-lg shadow-sm" style={{ backgroundColor: t.hexDark }} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-slate-900">{t.label}</p>
+                          <p className="text-xs text-slate-500">{t.description}</p>
+                        </div>
+                        {theme === t.id && (
+                          <div className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: t.hex }}>
+                            <Check className="w-3 h-3 text-white" strokeWidth={3} />
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-4">Your preference is saved automatically and persists between sessions.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Templates Tab */}
+          {activeTab === 'templates' && <div id="templates-tab"><TemplatesTab /></div>}
+
+          {/* Users Tab — Admin Only */}
+          {activeTab === 'users' && isAdmin && <div id="users-tab"><UsersTab currentUserId={(user as any)?.id} /></div>}
+
+          {/* Data Tab — Admin Only */}
+          {activeTab === 'data' && isAdmin && <div id="data-tab"><DataTab /></div>}
+
+          {/* Webhooks Tab — Admin Only */}
+          {activeTab === 'webhooks' && isAdmin && <div id="webhooks-tab"><WebhooksTab /></div>}
+        </div>
       </div>
 
-      {/* Profile Tab */}
-      {activeTab === 'profile' && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-5 border-b border-slate-100 flex items-center gap-4">
-            <div className="w-14 h-14 rounded-full bg-[rgb(var(--ns-accent))] flex items-center justify-center text-white text-xl font-bold flex-shrink-0">
-              {(user as any)?.name?.charAt(0)?.toUpperCase() || 'U'}
-            </div>
-            <div>
-              <p className="font-semibold text-slate-900">{(user as any)?.name || 'User'}</p>
-              <p className="text-sm text-slate-500">{(user as any)?.email || ''}</p>
-            </div>
-          </div>
-          <form onSubmit={handleSaveProfile} className="p-6 space-y-5">
-            <div>
-              <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 mb-1.5"><User className="w-3.5 h-3.5" /> Full name</label>
-              <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="Your full name" />
-            </div>
-            <div>
-              <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 mb-1.5"><Mail className="w-3.5 h-3.5" /> Email address</label>
-              <input type="email" value={(user as any)?.email || ''} disabled className={`${inputClass} bg-slate-50 text-slate-400 cursor-not-allowed`} />
-              <p className="text-xs text-slate-400 mt-1">Email cannot be changed</p>
-            </div>
-            <div>
-              <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 mb-1.5"><Building2 className="w-3.5 h-3.5" /> Company name</label>
-              <input type="text" value={company} onChange={(e) => setCompany(e.target.value)} className={inputClass} placeholder="Your company" />
-            </div>
-            <div className="flex items-center gap-3 pt-1">
-              <button type="submit" disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 shadow-sm">
-                <Save className="w-3.5 h-3.5" />
-                {saving ? 'Saving...' : 'Save changes'}
-              </button>
-              {saved && <span className="text-sm text-green-600 font-medium">✓ Saved!</span>}
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Security Tab */}
-      {activeTab === 'security' && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-5 border-b border-slate-100">
-            <div className="flex items-center gap-2"><Lock className="w-4 h-4 text-slate-400" /><h3 className="font-semibold text-slate-900">Change password</h3></div>
-            <p className="text-sm text-slate-500 mt-1">Use a strong password you don't use elsewhere.</p>
-          </div>
-          <form onSubmit={handleChangePassword} className="p-6 space-y-4">
-            {pwError && <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">{pwError}</div>}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Current password</label>
-              <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required className={inputClass} placeholder="••••••••" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">New password</label>
-              <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required className={inputClass} placeholder="Min. 8 characters" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Confirm new password</label>
-              <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required className={inputClass} placeholder="••••••••" />
-            </div>
-            <div className="flex items-center gap-3 pt-1">
-              <button type="submit" disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 shadow-sm">
-                <Lock className="w-3.5 h-3.5" />
-                {saving ? 'Updating...' : 'Update password'}
-              </button>
-              {saved && <span className="text-sm text-green-600 font-medium">✓ Updated!</span>}
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Appearance Tab */}
-      {activeTab === 'appearance' && (
-        <div className="space-y-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-6 py-5 border-b border-slate-100">
-              <div className="flex items-center gap-2"><Palette className="w-4 h-4 text-slate-400" /><h3 className="font-semibold text-slate-900">Accent colour</h3></div>
-              <p className="text-sm text-slate-500 mt-1">Changes the sidebar highlight, buttons, and interactive elements across the entire app.</p>
-            </div>
-            <div className="p-6">
-              <div className="grid grid-cols-2 gap-3">
-                {THEMES.map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => setTheme(t.id)}
-                    className={`relative flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all ${
-                      theme === t.id ? 'border-[rgb(var(--ns-accent))] bg-slate-50' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                    }`}
+      {/* RIGHT SIDEBAR TOC */}
+      <aside className="w-56 flex-shrink-0 hidden xl:block">
+        <div className="sticky top-0 space-y-4">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+              <ArrowUpRight className="w-3.5 h-3.5" />
+              On This Page
+            </h4>
+            <nav className="space-y-1">
+              {currentHeadings.map((heading) => {
+                const anchor = slugify(heading)
+                return (
+                  <a
+                    key={heading}
+                    href={`#${anchor}`}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      const el = document.getElementById(anchor)
+                      if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                      }
+                    }}
+                    className="block text-xs text-slate-500 hover:text-slate-900 transition-colors py-1 border-l-2 border-transparent hover:border-slate-300 pl-2"
                   >
-                    <div className="flex-shrink-0 flex gap-1">
-                      <div className="w-8 h-8 rounded-lg shadow-sm" style={{ backgroundColor: t.hex }} />
-                      <div className="w-3 h-8 rounded-r-lg shadow-sm" style={{ backgroundColor: t.hexDark }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-900">{t.label}</p>
-                      <p className="text-xs text-slate-500">{t.description}</p>
-                    </div>
-                    {theme === t.id && (
-                      <div className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: t.hex }}>
-                        <Check className="w-3 h-3 text-white" strokeWidth={3} />
-                      </div>
-                    )}
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-slate-400 mt-4">Your preference is saved automatically and persists between sessions.</p>
+                    {heading}
+                  </a>
+                )
+              })}
+            </nav>
+          </div>
+
+          {/* Keyboard Shortcuts Mini-Card */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Keyboard className="w-4 h-4 text-slate-400" />
+              <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Shortcuts</h4>
+            </div>
+            <div className="space-y-2">
+              {[
+                { key: 'Ctrl + K', desc: 'Global Search' },
+                { key: 'Ctrl + Enter', desc: 'Submit Forms' },
+                { key: 'Esc', desc: 'Close Dialogs' },
+              ].map((s) => (
+                <div key={s.key} className="flex items-center justify-between text-sm">
+                  <span className="text-xs text-slate-600">{s.desc}</span>
+                  <kbd className="bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-[11px] font-mono font-bold text-slate-700 shadow-sm">
+                    {s.key}
+                  </kbd>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Quick Links */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Quick Links</h4>
+            <div className="space-y-2">
+              <a href="/dashboard" className="flex items-center gap-2 text-xs text-slate-600 hover:text-indigo-600 transition-colors">
+                <ChevronRight className="w-3 h-3" /> Dashboard
+              </a>
+              <a href="/crm/contacts" className="flex items-center gap-2 text-xs text-slate-600 hover:text-indigo-600 transition-colors">
+                <ChevronRight className="w-3 h-3" /> CRM Contacts
+              </a>
+              <a href="/invoices" className="flex items-center gap-2 text-xs text-slate-600 hover:text-indigo-600 transition-colors">
+                <ChevronRight className="w-3 h-3" /> Invoices
+              </a>
             </div>
           </div>
         </div>
-      )}
-
-      {/* Templates Tab */}
-      {activeTab === 'templates' && <TemplatesTab />}
-
-      {/* Users Tab — Admin Only */}
-      {activeTab === 'users' && isAdmin && <UsersTab currentUserId={(user as any)?.id} />}
-
-      {/* Data Tab — Admin Only */}
-      {activeTab === 'data' && isAdmin && <DataTab />}
-
-      {/* Webhooks Tab — Admin Only */}
-      {activeTab === 'webhooks' && isAdmin && <WebhooksTab />}
+      </aside>
     </div>
   )
 }

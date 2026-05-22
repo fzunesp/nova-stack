@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import {
   Inbox, Plus, Settings2, FileText, CheckCircle2, Clock, XCircle,
-  ToggleLeft, ToggleRight, Pencil, Loader2,
+  ToggleLeft, ToggleRight, Pencil, Loader2, HelpCircle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -26,6 +26,7 @@ const isApproverOrAdmin = () => {
 
 // ─── Main HR Page ─────────────────────────────────────────────────────────────
 export function HrPage() {
+  const navigate = useNavigate()
   const [view, setView] = useState<'employee' | 'admin' | 'builder'>('employee')
   const [editingTemplate, setEditingTemplate] = useState<any | null>(null)
 
@@ -52,7 +53,15 @@ export function HrPage() {
             <p className="text-sm text-slate-500">Submit and manage HR form requests</p>
           </div>
         </div>
-        {isApproverOrAdmin() && (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/help?tab=hr')}
+            className="cursor-pointer flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-lg px-3 py-2 transition-colors"
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+            Help
+          </button>
+          {isApproverOrAdmin() && (
           <div className="flex gap-2">
             <Button
               variant={view === 'employee' ? 'default' : 'outline'}
@@ -73,6 +82,7 @@ export function HrPage() {
           </div>
         )}
       </div>
+    </div>
 
       {view === 'employee' && <EmployeeView />}
       {view === 'admin' && isApproverOrAdmin() && (
