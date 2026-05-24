@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { usePaginatedQuery } from '@/hooks/usePaginatedQuery'
 import { DataTablePagination } from '@/components/DataTablePagination'
-import { TableSkeleton } from '@/components/ui/skeleton'
+import { TableSkeleton, TableRowSkeleton } from '@/components/ui/skeleton'
 import pb from '@/lib/pocketbase'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -120,7 +120,7 @@ export function ProductsPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {isLoading ? (
-                  <TableSkeleton rows={5} />
+                  <TableRowSkeleton rows={5} />
                 ) : items.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-6 py-12 text-center">

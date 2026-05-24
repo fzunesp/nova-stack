@@ -1,8 +1,8 @@
+/// <reference path="../pb_data/types.d.ts" />
 console.log("[WEBHOOKS-BOOT] webhooks.pb.js loaded successfully")
 
 function triggerWebhooks(event, payload) {
   try {
-    // Find all active webhooks for this event type
     var webhooks = $app.findRecordsByFilter('webhooks', `event = "${event}" && isActive = true`)
     if (!webhooks || webhooks.length === 0) return
 
@@ -12,7 +12,7 @@ function triggerWebhooks(event, payload) {
       if (!url) continue
 
       try {
-        console.log(`[WEBHOOK] Posting ${event} payload to ${url}`)
+        console.log('[WEBHOOK] Posting ' + event + ' payload to ' + url)
         $http.send({
           url: url,
           method: 'POST',
@@ -27,15 +27,14 @@ function triggerWebhooks(event, payload) {
           })
         })
       } catch (err) {
-        console.error(`[WEBHOOK] Failed posting to ${url}: ${err}`)
+        console.error('[WEBHOOK] Failed posting to ' + url + ': ' + err)
       }
     }
   } catch (err) {
-    console.error(`[WEBHOOK] Error querying active webhooks: ${err}`)
+    console.error('[WEBHOOK] Error querying active webhooks: ' + err)
   }
 }
 
-// 1. contact.created
 onModelAfterCreateSuccess(function(e) {
   var payload = {
     id: e.model.id,
@@ -49,9 +48,8 @@ onModelAfterCreateSuccess(function(e) {
   triggerWebhooks('contact.created', payload)
 }, 'contacts')
 
-// 2. intake.approved
 onModelAfterUpdateSuccess(function(e) {
-  var oldStatus = e.model.originalCopy().getString('status')
+  var oldStatus = e.model.original().get('status')
   var newStatus = e.model.getString('status')
   if (oldStatus !== newStatus && newStatus === 'approved') {
     var payload = {
@@ -68,9 +66,8 @@ onModelAfterUpdateSuccess(function(e) {
   }
 }, 'intake_submissions')
 
-// 3. deal.won
 onModelAfterUpdateSuccess(function(e) {
-  var oldStage = e.model.originalCopy().getString('stage')
+  var oldStage = e.model.original().get('stage')
   var newStage = e.model.getString('stage')
   if (oldStage !== newStage && newStage === 'won') {
     var payload = {
@@ -86,9 +83,8 @@ onModelAfterUpdateSuccess(function(e) {
   }
 }, 'deals')
 
-// 4. invoice.paid
 onModelAfterUpdateSuccess(function(e) {
-  var oldStatus = e.model.originalCopy().getString('status')
+  var oldStatus = e.model.original().get('status')
   var newStatus = e.model.getString('status')
   if (oldStatus !== newStatus && newStatus === 'approved') {
     var payload = {
@@ -96,7 +92,7 @@ onModelAfterUpdateSuccess(function(e) {
       title: e.model.getString('title'),
       invoiceNumber: e.model.getString('invoiceNumber'),
       amount: e.model.getFloat('amount'),
-      status: 'paid', // approved = paid in statusLabels
+      status: 'paid',
       dueDate: e.model.getString('dueDate'),
       dealId: e.model.getString('dealId'),
       created: e.model.getString('created')
