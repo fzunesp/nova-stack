@@ -6,34 +6,15 @@ services:
       - ./pocketbase/pb_migrations:/pb_migrations
       - ./pocketbase/pb_hooks:/pb_hooks
     restart: unless-stopped
-    env_file: .env
-    networks:
-      - nova-network
 
   web:
     build:
       context: ./web
       args:
         - VITE_POCKETBASE_URL=/
-    ports:
-      - "${PORT:-80}:80"
     depends_on:
       - pocketbase
     restart: unless-stopped
-    networks:
-      - nova-network
-
-  mailpit:
-    image: axllent/mailpit:latest
-    ports:
-      - "${MAILPIT_UI_PORT:-8025}:8025"
-    restart: unless-stopped
-    networks:
-      - nova-network
-
-networks:
-  nova-network:
-    driver: bridge
 
 volumes:
   pb_data:
