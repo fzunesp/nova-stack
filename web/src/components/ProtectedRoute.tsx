@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Navigate } from 'react-router'
+import { Navigate, useLocation } from 'react-router'
 import { useAuth } from '@/hooks/useAuth'
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, checkAuth } = useAuth()
+  const { isAuthenticated, user, checkAuth } = useAuth()
   const [checking, setChecking] = useState(true)
+  const location = useLocation()
 
   useEffect(() => {
     checkAuth()
@@ -21,6 +22,10 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
+  }
+
+  if (user?.mustChangePassword && location.pathname !== '/settings') {
+    return <Navigate to="/settings?forceChange=true" replace />
   }
 
   return <>{children}</>

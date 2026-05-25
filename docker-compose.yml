@@ -1,20 +1,39 @@
 services:
   pocketbase:
     image: ghcr.io/muchobien/pocketbase:latest
-    ports:
-      - '8090:8090'
     volumes:
-      - ./pocketbase/pb_data:/pb_data
+      - pb_data:/pb_data
       - ./pocketbase/pb_migrations:/pb_migrations
       - ./pocketbase/pb_hooks:/pb_hooks
     restart: unless-stopped
-    environment:
-      - PB_ADMIN_EMAIL=admin@novastack.local
-      - PB_ADMIN_PASSWORD=novastack123
+    env_file: .env
+    networks:
+      - nova-network
+
+  web:
+    build:
+      context: ./web
+      args:
+        - VITE_POCKETBASE_URL=/
+    ports:
+      - "${PORT:-80}:80"
+    depends_on:
+      - pocketbase
+    restart: unless-stopped
+    networks:
+      - nova-network
 
   mailpit:
     image: axllent/mailpit:latest
     ports:
-      - '1025:1025'
-      - '8025:8025'
+      - "${MAILPIT_UI_PORT:-8025}:8025"
     restart: unless-stopped
+    networks:
+      - nova-network
+
+networks:
+  nova-network:
+    driver: bridge
+
+volumes:
+  pb_data:

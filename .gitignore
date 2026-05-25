@@ -50,5 +50,17 @@ next-env.d.ts
 data/
 pocketbase/pb_data/
 
+# logs
+*.log
+
+# binaries
+pocketbase/pocketbase.exe
+
 # AI agent skills (installed locally, not committed)
 .agents/skills/
+
+# tools
+tools/
+
+# test output
+web/test-results/

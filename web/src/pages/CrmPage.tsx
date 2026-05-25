@@ -824,10 +824,10 @@ function buildUnifiedEvents(contact: any, data: any) {
         type: 'interaction',
         interactionType: interaction.type,
         date: new Date(interaction.created || interaction.updated || Date.now()),
-        title: TYPE_CONFIG[interaction.type]?.label || interaction.type,
+        title: TYPE_CONFIG[interaction.type as InteractionType]?.label || interaction.type,
         description: interaction.content,
         status: 'Logged',
-        badgeColor: TYPE_CONFIG[interaction.type]?.color || 'bg-slate-50 text-slate-700 border-slate-200',
+        badgeColor: TYPE_CONFIG[interaction.type as InteractionType]?.color || 'bg-slate-50 text-slate-700 border-slate-200',
         isManual: true,
         raw: interaction,
       })

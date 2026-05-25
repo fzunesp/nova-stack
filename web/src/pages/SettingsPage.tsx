@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import pb from '@/lib/pocketbase'
-import { User, Users, Mail, Building2, Lock, Save, Palette, Check, Shield, Trash2, UserPlus, Loader2, Database, Download, Webhook, Plus, Play, Copy, FileText, Edit, MessageSquare, HelpCircle, Keyboard, ArrowUpRight, ChevronRight, Settings } from 'lucide-react'
-import { useNavigate } from 'react-router'
+import { User, Users, Mail, Building2, Lock, Save, Palette, Check, Shield, Trash2, UserPlus, Loader2, Database, Download, Webhook, Plus, Play, Copy, FileText, Edit, MessageSquare, HelpCircle, Keyboard, ArrowUpRight, ChevronRight, Settings, UserMinus, UserCheck, Eye, EyeOff } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router'
 import { useTheme, type ThemeName } from '@/contexts/ThemeContext'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
 
 const THEMES: { id: ThemeName; label: string; description: string; hex: string; hexDark: string }[] = [
   { id: 'indigo', label: 'Indigo', description: 'Classic & trustworthy', hex: '#4f46e5', hexDark: '#4338ca' },
@@ -27,6 +28,7 @@ const ROLE_COLORS: Record<string, string> = {
 
 export function SettingsPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { user, isAdmin } = useAuth()
   const { theme, setTheme } = useTheme()
   const tabs = [
@@ -39,7 +41,7 @@ export function SettingsPage() {
       { id: 'data', label: 'Data & Export', icon: Database },
       { id: 'webhooks', label: 'Webhooks', icon: Webhook }
     ] : []),
-  ] as any // Use as any to prevent strict const enum mismatch with dynamically updated TabId type
+  ] as any
   type TabId = typeof tabs[number]['id']
 
   const [activeTab, setActiveTab] = useState<TabId>('profile')
@@ -51,6 +53,15 @@ export function SettingsPage() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [pwError, setPwError] = useState('')
+  const [showPwCurrent, setShowPwCurrent] = useState(false)
+  const [showPwNew, setShowPwNew] = useState(false)
+  const [showPwConfirm, setShowPwConfirm] = useState(false)
+
+  useEffect(() => {
+    if (searchParams.get('forceChange') === 'true') {
+      setActiveTab('security' as TabId)
+    }
+  }, [searchParams])
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -75,10 +86,14 @@ export function SettingsPage() {
     try {
       await pb.collection('users').update((user as any).id, {
         oldPassword: currentPassword, password: newPassword, passwordConfirm: confirmPassword,
+        mustChangePassword: false,
       })
       setCurrentPassword(''); setNewPassword(''); setConfirmPassword('')
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
+      if (searchParams.get('forceChange') === 'true') {
+        navigate('/settings', { replace: true })
+      }
     } catch (err: any) {
       setPwError(err.message || 'Failed to update password')
     } finally {
@@ -191,6 +206,15 @@ export function SettingsPage() {
           {/* Security Tab */}
           {activeTab === 'security' && (
             <div className="space-y-8">
+              {searchParams.get('forceChange') === 'true' && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 shadow-sm">
+                  <Lock className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-amber-800">Password change required</p>
+                    <p className="text-sm text-amber-700 mt-0.5">You're using a temporary password. Please set a new password to continue.</p>
+                  </div>
+                </div>
+              )}
               <div id="change-password" className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="px-6 py-5 border-b border-slate-100">
                   <div className="flex items-center gap-2"><Lock className="w-4 h-4 text-slate-400" /><h3 className="font-semibold text-slate-900">Change password</h3></div>
@@ -200,15 +224,30 @@ export function SettingsPage() {
                   {pwError && <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">{pwError}</div>}
                   <div id="current-password">
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">Current password</label>
-                    <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required className={inputClass} placeholder="••••••••" />
+                    <div className="relative">
+                      <input type={showPwCurrent ? 'text' : 'password'} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required className="w-full px-3.5 py-2.5 pr-10 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ns-accent))] focus:border-transparent bg-white placeholder-slate-400" placeholder="••••••••" />
+                      <button type="button" onClick={() => setShowPwCurrent(!showPwCurrent)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer" tabIndex={-1}>
+                        {showPwCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
                   <div id="new-password">
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">New password</label>
-                    <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required className={inputClass} placeholder="Min. 8 characters" />
+                    <div className="relative">
+                      <input type={showPwNew ? 'text' : 'password'} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required className="w-full px-3.5 py-2.5 pr-10 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ns-accent))] focus:border-transparent bg-white placeholder-slate-400" placeholder="Min. 8 characters" />
+                      <button type="button" onClick={() => setShowPwNew(!showPwNew)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer" tabIndex={-1}>
+                        {showPwNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
                   <div id="confirm-password">
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">Confirm new password</label>
-                    <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required className={inputClass} placeholder="••••••••" />
+                    <div className="relative">
+                      <input type={showPwConfirm ? 'text' : 'password'} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required className="w-full px-3.5 py-2.5 pr-10 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ns-accent))] focus:border-transparent bg-white placeholder-slate-400" placeholder="••••••••" />
+                      <button type="button" onClick={() => setShowPwConfirm(!showPwConfirm)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer" tabIndex={-1}>
+                        {showPwConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
                   <div className="flex items-center gap-3 pt-1">
                     <button type="submit" disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 shadow-sm">
@@ -359,29 +398,68 @@ function UsersTab({ currentUserId }: { currentUserId: string }) {
   const [inviteName, setInviteName] = useState('')
   const [inviteRole, setInviteRole] = useState<'admin' | 'hr' | 'user'>('user')
   const [invitePassword, setInvitePassword] = useState('')
+  const [showInvitePassword, setShowInvitePassword] = useState(false)
 
-  const { data: users, isLoading } = useQuery({
+  // Edit User State
+  const [editOpen, setEditOpen] = useState(false)
+  const [editingUser, setEditingUser] = useState<any>(null)
+  const [editName, setEditName] = useState('')
+  const [editEmail, setEditEmail] = useState('')
+  const [editIsActive, setEditIsActive] = useState(true)
+
+  useEffect(() => {
+    if (editingUser) {
+      setEditName(editingUser.name || '')
+      setEditEmail(editingUser.email || '')
+      setEditIsActive(editingUser.isActive)
+    }
+  }, [editingUser])
+
+  const { data: users, isLoading, error } = useQuery({
     queryKey: ['admin-users'],
     queryFn: () => pb.collection('users').getFullList({ sort: 'name' }),
   })
 
   const createUser = useMutation({
-    mutationFn: () =>
-      pb.collection('users').create({
+    mutationFn: async () => {
+      const newUser = await pb.collection('users').create({
         name: inviteName,
         email: inviteEmail,
         role: inviteRole,
         password: invitePassword,
         passwordConfirm: invitePassword,
         emailVisibility: true,
-      }),
-    onSuccess: () => {
+        isActive: true,
+        mustChangePassword: true,
+      })
+      return { user: newUser, password: invitePassword }
+    },
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] })
       setInviteOpen(false)
+      
+      // Send welcome email (fire and forget, don't block UI)
+      pb.send('/api/send-welcome', {
+        method: 'POST',
+        body: { userId: data.user.id, password: data.password }
+      }).catch(err => console.error('Failed to send welcome email:', err))
+
       setInviteEmail(''); setInviteName(''); setInvitePassword(''); setInviteRole('user')
-      toast.success('User created successfully')
+      toast.success('User created and welcome email queued')
     },
     onError: (err: any) => toast.error(err.message || 'Failed to create user'),
+  })
+
+  const updateUser = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      pb.collection('users').update(id, { ...data, emailVisibility: true }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] })
+      setEditOpen(false)
+      setEditingUser(null)
+      toast.success('User updated successfully')
+    },
+    onError: (err: any) => toast.error(err.message || 'Failed to update user'),
   })
 
   const changeRole = useMutation({
@@ -394,14 +472,32 @@ function UsersTab({ currentUserId }: { currentUserId: string }) {
     onError: () => toast.error('Failed to update role'),
   })
 
-  const deleteUser = useMutation({
-    mutationFn: (id: string) => pb.collection('users').delete(id),
-    onSuccess: () => {
+  const toggleUserStatus = useMutation({
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) => 
+      pb.collection('users').update(id, { isActive }),
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] })
-      toast.success('User removed')
+      toast.success(variables.isActive ? 'User activated' : 'User deactivated')
     },
-    onError: () => toast.error('Failed to remove user'),
+    onError: () => toast.error('Failed to update user status'),
   })
+
+  const handleEditInit = (u: any) => {
+    console.log('Editing user:', u)
+    setEditingUser(u)
+    setEditName(u.name || '')
+    setEditEmail(u.email || '')
+    setEditOpen(true)
+  }
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingUser) return
+    updateUser.mutate({
+      id: editingUser.id,
+      data: { name: editName, email: editEmail, isActive: editIsActive }
+    })
+  }
 
   const inputClass = 'w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ns-accent))] focus:border-transparent bg-white placeholder-slate-400'
 
@@ -423,13 +519,34 @@ function UsersTab({ currentUserId }: { currentUserId: string }) {
         </div>
 
         {/* User List */}
+        <div className="px-6 py-2 bg-slate-50 text-[10px] text-slate-400 border-b border-slate-100">
+          Debug: {isLoading ? 'Loading...' : `Fetched ${(users || []).length} users`}
+        </div>
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-6 h-6 animate-spin text-slate-300" />
           </div>
+        ) : error ? (
+          <div className="p-8 text-center bg-red-50 rounded-lg m-6 border border-red-100">
+            <p className="text-sm font-semibold text-red-600">Failed to load workspace members</p>
+            <p className="text-xs text-red-500 mt-1">{(error as any).message || 'Verification failed or permission denied'}</p>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="mt-4 border-red-200 text-red-600 hover:bg-red-100"
+              onClick={() => queryClient.invalidateQueries({ queryKey: ['admin-users'] })}
+            >
+              Retry Connection
+            </Button>
+          </div>
+        ) : !users || users.length === 0 ? (
+          <div className="text-center py-16">
+            <Users className="w-10 h-10 mx-auto mb-3 text-slate-200" />
+            <p className="text-sm font-medium text-slate-500">No workspace members found</p>
+          </div>
         ) : (
           <div className="divide-y divide-slate-50">
-            {(users || []).map((u: any) => (
+            {users.map((u: any) => (
               <div key={u.id} className="flex items-center gap-4 px-6 py-4 hover:bg-slate-50 transition-colors">
                 {/* Avatar */}
                 <div className="w-9 h-9 rounded-full bg-[rgb(var(--ns-accent))] flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
@@ -444,7 +561,9 @@ function UsersTab({ currentUserId }: { currentUserId: string }) {
                       <span className="text-[10px] font-semibold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">You</span>
                     )}
                   </div>
-                  <p className="text-xs text-slate-400 truncate">{u.email}</p>
+                  <p className={`text-xs truncate ${!u.email ? 'text-slate-300 italic' : 'text-slate-400'}`}>
+                    {u.email || '(Email Hidden)'}
+                  </p>
                 </div>
 
                 {/* Role badge + selector */}
@@ -452,6 +571,12 @@ function UsersTab({ currentUserId }: { currentUserId: string }) {
                   <Badge className={`${ROLE_COLORS[u.role] || ROLE_COLORS.user} text-[10px] px-2 py-0.5 capitalize font-semibold`}>
                     {u.role || 'user'}
                   </Badge>
+                  
+                  {/* Status Badge */}
+                  <Badge className={`${u.isActive ? 'bg-green-50 text-green-700 border-green-100' : 'bg-slate-100 text-slate-400 border-slate-200'} text-[10px] px-2 py-0.5 font-semibold`}>
+                    {u.isActive ? 'Active' : 'Inactive'}
+                  </Badge>
+
                   {u.id !== currentUserId && (
                     <Select
                       value={u.role || 'user'}
@@ -469,20 +594,36 @@ function UsersTab({ currentUserId }: { currentUserId: string }) {
                   )}
                 </div>
 
-                {/* Delete — cannot delete self */}
-                {u.id !== currentUserId && (
+                {/* Actions */}
+                <div className="flex items-center gap-1">
                   <button
-                    onClick={() => {
-                      if (confirm(`Remove ${u.name || u.email} from the workspace?`)) {
-                        deleteUser.mutate(u.id)
-                      }
-                    }}
-                    className="p-1.5 rounded-md hover:bg-red-50 text-slate-300 hover:text-red-400 transition-colors"
-                    title="Remove user"
+                    onClick={() => handleEditInit(u)}
+                    className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                    title="Edit user details"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Edit className="w-3.5 h-3.5" />
                   </button>
-                )}
+
+                  {/* Toggle Status — cannot deactivate self */}
+                  {u.id !== currentUserId && (
+                    <button
+                      onClick={() => {
+                        const action = u.isActive ? 'Deactivate' : 'Activate'
+                        if (confirm(`${action} ${u.name || u.email}?`)) {
+                          toggleUserStatus.mutate({ id: u.id, isActive: !u.isActive })
+                        }
+                      }}
+                      className={`p-1.5 rounded-md transition-colors ${
+                        u.isActive 
+                          ? 'hover:bg-red-50 text-slate-300 hover:text-red-400' 
+                          : 'hover:bg-green-50 text-slate-300 hover:text-green-600'
+                      }`}
+                      title={u.isActive ? "Deactivate user" : "Activate user"}
+                    >
+                      {u.isActive ? <UserMinus className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -498,6 +639,55 @@ function UsersTab({ currentUserId }: { currentUserId: string }) {
           </div>
         </div>
       </div>
+
+      {/* Edit User Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="w-4 h-4" /> Edit User Details
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditSubmit} className="space-y-4 pt-1">
+            <div className="space-y-1.5">
+              <Label>Full Name</Label>
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                required
+                className={inputClass}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Email Address</Label>
+              <input
+                type="email"
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+                required
+                className={inputClass}
+              />
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <Checkbox
+                id="edit-isActive"
+                checked={editIsActive}
+                onCheckedChange={(v) => setEditIsActive(v === true)}
+              />
+              <Label htmlFor="edit-isActive" className="text-sm font-medium text-slate-700">
+                Active — user can log in
+              </Label>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setEditOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={updateUser.isPending}>
+                {updateUser.isPending ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Add User Dialog */}
       <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
@@ -535,15 +725,25 @@ function UsersTab({ currentUserId }: { currentUserId: string }) {
             </div>
             <div className="space-y-1.5">
               <Label>Temporary Password *</Label>
-              <input
-                type="password"
-                value={invitePassword}
-                onChange={(e) => setInvitePassword(e.target.value)}
-                required
-                placeholder="Min. 8 characters"
-                minLength={8}
-                className={inputClass}
-              />
+              <div className="relative">
+                <input
+                  type={showInvitePassword ? 'text' : 'password'}
+                  value={invitePassword}
+                  onChange={(e) => setInvitePassword(e.target.value)}
+                  required
+                  placeholder="Min. 8 characters"
+                  minLength={8}
+                  className="w-full px-3.5 py-2.5 pr-10 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ns-accent))] focus:border-transparent bg-white placeholder-slate-400"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowInvitePassword(!showInvitePassword)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                  tabIndex={-1}
+                >
+                  {showInvitePassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
               <p className="text-xs text-slate-400">Share this password with the user. They can change it in Settings.</p>
             </div>
             <div className="space-y-1.5">

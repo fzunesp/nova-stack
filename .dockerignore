@@ -1,5 +1,7 @@
-node_modules
-.next
-data
-.env
+**/node_modules
+**/dist
+**/dist-ssr
 .git
+.env
+*.log
+*.local

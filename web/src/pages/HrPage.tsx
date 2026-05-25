@@ -2,12 +2,12 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import {
   Inbox, Plus, Settings2, FileText, CheckCircle2, Clock, XCircle,
-  ToggleLeft, ToggleRight, Pencil, Loader2, HelpCircle,
+  Pencil, Loader2, HelpCircle,
   BarChart3, ChevronRight, LayoutDashboard,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -183,15 +183,6 @@ function EmployeeView() {
   const approvedSubs = subs.filter(s => s.status === 'approved')
   const rejectedSubs = subs.filter(s => s.status === 'rejected')
 
-  const formIconMap: Record<string, string> = {
-    vacation: 'CalendarDays',
-    expense: 'DollarSign',
-    equipment: 'Monitor',
-    leave: 'CalendarClock',
-    travel: 'Plane',
-    training: 'GraduationCap',
-  }
-
   return (
     <div className="space-y-8">
       {/* Stats bar */}
@@ -224,8 +215,6 @@ function EmployeeView() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {(forms as any[]).map((form) => {
-              const formKey = (form.key || '').toLowerCase()
-              const iconKey = formIconMap[formKey] || 'FileText'
               return (
                 <button
                   key={form.id}
@@ -458,7 +447,7 @@ function ApprovalCard({ group }: { group: any }) {
     onError: () => toast.error('Action failed. Please try again.'),
   })
 
-  const stepIcons = group.tasks.map((t: any, i: number) => {
+  const stepIcons = group.tasks.map((t: any, _i: number) => {
     if (t.status === 'approved') return 'done'
     if (t.status === 'rejected') return 'rejected'
     if (t.isActive && t.status === 'pending') return 'current'

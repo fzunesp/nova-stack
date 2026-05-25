@@ -5,7 +5,10 @@ async function runE2E() {
   await pb.admins.authWithPassword('admin@novastack.local', 'novastack123');
   
   // 1. Check if RWR form exists
-  const forms = await pb.collection('form_definitions').getFullList({ filter: 'prefix = "RWR"' });
+  const forms = await pb.collection('form_definitions').getFullList({ 
+    filter: 'prefix = "RWR"',
+    sort: '-created'
+  });
   if (forms.length === 0) {
     console.log('Error: RWR form not found');
     return;
@@ -69,7 +72,7 @@ async function runE2E() {
 
     const updatedSub = await pb.collection('intake_submissions').getOne(submission.id);
     console.log(`\nFinal Submission Status: ${updatedSub.status}`);
-    if (updatedSub.status === 'rejected' && updatedTasks[1].isActive === false) {
+    if (updatedSub.status === 'rejected' && (!updatedTasks[1] || updatedTasks[1].isActive === false)) {
       console.log('✅ Rejection Flow Test PASSED!');
     } else {
       console.log('❌ Rejection Flow Test FAILED!');

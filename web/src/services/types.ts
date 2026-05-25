@@ -6,6 +6,8 @@ export interface UserRecord {
   email: string
   role: 'admin' | 'hr' | 'user'
   companyName?: string
+  isActive: boolean
+  mustChangePassword?: boolean
   created?: string
   updated?: string
 }

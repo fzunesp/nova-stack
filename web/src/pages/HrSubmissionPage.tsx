@@ -129,8 +129,7 @@ export function HrSubmissionPage() {
         </CardHeader>
         <CardContent className="p-5">
           <div className="flex items-start">
-            {progressSteps.map((step, idx) => {
-              const Icon = step.icon
+            {progressSteps.map((step: any, idx) => {
               const isLast = idx === progressSteps.length - 1
               return (
                 <div key={idx} className="flex-1 flex items-start">

@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useDashboardData } from '@/hooks/useDashboardData'
 import { useActivityFeed } from '@/hooks/useActivityFeed'
 import { useMyWorkQueue } from '@/hooks/useMyWorkQueue'
@@ -13,20 +12,13 @@ import { groupWorkQueue } from '@/services/work-queue'
 import { ScratchpadWidget } from '@/components/ScratchpadWidget'
 import { Loader2, HelpCircle } from 'lucide-react'
 import { useNavigate } from 'react-router'
-import { FirstRunSetupWizard } from '@/components/FirstRunSetupWizard'
 
 export function DashboardPage() {
   const navigate = useNavigate()
   const { data, isLoading, error } = useDashboardData()
   const { data: feedEvents, isLoading: feedLoading } = useActivityFeed()
   const { data: workItems, isLoading: workLoading } = useMyWorkQueue()
-  const { user, isAdmin, isHrOrAdmin } = useAuth()
-
-  const [showSetup, setShowSetup] = useState(() => {
-    if (!isAdmin || !user) return false
-    const firstRunDone = localStorage.getItem(`novastack_first_run_completed_${user.id}`)
-    return !user.companyName && firstRunDone !== 'true'
-  })
+  const { isHrOrAdmin } = useAuth()
 
   if (isLoading) {
     return (
@@ -69,19 +61,9 @@ export function DashboardPage() {
       </div>
       {isHrOrAdmin && <ActivityFeed events={feedEvents || []} isLoading={feedLoading} />}
       <MyWorkQueue grouped={grouped} isLoading={workLoading} />
-      <MoneyAtRiskStrip data={moneyAtRisk} />
+      {isHrOrAdmin && <MoneyAtRiskStrip data={moneyAtRisk} />}
       <RadarPanel data={radar} />
-      <BusinessKpiGrid metrics={metrics} />
-
-      {showSetup && (
-        <FirstRunSetupWizard 
-          user={user} 
-          onComplete={() => {
-            setShowSetup(false)
-            window.location.reload()
-          }} 
-        />
-      )}
+      {isHrOrAdmin && <BusinessKpiGrid metrics={metrics} />}
     </div>
   )
 }

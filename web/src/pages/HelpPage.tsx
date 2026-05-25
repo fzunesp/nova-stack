@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router'
 import {
   LayoutDashboard, Users, CheckSquare, FileText, Inbox,
-  HelpCircle, TrendingUp, ChevronRight, Briefcase, Webhook,
+  HelpCircle, TrendingUp, ChevronRight, Briefcase,
   Search, Keyboard, ArrowUpRight, BookOpen, Building2, Package, Settings, Zap,
 } from 'lucide-react'
 

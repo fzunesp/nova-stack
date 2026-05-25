@@ -1,10 +1,12 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate, Link } from 'react-router'
+import { useNavigate } from 'react-router'
 import { useAuth } from '@/hooks/useAuth'
+import { Eye, EyeOff } from 'lucide-react'
 
 export function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const { login } = useAuth()
@@ -40,20 +42,20 @@ export function LoginPage() {
 
         <div>
           <h2 className="text-3xl font-bold text-white leading-tight">
-            Your business,<br />fully under control.
+            Own your business,<br />own your data.
           </h2>
           <p className="mt-4 text-indigo-200 text-sm leading-relaxed max-w-xs">
-            Manage CRM, invoices, tasks, and intake — all in one clean, fast workspace.
+            A unified platform for Companies, CRM, Invoices, Tasks, Products, and Intake workflows. Fast, private, and permanent.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex -space-x-2">
-            {['A', 'B', 'C'].map((l) => (
-              <div key={l} className="w-7 h-7 rounded-full bg-white/30 border-2 border-indigo-600 flex items-center justify-center text-white text-xs font-bold">{l}</div>
-            ))}
+          <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
+            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.744c0 5.548 4.075 10.14 9.477 10.891a11.942 11.942 0 009.477-10.891c0-1.315-.214-2.58-.606-3.767A11.967 11.947 0 0112 2.714z" />
+            </svg>
           </div>
-          <p className="text-indigo-200 text-xs">Trusted by growing teams</p>
+          <p className="text-indigo-200 text-xs font-medium uppercase tracking-wider">Self-hosted infrastructure</p>
         </div>
       </div>
 
@@ -72,7 +74,7 @@ export function LoginPage() {
 
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-slate-900">Welcome back</h1>
-            <p className="text-slate-500 text-sm mt-1">Sign in to your workspace</p>
+            <p className="text-slate-500 text-sm mt-1">Sign in to your account</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -104,15 +106,25 @@ export function LoginPage() {
                   Password
                 </label>
               </div>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-shadow bg-white placeholder-slate-400"
-                placeholder="••••••••"
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="w-full px-3.5 py-2.5 pr-10 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-shadow bg-white placeholder-slate-400"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <button
@@ -123,13 +135,6 @@ export function LoginPage() {
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
-
-          <p className="text-center text-sm text-slate-500 mt-6">
-            Don't have an account?{' '}
-            <Link to="/register" className="text-indigo-600 font-medium hover:underline">
-              Create one free
-            </Link>
-          </p>
         </div>
       </div>
     </div>

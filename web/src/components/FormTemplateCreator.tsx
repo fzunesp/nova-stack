@@ -79,7 +79,7 @@ export default function FormTemplateCreator({ onSaved, onBack, initialData }: Fo
     queryKey: ['users-for-hr'],
     queryFn: () =>
       pb.collection('users').getFullList({
-        filter: 'role = "hr" || role = "manager" || role = "admin"',
+        filter: '(role = "hr" || role = "manager" || role = "admin") && isActive = true',
         sort: 'name',
       }),
   })
