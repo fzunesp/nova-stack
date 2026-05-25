@@ -3,5 +3,3 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.presentation
-    ports:
-      - "80:80"
