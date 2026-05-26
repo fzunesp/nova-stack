@@ -41,14 +41,14 @@ export function DashboardPage() {
 
   return (
     <div>
-      <div className="mb-8 flex items-start justify-between">
+      <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Command Center</h1>
-          <p className="mt-1 text-sm text-slate-500">What needs your attention across deals, invoices, and tasks.</p>
+          <h2 className="text-xl font-semibold text-slate-900">Command Center</h2>
+          <p className="text-sm text-slate-500 mt-0.5">What needs your attention across deals, invoices, and tasks.</p>
         </div>
         <button
           onClick={() => navigate('/help?tab=dashboard')}
-          className="cursor-pointer flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-lg px-3 py-2 transition-colors"
+          className="cursor-pointer flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-[rgb(var(--ns-accent))] bg-slate-50 hover:bg-[rgb(var(--ns-accent))]/10 border border-slate-200 hover:border-[rgb(var(--ns-accent))]/30 rounded-lg px-3 py-2 transition-colors"
         >
           <HelpCircle className="w-3.5 h-3.5" />
           Help

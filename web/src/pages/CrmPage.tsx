@@ -33,8 +33,15 @@ export function CrmPage() {
   const isDealsRoute = location.pathname.startsWith('/crm/deals')
   const isContactsRoute = location.pathname.startsWith('/crm/contacts')
 
-  const initialTab = isDealsRoute ? 'deals' : (isContactsRoute ? 'contacts' : (location.state?.tab === 'deals' ? 'deals' : 'contacts'))
-  const [activeTab, setActiveTab] = useState<'contacts' | 'deals'>(initialTab)
+  const [activeTab, setActiveTab] = useState<'contacts' | 'deals'>(() => {
+    const saved = localStorage.getItem('crm-tab')
+    if (saved === 'deals' || saved === 'contacts') return saved
+    return isDealsRoute ? 'deals' : 'contacts'
+  })
+
+  useEffect(() => {
+    localStorage.setItem('crm-tab', activeTab)
+  }, [activeTab])
 
   useEffect(() => {
     if (isDealsRoute && activeTab !== 'deals') {
@@ -51,14 +58,14 @@ export function CrmPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-start justify-between">
+      <div className="mb-6 flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold text-slate-900">CRM</h2>
           <p className="text-sm text-slate-500 mt-0.5">Manage your contacts and pipeline</p>
         </div>
         <button
           onClick={() => navigate('/help?tab=contacts')}
-          className="cursor-pointer flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-lg px-3 py-2 transition-colors"
+          className="cursor-pointer flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-[rgb(var(--ns-accent))] bg-slate-50 hover:bg-[rgb(var(--ns-accent))]/10 border border-slate-200 hover:border-[rgb(var(--ns-accent))]/30 rounded-lg px-3 py-2 transition-colors"
         >
           <HelpCircle className="w-3.5 h-3.5" />
           Help
@@ -156,7 +163,7 @@ function ContactsTab({ autoOpen = false }: { autoOpen?: boolean }) {
           <Input value={search} onChange={(e) => updateSearch(e.target.value)} placeholder="Search contacts..." className="pl-10" />
         </div>
         <Dialog open={creating} onOpenChange={setCreating}>
-          <DialogTrigger asChild><Button>Add Contact</Button></DialogTrigger>
+          <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-1.5" />Add Contact</Button></DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>Add New Contact</DialogTitle></DialogHeader>
             <form onSubmit={(e) => { e.preventDefault(); createContact.mutate(formData) }} className="space-y-3">
@@ -290,8 +297,14 @@ function DealsTab({ autoOpen = false }: { autoOpen?: boolean }) {
   const queryClient = useQueryClient()
   const location = useLocation()
   const initialSearch = location.state?.search || ''
-  
-  const [viewMode, setViewMode] = useState<'list' | 'board'>('list')
+  const [viewMode, setViewMode] = useState<'list' | 'board'>(() => {
+    const saved = localStorage.getItem('deals-view')
+    return saved === 'board' ? 'board' : 'list'
+  })
+
+  useEffect(() => {
+    localStorage.setItem('deals-view', viewMode)
+  }, [viewMode])
 
   const { items, totalItems, totalPages, page, perPage, search, isLoading, toggleSort, goToPage, updateSearch } =
     usePaginatedQuery({ collection: 'deals', searchFields: ['title'], expand: 'contactId', initialSearch })
@@ -470,7 +483,7 @@ function DealsTab({ autoOpen = false }: { autoOpen?: boolean }) {
           </div>
         </div>
         <Dialog open={creating} onOpenChange={setCreating}>
-          <DialogTrigger asChild><Button>Add Deal</Button></DialogTrigger>
+          <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-1.5" />Add Deal</Button></DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>Add New Deal</DialogTitle></DialogHeader>
             <form onSubmit={(e) => { e.preventDefault(); createDeal.mutate(formData) }} className="space-y-4">

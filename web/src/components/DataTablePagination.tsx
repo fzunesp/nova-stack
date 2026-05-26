@@ -22,7 +22,7 @@ export function DataTablePagination({
   const end = Math.min(page * perPage, totalItems)
 
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-t">
+    <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
       <p className="text-sm text-muted-foreground">
         Showing {start} to {end} of {totalItems} items
       </p>

@@ -5,6 +5,7 @@ import {
   HelpCircle, TrendingUp, ChevronRight, Briefcase,
   Search, Keyboard, ArrowUpRight, BookOpen, Building2, Package, Settings, Zap,
 } from 'lucide-react'
+import { Input } from '@/components/ui/input'
 
 const sections = [
   { id: 'overview', label: 'Overview', icon: HelpCircle },
@@ -92,8 +93,9 @@ function InvoiceStatusFlow() {
   return (
     <div className="flex items-center gap-2 my-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
       {[
-        { label: 'Draft', color: 'bg-slate-100 text-slate-600 border-slate-300' },
-        { label: 'Sent', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+        { label: 'Draft', color: 'bg-gray-100 text-gray-700 border-gray-300' },
+        { label: 'Active', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+        { label: 'Pending Payment', color: 'bg-amber-50 text-amber-700 border-amber-200' },
         { label: 'Paid', color: 'bg-green-50 text-green-700 border-green-200' },
       ].map((s, i, arr) => (
         <div key={s.label} className="flex items-center gap-2">
@@ -110,8 +112,9 @@ function TaskStatusCycle() {
   return (
     <div className="flex items-center gap-3 my-4 bg-slate-50 p-4 rounded-xl border border-slate-100 justify-center">
       {[
-        { label: 'To Do', dot: 'border-slate-300' },
+        { label: 'To Do', dot: 'border-gray-300' },
         { label: 'In Progress', dot: 'border-blue-500' },
+        { label: 'Waiting', dot: 'border-amber-500' },
         { label: 'Done', dot: 'border-green-500 bg-green-500' },
       ].map((s, i, arr) => (
         <div key={s.label} className="flex items-center gap-3">
@@ -178,13 +181,13 @@ function IntakeFlowDiagram() {
   return (
     <div className="flex flex-col items-center gap-2 my-4 bg-slate-50 p-5 rounded-xl border border-slate-100">
       <div className="flex items-center gap-3">
-        <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs font-bold text-blue-700">New Lead</div>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs font-bold text-blue-700">New</div>
         <ChevronRight className="w-4 h-4 text-slate-300" />
         <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs font-bold text-amber-700">In Review</div>
         <ChevronRight className="w-4 h-4 text-slate-300" />
         <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs font-bold text-green-700">Approved</div>
         <ChevronRight className="w-4 h-4 text-slate-300" />
-        <div className="bg-violet-50 border border-violet-200 rounded-lg px-3 py-2 text-xs font-bold text-violet-700">Converted to Deal</div>
+        <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-xs font-bold text-emerald-700">Converted to Deal</div>
       </div>
       <div className="flex items-center gap-2 mt-1">
         <span className="text-xs text-slate-400">Alternative path:</span>
@@ -249,21 +252,21 @@ const content: Record<string, React.ReactNode> = {
         <div className="bg-slate-50 rounded-xl border border-slate-200 p-5 my-4">
           <div className="flex flex-col items-center gap-3">
             <div className="flex items-center gap-2 flex-wrap justify-center">
-              <span className="bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg text-xs font-bold">New Lead (Intake)</span>
+              <span className="bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg text-xs font-bold">New (Intake)</span>
+              <ChevronRight className="w-4 h-4 text-slate-300" />
+              <span className="bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-lg text-xs font-bold">In Review</span>
               <ChevronRight className="w-4 h-4 text-slate-300" />
               <span className="bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg text-xs font-bold">Approved</span>
               <ChevronRight className="w-4 h-4 text-slate-300" />
-              <span className="bg-violet-50 text-violet-700 border border-violet-200 px-3 py-1.5 rounded-lg text-xs font-bold">Contact Created</span>
-              <ChevronRight className="w-4 h-4 text-slate-300" />
-              <span className="bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-lg text-xs font-bold">Deal Created</span>
+              <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-lg text-xs font-bold">Converted to Deal</span>
             </div>
             <div className="flex items-center gap-2 flex-wrap justify-center">
               <ChevronRight className="w-4 h-4 text-slate-300 rotate-90" />
             </div>
             <div className="flex items-center gap-2 flex-wrap justify-center">
-              <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-lg text-xs font-bold">Deal Won</span>
+              <span className="bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg text-xs font-bold">Deal Won</span>
               <ChevronRight className="w-4 h-4 text-slate-300" />
-              <span className="bg-rose-50 text-rose-700 border border-rose-200 px-3 py-1.5 rounded-lg text-xs font-bold">Invoice Created</span>
+              <span className="bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-lg text-xs font-bold">Invoice Active</span>
               <ChevronRight className="w-4 h-4 text-slate-300" />
               <span className="bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg text-xs font-bold">Invoice Paid</span>
             </div>
@@ -538,11 +541,12 @@ const content: Record<string, React.ReactNode> = {
       </Section>
 
       <Section title="Task Statuses" id="task-statuses">
-        <p>Every task is in one of three states:</p>
+        <p>Every task is in one of four states:</p>
         <TaskStatusCycle />
         <ul className="list-disc pl-5 space-y-1.5 mt-2">
           <li><strong>To Do</strong> — Not started. The circle is empty/gray.</li>
           <li><strong>In Progress</strong> — You're working on it. The circle is blue and empty.</li>
+          <li><strong>Waiting</strong> — Blocked or pending someone else. The circle is amber.</li>
           <li><strong>Done</strong> — Completed. The circle is filled green.</li>
         </ul>
       </Section>
@@ -552,7 +556,7 @@ const content: Record<string, React.ReactNode> = {
           You don't need to open the edit dialog just to mark a task complete. Every task row has a <strong>circular button</strong> on the left side. Click it once and it cycles through the statuses:
         </p>
         <p className="text-center font-mono text-xs bg-slate-50 p-2 rounded-lg border border-slate-100">
-          To Do → In Progress → Done → To Do
+          To Do → In Progress → Waiting → Done → To Do
         </p>
         <Callout variant="info">
           This is the fastest way to update tasks. Just click the circle. If you need to change the due date, description, or linked contact, then open the edit dialog.
@@ -594,12 +598,13 @@ const content: Record<string, React.ReactNode> = {
         <InvoiceStatusFlow />
         <ul className="list-disc pl-5 space-y-1.5 mt-2">
           <li><strong>Draft</strong> — You're still writing it. The client hasn't seen it.</li>
-          <li><strong>Sent</strong> — You've sent it to the client (by email or otherwise).</li>
+          <li><strong>Active</strong> — The invoice is live and ready to be sent.</li>
+          <li><strong>Pending Payment</strong> — You've sent it to the client and are waiting for payment.</li>
           <li><strong>Paid</strong> — They paid you. Mark it as paid to update your revenue numbers.</li>
           <li><strong>Cancelled</strong> — Something went wrong. This voids the invoice.</li>
         </ul>
         <Callout variant="warning">
-          <strong>Outstanding</strong> money = all Draft + Sent invoices. This is money you're expecting but haven't received yet. Keep an eye on this number.
+          <strong>Outstanding</strong> money = all Active + Pending Payment invoices. This is money you're expecting but haven't received yet. Keep an eye on this number.
         </Callout>
       </Section>
 
@@ -611,7 +616,7 @@ const content: Record<string, React.ReactNode> = {
           <div className="bg-slate-50 rounded-lg border border-slate-200 p-4">
             <h4 className="text-xs font-bold text-slate-700 mb-2">Send by Email</h4>
             <p className="text-xs text-slate-600">
-              Click <strong>Send Invoice</strong> to dispatch it via SMTP. The system converts your invoice into a clean HTML email and sends it to the client's email address. The status automatically changes to <strong>Sent</strong>.
+              Click <strong>Send Invoice</strong> to dispatch it via SMTP. The system converts your invoice into a clean HTML email and sends it to the client's email address. The status automatically changes to <strong>Pending Payment</strong>.
             </p>
           </div>
           <div className="bg-slate-50 rounded-lg border border-slate-200 p-4">
@@ -679,7 +684,7 @@ const content: Record<string, React.ReactNode> = {
           <li><strong>In Review</strong> — You're looking at it, deciding what to do.</li>
           <li><strong>Approved</strong> — It's a real opportunity. Time to turn it into a contact and deal.</li>
           <li><strong>Rejected</strong> — Not a fit. Maybe it was spam or outside your scope.</li>
-          <li><strong>Converted</strong> — You already turned it into a CRM deal.</li>
+          <li><strong>Converted to Deal</strong> — You already turned it into a CRM deal.</li>
         </ul>
       </Section>
 
@@ -867,11 +872,11 @@ const content: Record<string, React.ReactNode> = {
             <h4 className="text-sm font-bold text-slate-900 mb-2">Workflow 1: New Lead → Deal → Invoice</h4>
             <ol className="list-decimal pl-5 text-xs text-slate-600 space-y-1">
               <li>Someone fills out your Intake form → submission appears in <strong>Intake</strong></li>
-              <li>You review and <strong>Approve</strong> it</li>
-              <li>Click <strong>Convert to Deal</strong> → creates Contact + Deal in CRM</li>
-              <li>Work the deal through pipeline stages</li>
+              <li>You review and move it to <strong>In Review</strong></li>
+              <li>Click <strong>Approve</strong> → then <strong>Convert to Deal</strong> → creates Contact + Deal in CRM</li>
+              <li>Work the deal through pipeline stages (Lead → Contacted → Quoted → Won)</li>
               <li>When deal is <strong>Won</strong>, click <strong>Create Invoice</strong></li>
-              <li>Send the invoice to client</li>
+              <li>Send the invoice to client (status → Pending Payment)</li>
               <li>When paid, mark invoice as <strong>Paid</strong></li>
             </ol>
           </div>
@@ -1000,12 +1005,11 @@ export function HelpPage() {
         <div className="mb-6">
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
+            <Input
               placeholder="Search help topics..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition-all"
+              className="pl-10"
             />
           </div>
         </div>
