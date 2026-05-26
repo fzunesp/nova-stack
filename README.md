@@ -4,6 +4,8 @@ Nova Stack is a self-hosted, single-tenant business operating system for small a
 
 Built on **Vite + React**, **PocketBase** (embedded SQLite), and deployed via **Docker Compose**.
 
+Features real-time CRM, HR operations, invoicing, and customizable sticky notes.
+
 ---
 
 ## Features
