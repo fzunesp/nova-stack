@@ -5,6 +5,16 @@ import pb from '@/lib/pocketbase'
 import { toast } from 'sonner'
 
 const SCRATCHPAD_KEY = 'scratchpad'
+const COLOR_KEY = 'scratchpad-color'
+
+const STICKY_COLORS = [
+  { name: 'Yellow', bg: '#fef08a', border: '#e6d64a' },
+  { name: 'Blue', bg: '#bfdbfe', border: '#93bbfd' },
+  { name: 'Green', bg: '#bbf7d0', border: '#86efac' },
+  { name: 'Pink', bg: '#fbcfe8', border: '#f9a8d4' },
+  { name: 'Orange', bg: '#fed7aa', border: '#fdba74' },
+  { name: 'Purple', bg: '#e9d5ff', border: '#d8b4fe' },
+]
 
 export function useScratchpad() {
   const userId = pb.authStore.record?.id
@@ -52,6 +62,15 @@ export function useDebouncedScratchpadSave(delay = 800) {
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const userId = pb.authStore.record?.id
+
+  const [selectedColor, setSelectedColor] = useState(() => {
+    const saved = localStorage.getItem(COLOR_KEY)
+    return saved ? JSON.parse(saved) : STICKY_COLORS[0]
+  })
+
+  useEffect(() => {
+    localStorage.setItem(COLOR_KEY, JSON.stringify(selectedColor))
+  }, [selectedColor])
 
   useEffect(() => {
     if (data && localContent === '' && !isLoading) {
@@ -112,5 +131,8 @@ export function useDebouncedScratchpadSave(delay = 800) {
     isLoading,
     isSaving,
     lastSaved,
+    selectedColor,
+    setSelectedColor,
+    stickyColors: STICKY_COLORS,
   }
 }
