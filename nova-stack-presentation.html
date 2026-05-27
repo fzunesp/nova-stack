@@ -1,614 +1,1321 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NovaStack — Client Pitch</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%;overflow-x:hidden}
-html{scroll-snap-type:y mandatory;scroll-behavior:smooth}
-body{font-family:'Space Grotesk',sans-serif}
 
-/* ===========================================
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NovaStack — Client Pitch</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@400;500;700&display=swap"
+        rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        html,
+        body {
+            height: 100%;
+            overflow-x: hidden
+        }
+
+        html {
+            scroll-snap-type: y mandatory;
+            scroll-behavior: smooth
+        }
+
+        body {
+            font-family: 'Space Grotesk', sans-serif
+        }
+
+        /* ===========================================
    VIEWPORT FITTING BASE
    =========================================== */
-.slide{width:100vw;height:100vh;height:100dvh;overflow:hidden;scroll-snap-align:start;display:flex;flex-direction:column;position:relative;background:#faf9f7}
-.slide-content{flex:1;display:flex;flex-direction:column;justify-content:center;max-height:100%;overflow:hidden;padding:clamp(1rem,4vw,4rem)}
+        .slide {
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+            scroll-snap-align: start;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            background: #faf9f7
+        }
 
-:root{--title-size:clamp(1.5rem,5vw,4rem);--h2-size:clamp(1.25rem,3.5vw,2.5rem);--h3-size:clamp(1rem,2.5vw,1.75rem);--body-size:clamp(0.75rem,1.5vw,1.125rem);--small-size:clamp(0.65rem,1vw,0.875rem);--slide-padding:clamp(1rem,4vw,4rem);--content-gap:clamp(0.5rem,2vw,2rem);--element-gap:clamp(0.25rem,1vw,1rem);--accent:#059669;--accent-light:rgba(5,150,105,0.08);--text-dark:#1a1a2e;--text-gray:#4a4a4a;--text-light:rgba(255,255,255,0.9)}
+        .slide-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            max-height: 100%;
+            overflow: hidden;
+            padding: clamp(1rem, 4vw, 4rem)
+        }
 
-.card,.container,.content-box{max-width:min(90vw,1000px);max-height:min(80vh,700px)}
-.feature-list,.bullet-list{gap:clamp(0.4rem,1vh,1rem)}
-.feature-list li,.bullet-list li{font-size:var(--body-size);line-height:1.4}
-.grid{display:flex;flex-wrap:nowrap;gap:clamp(0.5rem,1.5vw,1rem)}
-@media(max-width:700px){.grid{flex-wrap:wrap}}
-img,.image-container{max-width:100%;max-height:min(50vh,400px);object-fit:contain}
+        :root {
+            --title-size: clamp(1.5rem, 5vw, 4rem);
+            --h2-size: clamp(1.25rem, 3.5vw, 2.5rem);
+            --h3-size: clamp(1rem, 2.5vw, 1.75rem);
+            --body-size: clamp(0.75rem, 1.5vw, 1.125rem);
+            --small-size: clamp(0.65rem, 1vw, 0.875rem);
+            --slide-padding: clamp(1rem, 4vw, 4rem);
+            --content-gap: clamp(0.5rem, 2vw, 2rem);
+            --element-gap: clamp(0.25rem, 1vw, 1rem);
+            --accent: #059669;
+            --accent-light: rgba(5, 150, 105, 0.08);
+            --text-dark: #1a1a2e;
+            --text-gray: #4a4a4a;
+            --text-light: rgba(255, 255, 255, 0.9)
+        }
 
-@media(max-height:700px){:root{--slide-padding:clamp(0.75rem,3vw,2rem);--content-gap:clamp(0.4rem,1.5vw,1rem);--title-size:clamp(1.25rem,4.5vw,2.5rem);--h2-size:clamp(1rem,3vw,1.75rem)}}
-@media(max-height:600px){:root{--slide-padding:clamp(0.5rem,2.5vw,1.5rem);--content-gap:clamp(0.3rem,1vw,0.75rem);--title-size:clamp(1.1rem,4vw,2rem);--body-size:clamp(0.7rem,1.2vw,0.95rem)}.nav-dots{display:none}}
-@media(max-height:500px){:root{--slide-padding:clamp(0.4rem,2vw,1rem);--title-size:clamp(1rem,3.5vw,1.5rem);--h2-size:clamp(0.9rem,2.5vw,1.25rem);--body-size:clamp(0.65rem,1vw,0.85rem)}}
-@media(max-width:600px){:root{--title-size:clamp(1.25rem,7vw,2.5rem)}.grid{grid-template-columns:1fr}}
-@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;transition-duration:0.2s!important}html{scroll-behavior:auto}}
+        .card,
+        .container,
+        .content-box {
+            max-width: min(90vw, 1000px);
+            max-height: min(80vh, 700px)
+        }
 
-/* ===========================================
+        .feature-list,
+        .bullet-list {
+            gap: clamp(0.4rem, 1vh, 1rem)
+        }
+
+        .feature-list li,
+        .bullet-list li {
+            font-size: var(--body-size);
+            line-height: 1.4
+        }
+
+        .grid {
+            display: flex;
+            flex-wrap: nowrap;
+            gap: clamp(0.5rem, 1.5vw, 1rem)
+        }
+
+        @media(max-width:700px) {
+            .grid {
+                flex-wrap: wrap
+            }
+        }
+
+        img,
+        .image-container {
+            max-width: 100%;
+            max-height: min(50vh, 400px);
+            object-fit: contain
+        }
+
+        @media(max-height:700px) {
+            :root {
+                --slide-padding: clamp(0.75rem, 3vw, 2rem);
+                --content-gap: clamp(0.4rem, 1.5vw, 1rem);
+                --title-size: clamp(1.25rem, 4.5vw, 2.5rem);
+                --h2-size: clamp(1rem, 3vw, 1.75rem)
+            }
+        }
+
+        @media(max-height:600px) {
+            :root {
+                --slide-padding: clamp(0.5rem, 2.5vw, 1.5rem);
+                --content-gap: clamp(0.3rem, 1vw, 0.75rem);
+                --title-size: clamp(1.1rem, 4vw, 2rem);
+                --body-size: clamp(0.7rem, 1.2vw, 0.95rem)
+            }
+
+            .nav-dots {
+                display: none
+            }
+        }
+
+        @media(max-height:500px) {
+            :root {
+                --slide-padding: clamp(0.4rem, 2vw, 1rem);
+                --title-size: clamp(1rem, 3.5vw, 1.5rem);
+                --h2-size: clamp(0.9rem, 2.5vw, 1.25rem);
+                --body-size: clamp(0.65rem, 1vw, 0.85rem)
+            }
+        }
+
+        @media(max-width:600px) {
+            :root {
+                --title-size: clamp(1.25rem, 7vw, 2.5rem)
+            }
+
+            .grid {
+                grid-template-columns: 1fr
+            }
+        }
+
+        @media(prefers-reduced-motion:reduce) {
+
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.2s !important
+            }
+
+            html {
+                scroll-behavior: auto
+            }
+        }
+
+        /* ===========================================
    ANIMATIONS
    =========================================== */
-.reveal{opacity:0;transform:translateY(30px);transition:opacity 0.6s cubic-bezier(0.16,1,0.3,1),transform 0.6s cubic-bezier(0.16,1,0.3,1)}
-.slide.visible .reveal{opacity:1;transform:translateY(0)}
-.reveal:nth-child(1){transition-delay:0.1s}
-.reveal:nth-child(2){transition-delay:0.2s}
-.reveal:nth-child(3){transition-delay:0.3s}
-.reveal:nth-child(4){transition-delay:0.4s}
-.reveal:nth-child(5){transition-delay:0.5s}
-.reveal:nth-child(6){transition-delay:0.6s}
-.reveal:nth-child(7){transition-delay:0.7s}
-.reveal:nth-child(8){transition-delay:0.8s}
+        .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1)
+        }
 
-.reveal-left{opacity:0;transform:translateX(-40px);transition:opacity 0.6s cubic-bezier(0.16,1,0.3,1),transform 0.6s cubic-bezier(0.16,1,0.3,1)}
-.slide.visible .reveal-left{opacity:1;transform:translateX(0)}
-.reveal-left:nth-child(1){transition-delay:0.1s}
-.reveal-left:nth-child(2){transition-delay:0.2s}
-.reveal-left:nth-child(3){transition-delay:0.3s}
+        .slide.visible .reveal {
+            opacity: 1;
+            transform: translateY(0)
+        }
 
-/* ===========================================
+        .reveal:nth-child(1) {
+            transition-delay: 0.1s
+        }
+
+        .reveal:nth-child(2) {
+            transition-delay: 0.2s
+        }
+
+        .reveal:nth-child(3) {
+            transition-delay: 0.3s
+        }
+
+        .reveal:nth-child(4) {
+            transition-delay: 0.4s
+        }
+
+        .reveal:nth-child(5) {
+            transition-delay: 0.5s
+        }
+
+        .reveal:nth-child(6) {
+            transition-delay: 0.6s
+        }
+
+        .reveal:nth-child(7) {
+            transition-delay: 0.7s
+        }
+
+        .reveal:nth-child(8) {
+            transition-delay: 0.8s
+        }
+
+        .reveal-left {
+            opacity: 0;
+            transform: translateX(-40px);
+            transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1)
+        }
+
+        .slide.visible .reveal-left {
+            opacity: 1;
+            transform: translateX(0)
+        }
+
+        .reveal-left:nth-child(1) {
+            transition-delay: 0.1s
+        }
+
+        .reveal-left:nth-child(2) {
+            transition-delay: 0.2s
+        }
+
+        .reveal-left:nth-child(3) {
+            transition-delay: 0.3s
+        }
+
+        /* ===========================================
    COMMON COMPONENTS
    =========================================== */
-.progress-bar{position:fixed;top:0;left:0;width:0;height:3px;background:var(--accent);z-index:1000;transition:width 0.3s ease}
-.nav-dots{position:fixed;right:clamp(0.5rem,2vw,1.5rem);top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:8px;z-index:999}
-.nav-dots button{width:10px;height:10px;border-radius:50%;border:2px solid rgba(26,26,26,0.2);background:transparent;cursor:pointer;padding:0;transition:all 0.3s}
-.nav-dots button.active{border-color:var(--accent);background:var(--accent);transform:scale(1.2)}
+        .progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 0;
+            height: 3px;
+            background: var(--accent);
+            z-index: 1000;
+            transition: width 0.3s ease
+        }
 
-/* Slide number */
-.slide-num{position:absolute;bottom:clamp(0.5rem,2vw,1.5rem);left:clamp(1rem,4vw,3rem);font-family:'Archivo Black',sans-serif;font-size:clamp(0.75rem,1.2vw,1rem);color:rgba(26,26,26,0.15)}
+        .nav-dots {
+            position: fixed;
+            right: clamp(0.5rem, 2vw, 1.5rem);
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 999
+        }
 
-/* Orange accent bar */
-.accent-bar{position:absolute;top:0;right:0;width:clamp(60px,10vw,150px);height:100%;background:var(--accent);pointer-events:none}
+        .nav-dots button {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            border: 2px solid rgba(26, 26, 26, 0.2);
+            background: transparent;
+            cursor: pointer;
+            padding: 0;
+            transition: all 0.3s
+        }
 
-/* Accent card right */
-.accent-card-right{position:absolute;right:clamp(60px,10vw,150px);top:50%;transform:translateY(-50%);width:clamp(80px,15vw,180px);height:clamp(180px,45vh,400px);background:rgba(5,150,105,0.05);border-left:4px solid var(--accent);display:flex;flex-direction:column;justify-content:center;padding:clamp(0.8rem,2vw,2rem);pointer-events:none}
-.accent-card-right .big{font-family:'Archivo Black',sans-serif;font-size:clamp(1.2rem,3.5vw,3rem);color:var(--text-dark);line-height:1.15}
-.accent-card-right .num{font-family:'Archivo Black',sans-serif;font-size:clamp(0.8rem,1.5vw,1.2rem);color:var(--accent);margin-bottom:clamp(0.3rem,0.5vw,0.5rem)}
+        .nav-dots button.active {
+            border-color: var(--accent);
+            background: var(--accent);
+            transform: scale(1.2)
+        }
 
-/* Breadcrumbs */
-.breadcrumbs{position:absolute;top:clamp(1rem,3vw,2.5rem);right:clamp(calc(60px + 1.5rem),calc(10vw + 1.5rem),calc(150px + 1.5rem));display:flex;gap:6px;align-items:center;z-index:10}
-.breadcrumbs span{width:6px;height:6px;border-radius:50%;background:var(--text-dark);opacity:0.1}
-.breadcrumbs span.active{background:var(--accent);opacity:1;width:24px;border-radius:3px}
+        /* Slide number */
+        .slide-num {
+            position: absolute;
+            bottom: clamp(0.5rem, 2vw, 1.5rem);
+            left: clamp(1rem, 4vw, 3rem);
+            font-family: 'Archivo Black', sans-serif;
+            font-size: clamp(0.75rem, 1.2vw, 1rem);
+            color: rgba(26, 26, 26, 0.15)
+        }
 
-/* Section number */
-.section-num{position:absolute;top:clamp(1rem,3vw,2.5rem);left:clamp(1rem,4vw,3rem);font-family:'Archivo Black',sans-serif;font-size:clamp(0.9rem,1.8vw,1.3rem);color:var(--text-dark);opacity:0.4;z-index:10}
+        /* Orange accent bar */
+        .accent-bar {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: clamp(60px, 10vw, 150px);
+            height: 100%;
+            background: var(--accent);
+            pointer-events: none
+        }
 
-/* Cards */
-.info-card{padding:clamp(1rem,2vw,2rem);border-radius:clamp(8px,1vw,12px);background:rgba(5,150,105,0.04);border:1px solid rgba(5,150,105,0.1);flex:1;min-width:0}
-.info-card h3{font-family:'Archivo Black',sans-serif;font-size:clamp(0.85rem,1.3vw,1.1rem);color:var(--accent);margin-bottom:clamp(0.3rem,0.5vw,0.6rem)}
-.info-card p{font-size:clamp(0.7rem,1vw,0.9rem);color:var(--text-gray);line-height:1.5}
+        /* Accent card right */
+        .accent-card-right {
+            position: absolute;
+            right: clamp(60px, 10vw, 150px);
+            top: 50%;
+            transform: translateY(-50%);
+            width: clamp(80px, 15vw, 180px);
+            height: clamp(180px, 45vh, 400px);
+            background: rgba(5, 150, 105, 0.05);
+            border-left: 4px solid var(--accent);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: clamp(0.8rem, 2vw, 2rem);
+            pointer-events: none
+        }
 
-/* Stat number */
-.stat-num{font-family:'Archivo Black',sans-serif;font-size:clamp(2rem,4vw,3.5rem);color:var(--accent);line-height:1}
+        .accent-card-right .big {
+            font-family: 'Archivo Black', sans-serif;
+            font-size: clamp(1.2rem, 3.5vw, 3rem);
+            color: var(--text-dark);
+            line-height: 1.15
+        }
 
-/* Tag */
-.tag{display:inline-flex;align-items:center;gap:8px;padding:clamp(4px,0.5vw,8px) clamp(10px,1.2vw,20px);border-radius:100px;background:rgba(5,150,105,0.08);color:var(--accent);font-weight:500;font-size:clamp(0.55rem,0.8vw,0.7rem);text-transform:uppercase;letter-spacing:0.15em;margin-bottom:clamp(1rem,2vw,1.5rem);align-self:flex-start}
+        .accent-card-right .num {
+            font-family: 'Archivo Black', sans-serif;
+            font-size: clamp(0.8rem, 1.5vw, 1.2rem);
+            color: var(--accent);
+            margin-bottom: clamp(0.3rem, 0.5vw, 0.5rem)
+        }
 
-/* Check list */
-.checks{list-style:none;display:flex;flex-direction:column;gap:clamp(0.4rem,1vh,0.8rem)}
-.checks li{font-size:clamp(0.8rem,1.2vw,1rem);color:var(--text-dark);display:flex;align-items:center;gap:10px}
-.checks li::before{content:'';width:6px;height:6px;background:var(--accent);border-radius:50%;flex-shrink:0}
+        /* Breadcrumbs */
+        .breadcrumbs {
+            position: absolute;
+            top: clamp(1rem, 3vw, 2.5rem);
+            right: clamp(calc(60px + 1.5rem), calc(10vw + 1.5rem), calc(150px + 1.5rem));
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            z-index: 10
+        }
 
-/* ===========================================
+        .breadcrumbs span {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--text-dark);
+            opacity: 0.1
+        }
+
+        .breadcrumbs span.active {
+            background: var(--accent);
+            opacity: 1;
+            width: 24px;
+            border-radius: 3px
+        }
+
+        /* Section number */
+        .section-num {
+            position: absolute;
+            top: clamp(1rem, 3vw, 2.5rem);
+            left: clamp(1rem, 4vw, 3rem);
+            font-family: 'Archivo Black', sans-serif;
+            font-size: clamp(0.9rem, 1.8vw, 1.3rem);
+            color: var(--text-dark);
+            opacity: 0.4;
+            z-index: 10
+        }
+
+        /* Cards */
+        .info-card {
+            padding: clamp(1rem, 2vw, 2rem);
+            border-radius: clamp(8px, 1vw, 12px);
+            background: rgba(5, 150, 105, 0.04);
+            border: 1px solid rgba(5, 150, 105, 0.1);
+            flex: 1;
+            min-width: 0
+        }
+
+        .info-card h3 {
+            font-family: 'Archivo Black', sans-serif;
+            font-size: clamp(0.85rem, 1.3vw, 1.1rem);
+            color: var(--accent);
+            margin-bottom: clamp(0.3rem, 0.5vw, 0.6rem)
+        }
+
+        .info-card p {
+            font-size: clamp(0.7rem, 1vw, 0.9rem);
+            color: var(--text-gray);
+            line-height: 1.5
+        }
+
+        /* Stat number */
+        .stat-num {
+            font-family: 'Archivo Black', sans-serif;
+            font-size: clamp(2rem, 4vw, 3.5rem);
+            color: var(--accent);
+            line-height: 1
+        }
+
+        /* Tag */
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: clamp(4px, 0.5vw, 8px) clamp(10px, 1.2vw, 20px);
+            border-radius: 100px;
+            background: rgba(5, 150, 105, 0.08);
+            color: var(--accent);
+            font-weight: 500;
+            font-size: clamp(0.55rem, 0.8vw, 0.7rem);
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            margin-bottom: clamp(1rem, 2vw, 1.5rem);
+            align-self: flex-start
+        }
+
+        /* Check list */
+        .checks {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: clamp(0.4rem, 1vh, 0.8rem)
+        }
+
+        .checks li {
+            font-size: clamp(0.8rem, 1.2vw, 1rem);
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 10px
+        }
+
+        .checks li::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            background: var(--accent);
+            border-radius: 50%;
+            flex-shrink: 0
+        }
+
+        /* ===========================================
    SLIDE 1: TITLE
    =========================================== */
-.slide-1 .title{font-family:'Archivo Black',sans-serif;font-size:clamp(2rem,6.5vw,5rem);line-height:1.05;color:var(--text-dark);margin-bottom:clamp(1rem,2.5vw,2rem);max-width:min(75vw,700px)}
-.slide-1 .title span{color:var(--accent)}
-.slide-1 .subtitle{font-size:clamp(0.9rem,1.5vw,1.2rem);font-weight:400;line-height:1.7;color:var(--text-gray);max-width:min(75vw,750px);margin-bottom:clamp(2rem,4vw,4rem)}
-.slide-1 .cta-btn{display:inline-flex;align-items:center;gap:12px;padding:clamp(12px,1.2vw,18px) clamp(20px,2.5vw,32px);background:var(--accent);border:none;border-radius:100px;font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:clamp(0.8rem,1vw,0.95rem);color:#ffffff;cursor:pointer;transition:background 0.3s,transform 0.3s}
-.slide-1 .cta-btn:hover{background:#047857;transform:translateY(-2px)}
+        .slide-1 .title {
+            font-family: 'Archivo Black', sans-serif;
+            font-size: clamp(2rem, 6.5vw, 5rem);
+            line-height: 1.05;
+            color: var(--text-dark);
+            margin-bottom: clamp(1rem, 2.5vw, 2rem);
+            max-width: min(75vw, 700px)
+        }
 
-/* ===========================================
+        .slide-1 .title span {
+            color: var(--accent)
+        }
+
+        .slide-1 .subtitle {
+            font-size: clamp(0.9rem, 1.5vw, 1.2rem);
+            font-weight: 400;
+            line-height: 1.7;
+            color: var(--text-gray);
+            max-width: min(75vw, 750px);
+            margin-bottom: clamp(2rem, 4vw, 4rem)
+        }
+
+        .slide-1 .cta-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            padding: clamp(12px, 1.2vw, 18px) clamp(20px, 2.5vw, 32px);
+            background: var(--accent);
+            border: none;
+            border-radius: 100px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 500;
+            font-size: clamp(0.8rem, 1vw, 0.95rem);
+            color: #ffffff;
+            cursor: pointer;
+            transition: background 0.3s, transform 0.3s
+        }
+
+        .slide-1 .cta-btn:hover {
+            background: #047857;
+            transform: translateY(-2px)
+        }
+
+        /* ===========================================
    SLIDE 2: AGENDA
    =========================================== */
-.slide-2 .accent-card-right .big{font-size:clamp(0.8rem,2vw,1.5rem)}
-.agenda-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(0.5rem,1vw,1rem);max-width:min(75vw,750px)}
-.agenda-item{padding:clamp(0.6rem,1vw,1rem) 0;border-bottom:1px solid rgba(26,26,26,0.06);font-size:clamp(0.8rem,1.1vw,0.95rem);color:var(--text-gray);display:flex;align-items:center;gap:12px}
-.agenda-item .idx{font-family:'Archivo Black',sans-serif;color:var(--accent);font-size:clamp(0.7rem,1vw,0.85rem);width:clamp(16px,1.5vw,24px);flex-shrink:0}
+        .slide-2 .accent-card-right .big {
+            font-size: clamp(0.8rem, 2vw, 1.5rem)
+        }
 
-/* ===========================================
+        .agenda-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: clamp(0.5rem, 1vw, 1rem);
+            max-width: min(75vw, 750px)
+        }
+
+        .agenda-item {
+            padding: clamp(0.6rem, 1vw, 1rem) 0;
+            border-bottom: 1px solid rgba(26, 26, 26, 0.06);
+            font-size: clamp(0.8rem, 1.1vw, 0.95rem);
+            color: var(--text-gray);
+            display: flex;
+            align-items: center;
+            gap: 12px
+        }
+
+        .agenda-item .idx {
+            font-family: 'Archivo Black', sans-serif;
+            color: var(--accent);
+            font-size: clamp(0.7rem, 1vw, 0.85rem);
+            width: clamp(16px, 1.5vw, 24px);
+            flex-shrink: 0
+        }
+
+        /* ===========================================
    SLIDE 3: PROBLEM
    =========================================== */
-.problem-grid{display:flex;flex-wrap:nowrap;gap:clamp(0.5rem,1.5vw,1.5rem);max-width:min(85vw,1100px)}
-@media(max-width:700px){.problem-grid{flex-wrap:wrap}}
+        .problem-grid {
+            display: flex;
+            flex-wrap: nowrap;
+            gap: clamp(0.5rem, 1.5vw, 1.5rem);
+            max-width: min(85vw, 1100px)
+        }
 
-/* ===========================================
+        @media(max-width:700px) {
+            .problem-grid {
+                flex-wrap: wrap
+            }
+        }
+
+        /* ===========================================
    SLIDE 4: SOLUTION
    =========================================== */
-/* ===========================================
+        /* ===========================================
    SLIDE 5: CRM
    =========================================== */
-.crm-stats{display:flex;gap:clamp(1rem,3vw,3rem);margin-bottom:clamp(1rem,2vw,2rem)}
-.crm-stats .item{text-align:center}
-.crm-stats .label{font-size:clamp(0.65rem,0.9vw,0.8rem);color:var(--text-gray);text-transform:uppercase;letter-spacing:0.1em;margin-top:clamp(0.2rem,0.3vw,0.4rem)}
+        .crm-stats {
+            display: flex;
+            gap: clamp(1rem, 3vw, 3rem);
+            margin-bottom: clamp(1rem, 2vw, 2rem)
+        }
 
-/* ===========================================
+        .crm-stats .item {
+            text-align: center
+        }
+
+        .crm-stats .label {
+            font-size: clamp(0.65rem, 0.9vw, 0.8rem);
+            color: var(--text-gray);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-top: clamp(0.2rem, 0.3vw, 0.4rem)
+        }
+
+        /* ===========================================
    SLIDE 9: ARCHITECTURE
    =========================================== */
-.arch-flow{display:flex;align-items:center;justify-content:center;gap:clamp(0.3rem,1vw,1rem);max-width:min(70vw,650px);flex-wrap:wrap}
-.arch-box{padding:clamp(0.6rem,1vw,1.2rem) clamp(0.8rem,1.5vw,2rem);border-radius:clamp(6px,0.8vw,10px);text-align:center;min-width:clamp(60px,10vw,100px)}
-.arch-box.client{background:var(--accent);color:#fff;font-weight:500;font-size:clamp(0.7rem,1vw,0.9rem)}
-.arch-box.server{background:var(--accent-light);color:var(--text-dark);font-weight:500;font-size:clamp(0.7rem,1vw,0.9rem)}
-.arch-arrow{font-size:clamp(1rem,2vw,1.5rem);color:var(--accent);opacity:0.5}
+        .arch-flow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: clamp(0.3rem, 1vw, 1rem);
+            max-width: min(70vw, 650px);
+            flex-wrap: wrap
+        }
 
-/* ===========================================
+        .arch-box {
+            padding: clamp(0.6rem, 1vw, 1.2rem) clamp(0.8rem, 1.5vw, 2rem);
+            border-radius: clamp(6px, 0.8vw, 10px);
+            text-align: center;
+            min-width: clamp(60px, 10vw, 100px)
+        }
+
+        .arch-box.client {
+            background: var(--accent);
+            color: #fff;
+            font-weight: 500;
+            font-size: clamp(0.7rem, 1vw, 0.9rem)
+        }
+
+        .arch-box.server {
+            background: var(--accent-light);
+            color: var(--text-dark);
+            font-weight: 500;
+            font-size: clamp(0.7rem, 1vw, 0.9rem)
+        }
+
+        .arch-arrow {
+            font-size: clamp(1rem, 2vw, 1.5rem);
+            color: var(--accent);
+            opacity: 0.5
+        }
+
+        /* ===========================================
    SLIDE 13: CTA
    =========================================== */
-.cta-big{display:inline-flex;align-items:center;gap:16px;padding:clamp(16px,1.5vw,24px) clamp(24px,3vw,48px);background:var(--accent);border:none;border-radius:100px;font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:clamp(1rem,2vw,1.5rem);color:#fff;cursor:pointer;transition:transform 0.3s,box-shadow 0.3s;margin-top:clamp(1.5rem,3vw,3rem)}
-.cta-big:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(5,150,105,0.35)}
+        .cta-big {
+            display: inline-flex;
+            align-items: center;
+            gap: 16px;
+            padding: clamp(16px, 1.5vw, 24px) clamp(24px, 3vw, 48px);
+            background: var(--accent);
+            border: none;
+            border-radius: 100px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 500;
+            font-size: clamp(1rem, 2vw, 1.5rem);
+            color: #fff;
+            cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s;
+            margin-top: clamp(1.5rem, 3vw, 3rem)
+        }
 
-/* ===========================================
+        .cta-big:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 40px rgba(5, 150, 105, 0.35)
+        }
+
+        /* ===========================================
    NAVIGATION BUTTONS
    =========================================== */
-.nav-buttons{position:fixed;bottom:clamp(1rem,3vw,2.5rem);left:50%;transform:translateX(-50%);display:flex;gap:clamp(0.5rem,1vw,1rem);z-index:1001}
-.nav-btn{width:clamp(36px,4vw,52px);height:clamp(36px,4vw,52px);border-radius:50%;border:1px solid rgba(26,26,26,0.1);background:rgba(255,255,255,0.95);color:var(--text-dark);font-size:clamp(1rem,1.5vw,1.5rem);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.3s;backdrop-filter:blur(8px);box-shadow:0 2px 12px rgba(0,0,0,0.06)}
-.nav-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent);box-shadow:0 4px 20px rgba(5,150,105,0.25);transform:translateY(-2px)}
-.nav-btn:disabled{opacity:0.2;cursor:default;transform:none}
-.nav-btn:disabled:hover{background:rgba(255,255,255,0.95);color:var(--text-dark);border-color:rgba(26,26,26,0.1);box-shadow:0 2px 12px rgba(0,0,0,0.06);transform:none}
-@media(max-height:600px){.nav-buttons{display:none}}
-</style>
-</head>
-<body>
-<div class="progress-bar" id="progressBar"></div>
-<nav class="nav-dots" id="navDots"></nav>
-<div class="nav-buttons" id="navButtons">
-<button class="nav-btn" id="prevBtn" aria-label="Previous slide">‹</button>
-<button class="nav-btn" id="nextBtn" aria-label="Next slide">›</button>
-</div>
+        .nav-buttons {
+            position: fixed;
+            bottom: clamp(1rem, 3vw, 2.5rem);
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: clamp(0.5rem, 1vw, 1rem);
+            z-index: 1001
+        }
 
-<!-- ===========================================
+        .nav-btn {
+            width: clamp(36px, 4vw, 52px);
+            height: clamp(36px, 4vw, 52px);
+            border-radius: 50%;
+            border: 1px solid rgba(26, 26, 26, 0.1);
+            background: rgba(255, 255, 255, 0.95);
+            color: var(--text-dark);
+            font-size: clamp(1rem, 1.5vw, 1.5rem);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06)
+        }
+
+        .nav-btn:hover {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+            box-shadow: 0 4px 20px rgba(5, 150, 105, 0.25);
+            transform: translateY(-2px)
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.2;
+            cursor: default;
+            transform: none
+        }
+
+        .nav-btn:disabled:hover {
+            background: rgba(255, 255, 255, 0.95);
+            color: var(--text-dark);
+            border-color: rgba(26, 26, 26, 0.1);
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+            transform: none
+        }
+
+        @media(max-height:600px) {
+            .nav-buttons {
+                display: none
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="progress-bar" id="progressBar"></div>
+    <nav class="nav-dots" id="navDots"></nav>
+    <div class="nav-buttons" id="navButtons">
+        <button class="nav-btn" id="prevBtn" aria-label="Previous slide">‹</button>
+        <button class="nav-btn" id="nextBtn" aria-label="Next slide">›</button>
+    </div>
+
+    <!-- ===========================================
      SLIDE 1: TITLE
      =========================================== -->
-<section class="slide slide-1" data-index="0">
-<div class="accent-bar"></div>
-<div class="section-num">01</div>
-<div class="breadcrumbs"><span></span><span class="active"></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
-<div class="slide-content">
-<h1 class="title reveal">Nova<span>Stack</span></h1>
-<p class="subtitle reveal">Streamline your workflow. Amplify your results. The all-in-one platform for modern business operations.</p>
-<button class="cta-btn reveal" onclick="document.querySelector('[data-index=\'1\']')?.scrollIntoView({behavior:'smooth'})">Get started →</button>
-</div>
-<div class="slide-num">01 / 12</div>
-</section>
+    <section class="slide slide-1" data-index="0">
+        <div class="accent-bar"></div>
+        <div class="section-num">01</div>
+        <div class="breadcrumbs"><span></span><span
+                class="active"></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <div class="slide-content">
+            <h1 class="title reveal">Nova<span>Stack</span></h1>
+            <p class="subtitle reveal">Stop paying rent for business software. Own it instead. One payment, forever.</p>
+            <button class="cta-btn reveal"
+                onclick="document.querySelector('[data-index=\'1\']')?.scrollIntoView({behavior:'smooth'})">Get started
+                →</button>
+        </div>
+        <div class="slide-num">01 / 12</div>
+    </section>
 
-<!-- ===========================================
+    <!-- ===========================================
      SLIDE 2: AGENDA
      =========================================== -->
-<section class="slide" data-index="1">
-<div class="accent-bar"></div>
-<div class="accent-card-right"><div class="num">02</div><div class="big">Agenda</div></div>
-<div class="breadcrumbs"><span></span><span></span><span class="active"></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
-<div class="slide-content">
-<div class="tag reveal">Agenda</div>
-<h2 class="h2 reveal" style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.5rem,4vw,3rem);color:var(--text-dark);margin-bottom:clamp(1.5rem,3vw,3rem)">What we'll cover</h2>
-<div class="agenda-grid reveal">
-<div class="agenda-item"><span class="idx">01</span>The challenge</div>
-<div class="agenda-item"><span class="idx">02</span>NovaStack solution</div>
-<div class="agenda-item"><span class="idx">03</span>CRM &amp; Pipeline</div>
-<div class="agenda-item"><span class="idx">04</span>HR automation</div>
-<div class="agenda-item"><span class="idx">05</span>Smart invoicing</div>
-<div class="agenda-item"><span class="idx">06</span>Intake workflows</div>
-<div class="agenda-item"><span class="idx">07</span>Dashboard &amp; insights</div>
-<div class="agenda-item"><span class="idx">08</span>Architecture</div>
-</div>
-</div>
-<div class="slide-num">02 / 12</div>
-</section>
+    <section class="slide" data-index="1">
+        <div class="accent-bar"></div>
+        <div class="accent-card-right">
+            <div class="num">02</div>
+            <div class="big">Agenda</div>
+        </div>
+        <div class="breadcrumbs"><span></span><span></span><span
+                class="active"></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <div class="slide-content">
+            <div class="tag reveal">Agenda</div>
+            <h2 class="h2 reveal"
+                style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.5rem,4vw,3rem);color:var(--text-dark);margin-bottom:clamp(1.5rem,3vw,3rem)">
+                What we'll cover</h2>
+            <p class="reveal"
+                style="font-size:clamp(0.8rem,1.2vw,1rem);color:var(--text-gray);max-width:min(75vw,700px);margin-bottom:clamp(1rem,2vw,2rem);line-height:1.6">
+                We know you're drowning in disconnected tools and monthly bills. Here's how we solve it.</p>
+            <div class="agenda-grid reveal">
+                <div class="agenda-item"><span class="idx">03</span>The Problem</div>
+                <div class="agenda-item"><span class="idx">04</span>The Solution</div>
+                <div class="agenda-item"><span class="idx">05</span>One System</div>
+                <div class="agenda-item"><span class="idx">06</span>CRM & Pipeline</div>
+                <div class="agenda-item"><span class="idx">07</span>HR Auto</div>
+                <div class="agenda-item"><span class="idx">08</span>Smart Invoices</div>
+                <div class="agenda-item"><span class="idx">09</span>Intake</div>
+                <div class="agenda-item"><span class="idx">10</span>Insigh</div>
+                <div class="agenda-item"><span class="idx">11</span>Search</div>
+                <div class="agenda-item"><span class="idx">12</span>Why NovaStack</div>
+                <div class="agenda-item"><span class="idx">13</span>Early bird pricing</div>
+            </div>
+        </div>
+        <div class="slide-num">02 / 13</div>
+    </section>
 
-<!-- ===========================================
+    <!-- ===========================================
      SLIDE 3: THE PROBLEM
      =========================================== -->
-<section class="slide" data-index="2">
-<div class="accent-bar"></div>
-<div class="accent-card-right"><div class="num">03</div><div class="big">The<br>Problem</div></div>
-<div class="breadcrumbs"><span></span><span></span><span></span><span class="active"></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
-<div class="slide-content">
-<div class="tag reveal">The Challenge</div>
-<h2 class="h2 reveal" style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.5rem,4vw,3rem);color:var(--text-dark);margin-bottom:clamp(1rem,2vw,2rem)">Running your business<br>shouldn't be this hard</h2>
-<div class="problem-grid reveal">
-<div class="info-card">
-<h3>Disconnected tools</h3>
-<p>CRM in one app, HR in another, invoices in a spreadsheet. Data lives in silos with no central source of truth.</p>
-</div>
-<div class="info-card">
-<h3>Manual busywork</h3>
-<p>Approval chains, status updates, email follow-ups — hours lost to repetitive tasks that should automate themselves.</p>
-</div>
-<div class="info-card">
-<h3>No real-time visibility</h3>
-<p>Managers lack a single pane of glass. Pipeline health, HR metrics, cash flow — scattered across tabs and PDF exports.</p>
-</div>
-<div class="info-card">
-<h3>Scaling pain</h3>
-<p>What works for 5 people breaks at 20. Spreadsheets become unwieldy, permissions get messy, data integrity suffers.</p>
-</div>
-</div>
-</div>
-<div class="slide-num">03 / 12</div>
-</section>
+    <section class="slide" data-index="2">
+        <div class="accent-bar"></div>
+        <div class="accent-card-right">
+            <div class="num">03</div>
+            <div class="big">The<br>Problem</div>
+        </div>
+        <div class="breadcrumbs"><span></span><span></span><span></span><span
+                class="active"></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <div class="slide-content">
+            <div class="tag reveal">The Challenge</div>
+            <h2 class="h2 reveal"
+                style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.5rem,4vw,3rem);color:var(--text-dark);margin-bottom:clamp(1rem,2vw,2rem)">
+                Running your business<br>shouldn't be this hard</h2>
+            <div class="problem-grid reveal">
+                <div class="info-card">
+                    <h3>Disconnected tools</h3>
+                    <p>Your CRM is in Salesforce, HR in BambooHR, invoices in QuickBooks. Data scattered across 5+ apps
+                        with no single source of truth.</p>
+                </div>
+                <div class="info-card">
+                    <h3>Manual busywork</h3>
+                    <p>A Slack thread about a PTO request bounces between your HR person, manager, and Finance. Three
+                        days later, it's still not approved.</p>
+                </div>
+                <div class="info-card">
+                    <h3>No real-time visibility</h3>
+                    <p>You can't answer basic questions: How many deals are in the pipeline? What's overdue? Who's
+                        waiting for approval? You're hunting through tabs.</p>
+                </div>
+                <div class="info-card">
+                    <h3>Scaling pain</h3>
+                    <p>You've outgrown spreadsheets. But setting up permissions, tracking changes, maintaining data
+                        integrity, and managing access is a nightmare.</p>
+                </div>
+            </div>
+        </div>
+        <div class="slide-num">03 / 13</div>
+    </section>
 
-<!-- ===========================================
+    <!-- ===========================================
      SLIDE 4: THE SOLUTION
      =========================================== -->
-<section class="slide" data-index="3">
-<div class="accent-bar"></div>
-<div class="accent-card-right"><div class="num">04</div><div class="big">Solution</div></div>
-<div class="breadcrumbs"><span></span><span></span><span></span><span></span><span class="active"></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
-<div class="slide-content">
-<div class="tag reveal">Introducing</div>
-<h2 class="h2 reveal" style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.5rem,4vw,3rem);color:var(--text-dark);margin-bottom:clamp(1rem,2vw,2rem)">NovaStack — one platform,<br>endless possibilities</h2>
-<p class="reveal" style="font-size:clamp(0.8rem,1.2vw,1rem);color:var(--text-gray);max-width:min(75vw,700px);margin-bottom:clamp(1.5rem,3vw,3rem);line-height:1.6">
-An all-in-one business operating system that unifies CRM, HR, invoicing, intake management, and analytics into a single, beautiful, real-time dashboard.
-</p>
-<div class="grid reveal" style="max-width:min(85vw,1100px)">
-<div class="info-card">
-<h3>🧠 CRM</h3>
-<p>Full pipeline management with deal tracking, Kanban board, contact history, and team collaboration.</p>
-</div>
-<div class="info-card">
-<h3>⚖ HR Operations</h3>
-<p>Automated approval workflows, employee onboarding, compliance tracking, and form builder.</p>
-</div>
-<div class="info-card">
-<h3>📄 Invoicing</h3>
-<p>Smart invoicing with PDF generation, line items, status tracking, and payment reconciliation.</p>
-</div>
-</div>
-</div>
-<div class="slide-num">04 / 12</div>
-</section>
+    <section class="slide" data-index="3">
+        <div class="accent-bar"></div>
+        <div class="accent-card-right">
+            <div class="num">04</div>
+            <div class="big">Solution</div>
+        </div>
+        <div class="breadcrumbs"><span></span><span></span><span></span><span></span><span
+                class="active"></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <div class="slide-content">
+            <div class="tag reveal">Introducing</div>
+            <h2 class="h2 reveal"
+                style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.5rem,4vw,3rem);color:var(--text-dark);margin-bottom:clamp(1rem,2vw,2rem)">
+                NovaStack — all your business<br>tools in one place</h2>
+            <p class="reveal"
+                style="font-size:clamp(0.8rem,1.2vw,1rem);color:var(--text-gray);max-width:min(75vw,700px);margin-bottom:clamp(1.5rem,3vw,3rem);line-height:1.6">
+                Imagine: every deal, invoice, approval, and team member in a unified system. No monthly fees. No
+                per-seat pricing. No vendor chaining you in. You run it on your hardware. Your data stays yours.
+            </p>
+            <div class="grid reveal" style="max-width:min(85vw,1100px)">
+                <div class="info-card">
+                    <h3>🧠 CRM</h3>
+                    <p>Full pipeline management with deal tracking, Kanban board, contact history, and team
+                        collaboration.</p>
+                </div>
+                <div class="info-card">
+                    <h3>⚖ HR Operations</h3>
+                    <p>Automated approval workflows, employee onboarding, compliance tracking, and form builder.</p>
+                </div>
+                <div class="info-card">
+                    <h3>📄 Invoicing</h3>
+                    <p>Smart invoicing with PDF generation, line items, status tracking, and payment reconciliation.</p>
+                </div>
+            </div>
+        </div>
+        <div class="slide-num">04 / 13</div>
+    </section>
 
-<!-- ===========================================
-     SLIDE 5: CRM & PIPELINE
+    <!-- ===========================================
+     SLIDE 5: THE INTEGRATION ADVANTAGE
      =========================================== -->
-<section class="slide" data-index="4">
-<div class="accent-bar"></div>
-<div class="accent-card-right"><div class="num">05</div><div class="big">CRM &amp;<br>Pipeline</div></div>
-<div class="breadcrumbs"><span></span><span></span><span></span><span></span><span></span><span class="active"></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
-<div class="slide-content">
-<div class="tag reveal">Feature</div>
-<h2 class="h2 reveal" style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.5rem,4vw,3rem);color:var(--text-dark);margin-bottom:clamp(1rem,2vw,2rem)">CRM &amp; Pipeline Management</h2>
-<div class="crm-stats reveal">
-<div class="item"><div class="stat-num">100%</div><div class="label">Customizable stages</div></div>
-<div class="item"><div class="stat-num">Kanban</div><div class="label">Drag-and-drop board</div></div>
-<div class="item"><div class="stat-num">Real-time</div><div class="label">Updates &amp; assignment</div></div>
-</div>
-<div class="grid reveal" style="max-width:min(85vw,1100px)">
-<div class="info-card">
-<h3>Contact management</h3>
-<p>Centralized directory with companies, roles, interaction history, and activity tracking.</p>
-</div>
-<div class="info-card">
-<h3>Deal tracking</h3>
-<p>Visual pipeline with stages, values, expected close dates, and team assignments.</p>
-</div>
-<div class="info-card">
-<h3>Activity feed</h3>
-<p>Every touchpoint logged — calls, emails, meetings. Full audit trail for every relationship.</p>
-</div>
-<div class="info-card">
-<h3>Pipeline analytics</h3>
-<p>Conversion rates, velocity metrics, and revenue forecasting at a glance.</p>
-</div>
-</div>
-</div>
-<div class="slide-num">05 / 12</div>
-</section>
+    <section class="slide" data-index="4">
+        <div class="accent-bar"></div>
+        <div class="accent-card-right">
+            <div class="num">05</div>
+            <div class="big">One<br>System</div>
+        </div>
+        <div class="breadcrumbs"><span></span><span></span><span></span><span></span><span
+                class="active"></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <div class="slide-content">
+            <div class="tag reveal">The Real Power</div>
+            <h2 class="h2 reveal"
+                style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.5rem,4vw,3rem);color:var(--text-dark);margin-bottom:clamp(1rem,2vw,2rem)">
+                Everything works together</h2>
+            <p class="reveal"
+                style="font-size:clamp(0.8rem,1.2vw,1rem);color:var(--text-gray);max-width:min(75vw,700px);margin-bottom:clamp(1.5rem,3vw,3rem);line-height:1.6">
+                This isn't just a collection of tools. It's a system where every module talks to every other module.
+            </p>
+            <div class="grid reveal" style="max-width:min(85vw,1100px)">
+                <div class="info-card">
+                    <h3>Example: A deal closes</h3>
+                    <p>You mark a deal as won in the CRM. Instantly, an invoice is ready to create. Your team is
+                        notified. Cash flow gets updated. One action ripples through your entire business.</p>
+                </div>
+                <div class="info-card">
+                    <h3>Example: An approval request</h3>
+                    <p>An employee submits a hardware request. It auto-routes to their manager. Manager approves.
+                        Finance is notified. Budget is adjusted. No emails. No handoff delays. No wondering where it
+                        went.</p>
+                </div>
+                <div class="info-card">
+                    <h3>One source of truth</h3>
+                    <p>Data lives in one unified database. When you update something, everyone sees the change
+                        instantly. No syncing delays. No conflicting versions. No "which Spreadsheet is the real one?"
+                    </p>
+                </div>
+                <div class="info-card">
+                    <h3>Your business on one screen</h3>
+                    <p>The dashboard shows deals, invoices, pending approvals, and team workload—all connected. You can
+                        drill down from high-level KPIs to individual transactions in seconds.</p>
+                </div>
+            </div>
+        </div>
+        <div class="slide-num">05 / 13</div>
+    </section>
 
-<!-- ===========================================
-     SLIDE 6: HR AUTOMATION
+    <!-- ===========================================
+     SLIDE 6: CRM & PIPELINE
      =========================================== -->
-<section class="slide" data-index="5">
-<div class="accent-bar"></div>
-<div class="accent-card-right"><div class="num">06</div><div class="big">HR<br>Auto</div></div>
-<div class="breadcrumbs"><span></span><span></span><span></span><span></span><span></span><span></span><span class="active"></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
-<div class="slide-content">
-<div class="tag reveal">Feature</div>
-<h2 class="h2 reveal" style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.5rem,4vw,3rem);color:var(--text-dark);margin-bottom:clamp(1rem,2vw,2rem)">HR Automation</h2>
-<div class="grid reveal" style="max-width:min(85vw,1100px)">
-<div class="info-card">
-<h3>Employee management</h3>
-<p>Roles, departments, status tracking, and organizational hierarchy in one place.</p>
-</div>
-<div class="info-card">
-<h3>Approval workflows</h3>
-<p>Vacation requests, expense approvals, and HR decisions routed through configurable chains.</p>
-</div>
-<div class="info-card">
-<h3>Onboarding &amp; offboarding</h3>
-<p>Structured intake forms, task assignments, and checklists for every employee lifecycle event.</p>
-</div>
-<div class="info-card">
-<h3>Compliance &amp; audit</h3>
-<p>Automatic audit logs, document generation, and policy enforcement for regulatory peace of mind.</p>
-</div>
-</div>
-</div>
-<div class="slide-num">06 / 12</div>
-</section>
+    <section class="slide" data-index="5">
+        <div class="accent-bar"></div>
+        <div class="accent-card-right">
+            <div class="num">06</div>
+            <div class="big">CRM &amp;<br>Pipeline</div>
+        </div>
+        <div class="breadcrumbs"><span></span><span></span><span></span><span></span><span></span><span
+                class="active"></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <div class="slide-content">
+            <div class="tag reveal">Feature</div>
+            <h2 class="h2 reveal"
+                style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.5rem,4vw,3rem);color:var(--text-dark);margin-bottom:clamp(1rem,2vw,2rem)">
+                See your entire pipeline at a glance</h2>
+            <div class="crm-stats reveal">
+                <div class="item">
+                    <div class="stat-num">Real-time</div>
+                    <div class="label">Deal updates</div>
+                </div>
+                <div class="item">
+                    <div class="stat-num">Kanban</div>
+                    <div class="label">Visual board</div>
+                </div>
+                <div class="item">
+                    <div class="stat-num">100%</div>
+                    <div class="label">Custom stages</div>
+                </div>
+            </div>
+            <div class="grid reveal" style="max-width:min(85vw,1100px)">
+                <div class="info-card">
+                    <h3>Contact management</h3>
+                    <p>Know everything about every relationship. Companies, roles, every call, email, and meeting. Never
+                        wonder what happened last month.</p>
+                </div>
+                <div class="info-card">
+                    <h3>Deal tracking</h3>
+                    <p>Visual pipeline with stages, values, close dates, and team assignments. See exactly where money
+                        is and when it closes.</p>
+                </div>
+                <div class="info-card">
+                    <h3>Activity feed</h3>
+                    <p>Every touchpoint logged automatically. Full audit trail for every relationship. No more "did we
+                        follow up?" questions.</p>
+                </div>
+                <div class="info-card">
+                    <h3>Pipeline analytics</h3>
+                    <p>Conversion rates, velocity, revenue forecasting. Know your numbers without digging through
+                        spreadsheets.</p>
+                </div>
+            </div>
+        </div>
+        <div class="slide-num">05 / 12</div>
+    </section>
 
-<!-- ===========================================
-     SLIDE 7: SMART INVOICING
+    <!-- ===========================================
+     SLIDE 7: HR AUTOMATION
      =========================================== -->
-<section class="slide" data-index="6">
-<div class="accent-bar"></div>
-<div class="accent-card-right"><div class="num">07</div><div class="big">Smart<br>Invoices</div></div>
-<div class="breadcrumbs"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span class="active"></span><span></span><span></span><span></span><span></span><span></span></div>
-<div class="slide-content">
-<div class="tag reveal">Feature</div>
-<h2 class="h2 reveal" style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.5rem,4vw,3rem);color:var(--text-dark);margin-bottom:clamp(1rem,2vw,2rem)">Smart Invoicing</h2>
-<div class="grid reveal" style="max-width:min(85vw,1100px)">
-<div class="info-card">
-<h3>PDF generation</h3>
-<p>Professional invoices generated instantly with your branding, ready to send or download.</p>
-</div>
-<div class="info-card">
-<h3>Status tracking</h3>
-<p>Draft → Sent → Paid — full lifecycle with timestamps and payment reconciliation.</p>
-</div>
-<div class="info-card">
-<h3>Deal integration</h3>
-<p>Create invoices directly from deals. Revenue flows seamlessly from pipeline to accounts.</p>
-</div>
-<div class="info-card">
-<h3>Email delivery</h3>
-<p>Send invoices directly from the platform with embedded PDFs and read receipts.</p>
-</div>
-</div>
-</div>
-<div class="slide-num">07 / 12</div>
-</section>
+    <section class="slide" data-index="6">
+        <div class="accent-bar"></div>
+        <div class="accent-card-right">
+            <div class="num">07</div>
+            <div class="big">HR<br>Auto</div>
+        </div>
+        <div class="breadcrumbs"><span></span><span></span><span></span><span></span><span></span><span></span><span
+                class="active"></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <div class="slide-content">
+            <div class="tag reveal">Feature</div>
+            <h2 class="h2 reveal"
+                style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.5rem,4vw,3rem);color:var(--text-dark);margin-bottom:clamp(1rem,2vw,2rem)">
+                Stop hunting through Slack for approvals</h2>
+            <div class="grid reveal" style="max-width:min(85vw,1100px)">
+                <div class="info-card">
+                    <h3>Employee management</h3>
+                    <p>Roles, departments, status, and org hierarchy in one place. Everyone knows who reports to whom.
+                    </p>
+                </div>
+                <div class="info-card">
+                    <h3>Approval workflows</h3>
+                    <p>PTO requests, expense approvals, hardware orders — routed to the right people automatically. No
+                        more Slack threads.</p>
+                </div>
+                <div class="info-card">
+                    <h3>Onboarding & offboarding</h3>
+                    <p>Structured checklists for every employee lifecycle event. First day to last day, nothing gets
+                        missed.</p>
+                </div>
+                <div class="info-card">
+                    <h3>Compliance & audit</h3>
+                    <p>Automatic audit logs, document generation, policy enforcement. Sleep soundly knowing everything
+                        is tracked.</p>
+                </div>
+            </div>
+        </div>
+        <div class="slide-num">07 / 13</div>
+    </section>
 
-<!-- ===========================================
-     SLIDE 8: INTAKE WORKFLOWS
+    <!-- ===========================================
+     SLIDE 8: SMART INVOICING
      =========================================== -->
-<section class="slide" data-index="7">
-<div class="accent-bar"></div>
-<div class="accent-card-right"><div class="num">08</div><div class="big">Intake</div></div>
-<div class="breadcrumbs"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span class="active"></span><span></span><span></span><span></span><span></span></div>
-<div class="slide-content">
-<div class="tag reveal">Feature</div>
-<h2 class="h2 reveal" style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.5rem,4vw,3rem);color:var(--text-dark);margin-bottom:clamp(1rem,2vw,2rem)">Intake &amp; Approval Workflows</h2>
-<div class="grid reveal" style="max-width:min(85vw,1100px)">
-<div class="info-card">
-<h3>📋 Custom intake forms</h3>
-<p>Dynamic form builder with customizable fields. Capture exactly what you need from every submission.</p>
-</div>
-<div class="info-card">
-<h3>🔀 Smart routing</h3>
-<p>Auto-routed to the right people based on type, department, and workload. Never lose a request again.</p>
-</div>
-<div class="info-card">
-<h3>✅ Decision queue</h3>
-<p>Accept, reject, or request changes. Full audit trail from submission to resolution with escalation rules.</p>
-</div>
-</div>
-</div>
-<div class="slide-num">08 / 12</div>
-</section>
+    <section class="slide" data-index="7">
+        <div class="accent-bar"></div>
+        <div class="accent-card-right">
+            <div class="num">08</div>
+            <div class="big">Smart<br>Invoices</div>
+        </div>
+        <div class="breadcrumbs">
+            <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span
+                class="active"></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <div class="slide-content">
+            <div class="tag reveal">Feature</div>
+            <h2 class="h2 reveal"
+                style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.5rem,4vw,3rem);color:var(--text-dark);margin-bottom:clamp(1rem,2vw,2rem)">
+                From deal closed to invoice sent in seconds</h2>
+            <div class="grid reveal" style="max-width:min(85vw,1100px)">
+                <div class="info-card">
+                    <h3>PDF generation</h3>
+                    <p>Professional invoices generated instantly with your branding. Send or download in one click.</p>
+                </div>
+                <div class="info-card">
+                    <h3>Status tracking</h3>
+                    <p>Draft → Sent → Paid. Know exactly which invoices are overdue and chase them down automatically.
+                    </p>
+                </div>
+                <div class="info-card">
+                    <h3>Deal integration</h3>
+                    <p>Create an invoice directly from a closed deal. Revenue flows seamlessly from pipeline to
+                        accounts.</p>
+                </div>
+                <div class="info-card">
+                    <h3>Email delivery</h3>
+                    <p>Send invoices directly from the platform. No copying, pasting, or hunting for PDFs in your inbox.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="slide-num">08 / 13</div>
+    </section>
 
-<!-- ===========================================
-     SLIDE 9: DASHBOARD & ANALYTICS
+    <!-- ===========================================
+     SLIDE 9: INTAKE WORKFLOWS
      =========================================== -->
-<section class="slide" data-index="8">
-<div class="accent-bar"></div>
-<div class="accent-card-right"><div class="num">09</div><div class="big">Insights</div></div>
-<div class="breadcrumbs"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span class="active"></span><span></span><span></span><span></span></div>
-<div class="slide-content">
-<div class="tag reveal">Feature</div>
-<h2 class="h2 reveal" style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.5rem,4vw,3rem);color:var(--text-dark);margin-bottom:clamp(1rem,2vw,2rem)">Dashboard &amp; Analytics</h2>
-<div class="grid reveal" style="max-width:min(85vw,1100px)">
-<div class="info-card">
-<h3>KPI dashboard</h3>
-<p>Revenue, pipeline value, active deals, pending approvals — all visible at a glance.</p>
-</div>
-<div class="info-card">
-<h3>My Work Queue</h3>
-<p>Personalized task list across all modules — never miss a follow-up or approval again.</p>
-</div>
-<div class="info-card">
-<h3>Activity feed</h3>
-<p>Real-time stream of all business activity: new deals, closed invoices, HR changes.</p>
-</div>
-<div class="info-card">
-<h3>Money-at-Risk</h3>
-<p>Proactive alerts for overdue invoices, stalled deals, and pending decisions.</p>
-</div>
-</div>
-</div>
-<div class="slide-num">09 / 12</div>
-</section>
+    <section class="slide" data-index="8">
+        <div class="accent-bar"></div>
+        <div class="accent-card-right">
+            <div class="num">09</div>
+            <div class="big">Intake</div>
+        </div>
+        <div class="breadcrumbs">
+            <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span
+                class="active"></span><span></span><span></span><span></span><span></span>
+        </div>
+        <div class="slide-content">
+            <div class="tag reveal">Feature</div>
+            <h2 class="h2 reveal"
+                style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.5rem,4vw,3rem);color:var(--text-dark);margin-bottom:clamp(1rem,2vw,2rem)">
+                No more lost requests in email</h2>
+            <div class="grid reveal" style="max-width:min(85vw,1100px)">
+                <div class="info-card">
+                    <h3>📋 Custom intake forms</h3>
+                    <p>Build custom forms for any request type. Capture exactly what you need. No coding required.</p>
+                </div>
+                <div class="info-card">
+                    <h3>🔀 Smart routing</h3>
+                    <p>Auto-route to the right person based on type, department, and priority. Nothing falls through the
+                        cracks.</p>
+                </div>
+                <div class="info-card">
+                    <h3>✅ Decision queue</h3>
+                    <p>Accept, reject, or ask for more info. Full audit trail from submission to resolution with
+                        escalation rules.</p>
+                </div>
+            </div>
+        </div>
+        <div class="slide-num">09 / 13</div>
+    </section>
 
-<!-- ===========================================
-     SLIDE 10: GLOBAL SEARCH
+    <!-- ===========================================
+     SLIDE 10: DASHBOARD & ANALYTICS
      =========================================== -->
-<section class="slide" data-index="9">
-<div class="accent-bar"></div>
-<div class="accent-card-right"><div class="num">10</div><div class="big">Search</div></div>
-<div class="breadcrumbs"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span class="active"></span><span></span><span></span></div>
-<div class="slide-content">
-<div class="tag reveal">Feature</div>
-<h2 class="h2 reveal" style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.5rem,4vw,3rem);color:var(--text-dark);margin-bottom:clamp(1rem,2vw,2rem)">Global Search</h2>
-<div class="grid reveal" style="max-width:min(85vw,1100px)">
-<div class="info-card">
-<h3>🔍 Unified search</h3>
-<p>Find anything instantly — contacts, deals, invoices, tasks, employees, submissions. One search bar, every result.</p>
-</div>
-<div class="info-card">
-<h3>💡 Smart suggestions</h3>
-<p>Type-ahead with contextual previews. Filter by module, status, assignee, and date. Keyboard-friendly for power users.</p>
-</div>
-</div>
-</div>
-<div class="slide-num">10 / 12</div>
-</section>
+    <section class="slide" data-index="9">
+        <div class="accent-bar"></div>
+        <div class="accent-card-right">
+            <div class="num">10</div>
+            <div class="big">Insights</div>
+        </div>
+        <div class="breadcrumbs">
+            <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span
+                class="active"></span><span></span><span></span><span></span>
+        </div>
+        <div class="slide-content">
+            <div class="tag reveal">Feature</div>
+            <h2 class="h2 reveal"
+                style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.5rem,4vw,3rem);color:var(--text-dark);margin-bottom:clamp(1rem,2vw,2rem)">
+                See what's happening right now</h2>
+            <div class="grid reveal" style="max-width:min(85vw,1100px)">
+                <div class="info-card">
+                    <h3>KPI dashboard</h3>
+                    <p>Revenue pipeline, pending approvals, overdue invoices, team capacity. Everything that matters in
+                        one screen.</p>
+                </div>
+                <div class="info-card">
+                    <h3>My work queue</h3>
+                    <p>Personalized to-do list across all modules. Never miss a follow-up or approval again.</p>
+                </div>
+                <div class="info-card">
+                    <h3>Activity feed</h3>
+                    <p>Real-time stream of business activity. New deals, closed invoices, HR changes. Nothing hidden.
+                    </p>
+                </div>
+                <div class="info-card">
+                    <h3>Money-at-risk alerts</h3>
+                    <p>Automatic alerts for overdue invoices, stalled deals, and pending decisions. Act fast.</p>
+                </div>
+            </div>
+        </div>
+        <div class="slide-num">10 / 13</div>
+    </section>
 
-<!-- ===========================================
-     SLIDE 11: WHY NOVASTACK
+    <!-- ===========================================
+     SLIDE 11: GLOBAL SEARCH
      =========================================== -->
-<section class="slide" data-index="10">
-<div class="accent-bar"></div>
-<div class="accent-card-right"><div class="num">11</div><div class="big">Why<br>NovaStack</div></div>
-<div class="breadcrumbs"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span class="active"></span><span></span></div>
-<div class="slide-content">
-<div class="tag reveal">Why Choose Us</div>
-<h2 class="h2 reveal" style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.5rem,4vw,3rem);color:var(--text-dark);margin-bottom:clamp(1rem,2vw,2rem)">Your data. Your hardware.<br>Your rules.</h2>
-<div class="grid reveal" style="max-width:min(95vw,1400px)">
-<div class="info-card">
-<h3>💰 One-time payment</h3>
-<p>No monthly subscriptions. No per-seat fees. Pay once, own forever. Typical SaaS costs $6,000/year for 10 users — NovaStack pays for itself in under 2 months.</p>
-</div>
-<div class="info-card">
-<h3>🔒 Your data stays yours</h3>
-<p>Runs on your own computer. Not in the cloud. No third-party servers. No data mining. No 'oops, we got hacked' emails. Ever.</p>
-</div>
-<div class="info-card">
-<h3>🎯 Simple to run</h3>
-<p>No IT degree required. Works on Windows, Mac, or Linux. Even an old laptop works. One simple setup and you're running.</p>
-</div>
-<div class="info-card">
-<h3>🌍 No internet? No problem</h3>
-<p>Works completely offline on your local network. Your business keeps running even when the internet goes down.</p>
-</div>
-</div>
-</div>
-<div class="slide-num">11 / 12</div>
-</section>
+    <section class="slide" data-index="10">
+        <div class="accent-bar"></div>
+        <div class="accent-card-right">
+            <div class="num">11</div>
+            <div class="big">Search</div>
+        </div>
+        <div class="breadcrumbs">
+            <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span
+                class="active"></span><span></span><span></span>
+        </div>
+        <div class="slide-content">
+            <div class="tag reveal">Feature</div>
+            <h2 class="h2 reveal"
+                style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.5rem,4vw,3rem);color:var(--text-dark);margin-bottom:clamp(1rem,2vw,2rem)">
+                Find anything in seconds</h2>
+            <div class="grid reveal" style="max-width:min(85vw,1100px)">
+                <div class="info-card">
+                    <h3>🔍 Unified search</h3>
+                    <p>Find any contact, deal, invoice, task, employee, or submission instantly. One search bar.
+                        Everything appears.</p>
+                </div>
+                <div class="info-card">
+                    <h3>💡 Smart suggestions</h3>
+                    <p>Type-ahead shows previews. Filter by module, status, person, or date. Power users can search with
+                        keyboard alone.</p>
+                </div>
+            </div>
+        </div>
+        <div class="slide-num">11 / 13</div>
+    </section>
 
-
-
-<!-- ===========================================
-     SLIDE 12: CALL TO ACTION
+    <!-- ===========================================
+     SLIDE 12: WHY NOVASTACK
      =========================================== -->
-<section class="slide slide-1" data-index="11">
-<div class="accent-bar"></div>
-<div class="section-num">12</div>
-<div class="breadcrumbs"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span class="active"></span></div>
-<div class="slide-content" style="align-items:center;text-align:center">
-<div class="tag reveal">Limited Time</div>
-<h1 class="title reveal" style="font-family:'Archivo Black',sans-serif;font-size:clamp(2rem,6vw,4.5rem);line-height:1.05;color:var(--text-dark);margin-bottom:clamp(0.5rem,1.5vw,1rem)">Early Bird Pricing<br><span style="color:var(--accent)">$999 — Pay Once</span></h1>
-<p class="subtitle reveal" style="font-size:clamp(0.9rem,1.5vw,1.2rem);color:var(--text-gray);max-width:min(70vw,550px);margin-bottom:clamp(0.5rem,1vw,1rem);line-height:1.6">
-NovaStack is ready for your team. Runs on your hardware, no subscriptions, your data stays yours. Pay once, own forever.
-</p>
-<p class="subtitle reveal" style="font-size:clamp(0.85rem,1.3vw,1.05rem);color:var(--accent);font-weight:500;max-width:min(70vw,550px);margin-bottom:clamp(1.5rem,2vw,2rem);line-height:1.5">
-⏱️ Introductory pricing ends soon — save $600 when you lock in today. No subscription. Ever.
-</p>
-<a class="cta-big reveal" href="https://www.flowmatica.ca/novastack/" target="_blank" rel="noopener">Reserve early bird pricing →</a>
-</div>
-<div class="slide-num">12 / 12</div>
-</section>
+    <section class="slide" data-index="11">
+        <div class="accent-bar"></div>
+        <div class="accent-card-right">
+            <div class="num">12</div>
+            <div class="big">Why<br>NovaStack</div>
+        </div>
+        <div class="breadcrumbs">
+            <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span
+                class="active"></span><span></span>
+        </div>
+        <div class="slide-content">
+            <div class="tag reveal">Why Choose Us</div>
+            <h2 class="h2 reveal"
+                style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.5rem,4vw,3rem);color:var(--text-dark);margin-bottom:clamp(1rem,2vw,2rem)">
+                Your data. Your hardware.<br>Your rules.</h2>
+            <div class="grid reveal" style="max-width:min(95vw,1400px)">
+                <div class="info-card">
+                    <h3>🔒 Your data stays yours</h3>
+                    <p>Runs on your own computer. Not in the cloud. No third-party servers. No data mining. No "oops, we
+                        got hacked" emails. Ever.</p>
+                </div>
+                <div class="info-card">
+                    <h3>💰 One-time payment, forever</h3>
+                    <p>A 15-person team on Salesforce + HubSpot + Asana spends $850/month ($10,200/year). NovaStack is
+                        $999 one time. Break even in 1.2 months. Then you own it forever. For 10 years, that's $10k in
+                        savings.</p>
+                </div>
+                <div class="info-card">
+                    <h3>🎯 Simple to run</h3>
+                    <p>No IT degree required. Works on Windows, Mac, or Linux. Even an old laptop works. One simple
+                        setup and you're running. Updates when you want them.</p>
+                </div>
+                <div class="info-card">
+                    <h3>🌍 No internet? No problem</h3>
+                    <p>Works completely offline on your local network. Your business keeps running even when the
+                        internet goes down. No vendor dependency.</p>
+                </div>
+            </div>
+        </div>
+        <div class="slide-num">12 / 13</div>
+    </section>
 
-<!-- ===========================================
+
+
+    <!-- ===========================================
+     SLIDE 13: CALL TO ACTION
+     =========================================== -->
+    <section class="slide slide-1" data-index="12">
+        <div class="accent-bar"></div>
+        <div class="section-num">13</div>
+        <div class="breadcrumbs">
+            <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span
+                class="active"></span>
+        </div>
+        <div class="slide-content" style="align-items:center;text-align:center">
+            <div class="tag reveal">Claim Now — Deadline August 31, 2026</div>
+            <h1 class="title reveal"
+                style="font-family:'Archivo Black',sans-serif;font-size:clamp(2rem,6vw,4.5rem);line-height:1.15;color:var(--text-dark);margin-bottom:clamp(0.5rem,1.5vw,1rem)">
+                Early Bird Pricing<span style="color:var(--accent);display:block;font-size:1.15em;margin-top:0.6rem;margin-bottom:0.25rem">$999</span><span style="font-size:0.5em;color:var(--text-gray);font-weight:500;display:block">(Then $1,599)</span></h1>
+            <p class="subtitle reveal"
+                style="font-size:clamp(0.9rem,1.5vw,1.2rem);color:var(--text-gray);max-width:min(70vw,550px);margin-bottom:clamp(0.5rem,1vw,1rem);line-height:1.6">
+                Lock in lifetime ownership before the price goes up. No monthly fees. No subscriptions. Your data stays
+                yours.
+            </p>
+            <p class="subtitle reveal"
+                style="font-size:clamp(0.85rem,1.3vw,1.05rem);color:var(--accent);font-weight:500;max-width:min(70vw,550px);margin-bottom:clamp(1.5rem,2vw,2rem);line-height:1.5">
+                One payment covers unlimited users forever. Break even in 1.2 months. Then save thousands every year.
+            </p>
+            <a class="cta-big reveal" href="https://www.flowmatica.ca/novastack/" target="_blank" rel="noopener">Claim
+                early bird pricing →</a>
+        </div>
+        <div class="slide-num">13 / 13</div>
+    </section>
+
+    <!-- ===========================================
      SLIDE CONTROLLER
      =========================================== -->
-<script>
-class SlidePresentation {
-    constructor() {
-        this.slides = document.querySelectorAll('.slide');
-        this.currentSlide = 0;
-        this.setupObserver();
-        this.setupKeyboardNav();
-        this.setupTouchNav();
-        this.setupProgressBar();
-        this.setupNavDots();
-        this.setupNavButtons();
-        this.setupWheelNav();
-    }
-    setupObserver() {
-        const o = new IntersectionObserver(entries => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add('visible');
-                    this.currentSlide = Array.from(this.slides).indexOf(entry.target);
-                    this.updateProgress();
-                    this.updateNavDots();
-                    this.updateNavButtons();
-                }
-            });
-        }, { threshold: 0.3 });
-        this.slides.forEach(s => o.observe(s));
-    }
-    setupKeyboardNav() {
-        document.addEventListener('keydown', e => {
-            if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === ' ') {
-                e.preventDefault();
-                this.goTo(Math.min(this.currentSlide + 1, this.slides.length - 1));
+    <script>
+        class SlidePresentation {
+            constructor() {
+                this.slides = document.querySelectorAll('.slide');
+                this.currentSlide = 0;
+                this.setupObserver();
+                this.setupKeyboardNav();
+                this.setupTouchNav();
+                this.setupProgressBar();
+                this.setupNavDots();
+                this.setupNavButtons();
+                this.setupWheelNav();
             }
-            if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-                e.preventDefault();
-                this.goTo(Math.max(this.currentSlide - 1, 0));
+            setupObserver() {
+                const o = new IntersectionObserver(entries => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            entry.target.classList.add('visible');
+                            this.currentSlide = Array.from(this.slides).indexOf(entry.target);
+                            this.updateProgress();
+                            this.updateNavDots();
+                            this.updateNavButtons();
+                        }
+                    });
+                }, { threshold: 0.3 });
+                this.slides.forEach(s => o.observe(s));
             }
-        });
-    }
-    setupTouchNav() {
-        let startY = 0;
-        document.addEventListener('touchstart', e => { startY = e.touches[0].clientY; });
-        document.addEventListener('touchend', e => {
-            const diff = startY - e.changedTouches[0].clientY;
-            if (Math.abs(diff) > 50) {
-                diff > 0
-                    ? this.goTo(Math.min(this.currentSlide + 1, this.slides.length - 1))
-                    : this.goTo(Math.max(this.currentSlide - 1, 0));
+            setupKeyboardNav() {
+                document.addEventListener('keydown', e => {
+                    if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === ' ') {
+                        e.preventDefault();
+                        this.goTo(Math.min(this.currentSlide + 1, this.slides.length - 1));
+                    }
+                    if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+                        e.preventDefault();
+                        this.goTo(Math.max(this.currentSlide - 1, 0));
+                    }
+                });
             }
-        });
-    }
-    setupWheelNav() {
-        let ticking = false;
-        document.addEventListener('wheel', e => {
-            if (ticking) return;
-            ticking = true;
-            setTimeout(() => ticking = false, 600);
-            if (e.deltaY > 0) this.goTo(Math.min(this.currentSlide + 1, this.slides.length - 1));
-            else this.goTo(Math.max(this.currentSlide - 1, 0));
-        }, { passive: true });
-    }
-    setupProgressBar() {
-        this.progressBar = document.getElementById('progressBar');
-    }
-    setupNavDots() {
-        this.navDotsContainer = document.getElementById('navDots');
-        this.slides.forEach((_, i) => {
-            const btn = document.createElement('button');
-            btn.addEventListener('click', () => this.goTo(i));
-            this.navDotsContainer.appendChild(btn);
-        });
-        this.updateNavDots();
-    }
-    setupNavButtons() {
-        this.prevBtn = document.getElementById('prevBtn');
-        this.nextBtn = document.getElementById('nextBtn');
-        this.prevBtn.addEventListener('click', () => this.goTo(this.currentSlide - 1));
-        this.nextBtn.addEventListener('click', () => this.goTo(this.currentSlide + 1));
-        this.updateNavButtons();
-    }
-    updateNavButtons() {
-        this.prevBtn.disabled = this.currentSlide === 0;
-        this.nextBtn.disabled = this.currentSlide === this.slides.length - 1;
-    }
-    updateProgress() {
-        const pct = (this.currentSlide / (this.slides.length - 1)) * 100;
-        this.progressBar.style.width = pct + '%';
-    }
-    updateNavDots() {
-        const btns = this.navDotsContainer.querySelectorAll('button');
-        btns.forEach((btn, i) => btn.classList.toggle('active', i === this.currentSlide));
-    }
-    goTo(index) {
-        if (index < 0 || index >= this.slides.length) return;
-        this.slides[index].scrollIntoView({ behavior: 'smooth' });
-    }
-}
-new SlidePresentation();
-setTimeout(() => {
-    document.querySelectorAll('.slide:first-child, .slide:nth-child(2)').forEach(s => s.classList.add('visible'));
-}, 100);
-</script>
+            setupTouchNav() {
+                let startY = 0;
+                document.addEventListener('touchstart', e => { startY = e.touches[0].clientY; });
+                document.addEventListener('touchend', e => {
+                    const diff = startY - e.changedTouches[0].clientY;
+                    if (Math.abs(diff) > 50) {
+                        diff > 0
+                            ? this.goTo(Math.min(this.currentSlide + 1, this.slides.length - 1))
+                            : this.goTo(Math.max(this.currentSlide - 1, 0));
+                    }
+                });
+            }
+            setupWheelNav() {
+                let ticking = false;
+                document.addEventListener('wheel', e => {
+                    if (ticking) return;
+                    ticking = true;
+                    setTimeout(() => ticking = false, 600);
+                    if (e.deltaY > 0) this.goTo(Math.min(this.currentSlide + 1, this.slides.length - 1));
+                    else this.goTo(Math.max(this.currentSlide - 1, 0));
+                }, { passive: true });
+            }
+            setupProgressBar() {
+                this.progressBar = document.getElementById('progressBar');
+            }
+            setupNavDots() {
+                this.navDotsContainer = document.getElementById('navDots');
+                this.slides.forEach((_, i) => {
+                    const btn = document.createElement('button');
+                    btn.addEventListener('click', () => this.goTo(i));
+                    this.navDotsContainer.appendChild(btn);
+                });
+                this.updateNavDots();
+            }
+            setupNavButtons() {
+                this.prevBtn = document.getElementById('prevBtn');
+                this.nextBtn = document.getElementById('nextBtn');
+                this.prevBtn.addEventListener('click', () => this.goTo(this.currentSlide - 1));
+                this.nextBtn.addEventListener('click', () => this.goTo(this.currentSlide + 1));
+                this.updateNavButtons();
+            }
+            updateNavButtons() {
+                this.prevBtn.disabled = this.currentSlide === 0;
+                this.nextBtn.disabled = this.currentSlide === this.slides.length - 1;
+            }
+            updateProgress() {
+                const pct = (this.currentSlide / (this.slides.length - 1)) * 100;
+                this.progressBar.style.width = pct + '%';
+            }
+            updateNavDots() {
+                const btns = this.navDotsContainer.querySelectorAll('button');
+                btns.forEach((btn, i) => btn.classList.toggle('active', i === this.currentSlide));
+            }
+            goTo(index) {
+                if (index < 0 || index >= this.slides.length) return;
+                this.slides[index].scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+        new SlidePresentation();
+        setTimeout(() => {
+            document.querySelectorAll('.slide:first-child, .slide:nth-child(2)').forEach(s => s.classList.add('visible'));
+        }, 100);
+    </script>
 </body>
+
 </html>
