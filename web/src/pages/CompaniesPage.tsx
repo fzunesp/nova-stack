@@ -12,8 +12,12 @@ import { TableSkeleton } from '@/components/ui/skeleton'
 import pb from '@/lib/pocketbase'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
-
 import { useNavigate, useParams } from 'react-router'
+import { DynamicCustomFieldsForm, validateCustomFields } from '@/components/DynamicCustomFieldsForm'
+import { DynamicCustomFieldsViewer } from '@/components/DynamicCustomFieldsViewer'
+import { useCustomFieldDefinitions } from '@/hooks/useCustomFields'
+import { useColumnPicker, type ColumnDef } from '@/hooks/useColumnPicker'
+import { ColumnPicker } from '@/components/ColumnPicker'
 
 type CompanyStatus = 'lead' | 'active' | 'inactive'
 
@@ -50,12 +54,36 @@ export function CompaniesPage() {
     enabled: !!id,
   })
 
-  const emptyForm = { name: '', industry: '', website: '', phone: '', address: '', city: '', country: '', notes: '', status: 'active' as CompanyStatus }
+  const emptyForm = { name: '', industry: '', website: '', phone: '', address: '', city: '', country: '', notes: '', status: 'active' as CompanyStatus, customFields: {} as Record<string, any> }
   const [formData, setFormData] = useState(emptyForm)
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
   const [editForm, setEditForm] = useState(emptyForm)
   const [selectedCompany, setSelectedCompany] = useState<any | null>(null)
+
+  const { data: customFieldDefs = [] } = useCustomFieldDefinitions('companies')
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+
+  const standardColumns: ColumnDef[] = [
+    { key: 'name', label: 'Company', flex: true, minWidth: 200, sortField: 'name' },
+    { key: 'industry', label: 'Industry', width: 150 },
+    { key: 'location', label: 'Location', width: 140 },
+    { key: 'status', label: 'Status', width: 100 },
+    { key: 'actions', label: 'Actions', width: 100, alwaysVisible: true, stickyRight: true }
+  ]
+
+  const customColumns: ColumnDef[] = customFieldDefs.map((def: any) => ({
+    key: def.key,
+    label: def.name,
+    width: 140,
+    isCustom: true
+  }))
+
+  // Custom fields go BEFORE the sticky actions column
+  const standardData = standardColumns.filter(c => !c.stickyRight)
+  const stickyActions = standardColumns.filter(c => c.stickyRight)
+  const allColumns = [...standardData, ...customColumns, ...stickyActions]
+  const { visibleKeys, visibleColumns, toggleColumn } = useColumnPicker('companies', allColumns)
 
   const createCompany = useMutation({
     mutationFn: (data: typeof formData) =>
@@ -63,6 +91,7 @@ export function CompaniesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['companies'] })
       setFormData(emptyForm)
+      setFormErrors({})
       setCreating(false)
       toast.success('Company added')
     },
@@ -75,6 +104,7 @@ export function CompaniesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['companies'] })
       setEditing(null)
+      setFormErrors({})
       toast.success('Company updated')
     },
     onError: (err: any) => toast.error(err?.message || 'Failed to update company'),
@@ -89,7 +119,50 @@ export function CompaniesPage() {
     onError: () => toast.error('Failed to delete company'),
   })
 
-  const CompanyForm = ({ data, onChange, onSubmit, isPending, label }: any) => (
+  const handleOpenCreating = () => {
+    setFormData(emptyForm)
+    setFormErrors({})
+    setCreating(true)
+  }
+
+  const handleOpenEditing = (company: any) => {
+    setFormErrors({})
+    setEditForm({
+      name: company.name || '',
+      industry: company.industry || '',
+      website: company.website || '',
+      phone: company.phone || '',
+      address: company.address || '',
+      city: company.city || '',
+      country: company.country || '',
+      notes: company.notes || '',
+      status: company.status || 'active',
+      customFields: company.customFields || {},
+    })
+    setEditing(company.id)
+  }
+
+  const handleCreateSubmit = () => {
+    const errs = validateCustomFields(customFieldDefs, formData.customFields || {})
+    if (Object.keys(errs).length > 0) {
+      setFormErrors(errs)
+      toast.error('Please fill in all required custom fields')
+      return
+    }
+    createCompany.mutate(formData)
+  }
+
+  const handleEditSubmit = () => {
+    const errs = validateCustomFields(customFieldDefs, editForm.customFields || {})
+    if (Object.keys(errs).length > 0) {
+      setFormErrors(errs)
+      toast.error('Please fill in all required custom fields')
+      return
+    }
+    updateCompany.mutate({ id: editing!, data: editForm })
+  }
+
+  const CompanyForm = ({ data, onChange, onSubmit, isPending, label, errors = {} }: any) => (
     <form onSubmit={(e) => { e.preventDefault(); onSubmit() }} className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2 space-y-1"><Label>Company Name *</Label><Input placeholder="Acme Corp" value={data.name} onChange={(e) => onChange({ ...data, name: e.target.value })} required /></div>
@@ -119,6 +192,12 @@ export function CompaniesPage() {
         <div className="space-y-1"><Label>Country</Label><Input placeholder="USA" value={data.country} onChange={(e) => onChange({ ...data, country: e.target.value })} /></div>
         <div className="col-span-2 space-y-1"><Label>Notes</Label><Input placeholder="Internal notes..." value={data.notes} onChange={(e) => onChange({ ...data, notes: e.target.value })} /></div>
       </div>
+      <DynamicCustomFieldsForm
+        entityType="companies"
+        values={data.customFields || {}}
+        onChange={(customFields) => onChange({ ...data, customFields })}
+        errors={errors}
+      />
       <DialogFooter><Button type="submit" disabled={isPending} className="bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white">{label}</Button></DialogFooter>
     </form>
   )
@@ -138,78 +217,175 @@ export function CompaniesPage() {
             <HelpCircle className="w-3.5 h-3.5" />
             Help
           </button>
-          <Dialog open={creating} onOpenChange={setCreating}>
+          <Dialog open={creating} onOpenChange={(open) => {
+            if (open) handleOpenCreating()
+            else {
+              setCreating(false)
+              setFormErrors({})
+            }
+          }}>
             <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-1.5" />Add Company</Button></DialogTrigger>
             <DialogContent className="sm:max-w-lg">
               <DialogHeader><DialogTitle>Add New Company</DialogTitle></DialogHeader>
-              <CompanyForm data={formData} onChange={setFormData} onSubmit={() => createCompany.mutate(formData)} isPending={createCompany.isPending} label="Add Company" />
+              <CompanyForm data={formData} onChange={setFormData} onSubmit={handleCreateSubmit} isPending={createCompany.isPending} label="Add Company" errors={formErrors} />
             </DialogContent>
           </Dialog>
         </div>
       </div>
 
-      <div className="relative mb-4 max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <Input value={search} onChange={(e) => updateSearch(e.target.value)} placeholder="Search companies..." className="pl-10" />
+      <div className="flex items-center justify-between mb-4 gap-4">
+        <div className="relative flex-grow max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Input value={search} onChange={(e) => updateSearch(e.target.value)} placeholder="Search companies..." className="pl-10" />
+        </div>
+        <ColumnPicker allColumns={allColumns} visibleKeys={visibleKeys} onToggle={toggleColumn} />
       </div>
 
       {isLoading ? <TableSkeleton rows={5} /> : (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-          <div className="grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wide">
-            <button className="col-span-4 flex items-center gap-1 hover:text-slate-600" onClick={() => toggleSort('name')}>Company <ArrowUpDown className="w-3 h-3" /></button>
-            <div className="col-span-3">Industry</div>
-            <div className="col-span-2">Location</div>
-            <div className="col-span-1">Status</div>
-            <div className="col-span-2 text-right">Actions</div>
-          </div>
-
-          {items.length === 0 ? (
-            <div className="text-center py-16">
-              <Building2 className="w-10 h-10 mx-auto mb-3 text-slate-200" />
-              <p className="text-sm font-medium text-slate-500 mb-4">No companies yet</p>
-              <Button size="sm" variant="outline" onClick={() => setCreating(true)}>Add your first company</Button>
-            </div>
-          ) : (
-            items.map((company: any) => (
-              <div key={company.id} className="group grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors items-center">
-                <div className="col-span-4 cursor-pointer" onClick={() => navigate(`/companies/${company.id}`)}>
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600 text-xs font-bold flex-shrink-0">
-                      {company.name?.charAt(0)?.toUpperCase() || '?'}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <div className="min-w-full divide-y divide-slate-100">
+              <div className="flex items-center px-4 py-3 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                {visibleColumns.map(col => {
+                  const stickyClass = col.stickyRight ? 'sticky right-0 bg-white z-10 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.04)]' : ''
+                  if (col.sortField) {
+                    return (
+                      <button 
+                        key={col.key} 
+                        style={col.flex ? { flex: 1, minWidth: col.minWidth } : { width: col.width }}
+                        className={`flex items-center gap-1 hover:text-slate-600 text-left font-semibold uppercase ${stickyClass}`} 
+                        onClick={() => toggleSort(col.sortField!)}
+                      >
+                        {col.label} <ArrowUpDown className="w-3 h-3" />
+                      </button>
+                    )
+                  }
+                  return (
+                    <div 
+                      key={col.key} 
+                      style={col.flex ? { flex: 1, minWidth: col.minWidth } : { width: col.width }} 
+                      className={`truncate ${stickyClass}`}
+                    >
+                      {col.label}
                     </div>
-                    <div className="min-w-0">
-                      <span className="font-medium text-slate-900 truncate block group-hover:text-[rgb(var(--ns-accent))] transition-colors">{company.name}</span>
-                      {company.website && <span className="text-xs text-slate-400 truncate block">{company.website.replace(/^https?:\/\//, '')}</span>}
-                    </div>
-                  </div>
-                </div>
-                <div className="col-span-3 text-sm text-slate-500">{company.industry || '—'}</div>
-                <div className="col-span-2 text-sm text-slate-400 truncate">{[company.city, company.country].filter(Boolean).join(', ') || '—'}</div>
-                <div className="col-span-1">
-                  <Badge className={`${statusColors[company.status as CompanyStatus] || statusColors.active} text-[10px] px-1.5 py-0.5 capitalize`}>
-                    {company.status || 'active'}
-                  </Badge>
-                </div>
-                <div className="col-span-2 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Dialog open={editing === company.id} onOpenChange={(open) => {
-                    if (open) {
-                      setEditing(company.id)
-                      setEditForm({ name: company.name || '', industry: company.industry || '', website: company.website || '', phone: company.phone || '', address: company.address || '', city: company.city || '', country: company.country || '', notes: company.notes || '', status: company.status || 'active' })
-                    } else setEditing(null)
-                  }}>
-                    <DialogTrigger asChild><Button variant="ghost" size="icon"><Pencil className="w-3.5 h-3.5" /></Button></DialogTrigger>
-                    <DialogContent className="sm:max-w-lg">
-                      <DialogHeader><DialogTitle>Edit Company</DialogTitle></DialogHeader>
-                      <CompanyForm data={editForm} onChange={setEditForm} onSubmit={() => updateCompany.mutate({ id: company.id, data: editForm })} isPending={updateCompany.isPending} label="Save Changes" />
-                    </DialogContent>
-                  </Dialog>
-                  <Button variant="ghost" size="icon" onClick={() => { if (confirm('Delete this company? Contacts linked to it will not be deleted.')) deleteCompany.mutate(company.id) }}>
-                    <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                  </Button>
-                </div>
+                  )
+                })}
               </div>
-            ))
-          )}
+
+              {items.length === 0 ? (
+                <div className="text-center py-16">
+                  <Building2 className="w-10 h-10 mx-auto mb-3 text-slate-200" />
+                  <p className="text-sm font-medium text-slate-500 mb-4">No companies yet</p>
+                  <Button size="sm" variant="outline" onClick={() => setCreating(true)}>Add your first company</Button>
+                </div>
+              ) : (
+                items.map((company: any) => (
+                  <div key={company.id} className="group flex items-center px-4 py-3 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors">
+                    {visibleColumns.map(col => {
+                      if (col.key === 'name') {
+                        return (
+                          <div 
+                            key={col.key} 
+                            style={{ flex: 1, minWidth: col.minWidth }} 
+                            className="cursor-pointer min-w-0" 
+                            onClick={() => navigate(`/companies/${company.id}`)}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-7 h-7 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600 text-xs font-bold flex-shrink-0">
+                                {company.name?.charAt(0)?.toUpperCase() || '?'}
+                              </div>
+                              <div className="min-w-0">
+                                <span className="font-medium text-slate-900 truncate block group-hover:text-[rgb(var(--ns-accent))] transition-colors">{company.name}</span>
+                                {company.website && <span className="text-xs text-slate-400 truncate block">{company.website.replace(/^https?:\/\//, '')}</span>}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      }
+                      if (col.key === 'industry') {
+                        return (
+                          <div key={col.key} style={{ width: col.width }} className="text-sm text-slate-500 truncate flex-shrink-0">
+                            {company.industry || '—'}
+                          </div>
+                        )
+                      }
+                      if (col.key === 'location') {
+                        return (
+                          <div key={col.key} style={{ width: col.width }} className="text-sm text-slate-400 truncate flex-shrink-0">
+                            {[company.city, company.country].filter(Boolean).join(', ') || '—'}
+                          </div>
+                        )
+                      }
+                      if (col.key === 'status') {
+                        return (
+                          <div key={col.key} style={{ width: col.width }} className="flex-shrink-0">
+                            <Badge className={`${statusColors[company.status as CompanyStatus] || statusColors.active} text-[10px] px-1.5 py-0.5 capitalize`}>
+                              {company.status || 'active'}
+                            </Badge>
+                          </div>
+                        )
+                      }
+                      if (col.key === 'actions') {
+                        return (
+                          <div key={col.key} style={{ width: col.width }} className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 sticky right-0 bg-white group-hover:bg-slate-50 z-10 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.04)]">
+                            <Dialog open={editing === company.id} onOpenChange={(open) => {
+                              if (open) handleOpenEditing(company)
+                              else {
+                                setEditing(null)
+                                setFormErrors({})
+                              }
+                            }}>
+                              <DialogTrigger asChild><Button variant="ghost" size="icon"><Pencil className="w-3.5 h-3.5" /></Button></DialogTrigger>
+                              <DialogContent className="sm:max-w-lg">
+                                <DialogHeader><DialogTitle>Edit Company</DialogTitle></DialogHeader>
+                                <CompanyForm data={editForm} onChange={setEditForm} onSubmit={handleEditSubmit} isPending={updateCompany.isPending} label="Save Changes" errors={formErrors} />
+                              </DialogContent>
+                            </Dialog>
+                            <Button variant="ghost" size="icon" onClick={() => { if (confirm('Delete this company? Contacts linked to it will not be deleted.')) deleteCompany.mutate(company.id) }}>
+                              <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                            </Button>
+                          </div>
+                        )
+                      }
+                      // Render custom attributes dynamically
+                      const rawVal = company.customFields?.[col.key]
+                      const fieldDef = customFieldDefs.find((f: any) => f.key === col.key)
+                      let displayVal = '—'
+                      if (rawVal !== undefined && rawVal !== null && rawVal !== '') {
+                        if (fieldDef?.type === 'checkbox') {
+                          displayVal = rawVal ? 'Yes' : 'No'
+                        } else if (fieldDef?.type === 'date') {
+                          try {
+                            displayVal = new Date(rawVal).toLocaleDateString(undefined, {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric'
+                            })
+                          } catch {
+                            displayVal = String(rawVal)
+                          }
+                        } else {
+                          displayVal = String(rawVal)
+                        }
+                      }
+
+                      return (
+                        <div key={col.key} style={{ width: col.width }} className="text-sm text-slate-500 truncate flex-shrink-0">
+                          {fieldDef?.type === 'checkbox' && (rawVal !== undefined && rawVal !== null && rawVal !== '') ? (
+                            <Badge className="bg-slate-200 text-slate-700 border-none text-[10px] px-1.5 py-0.5 font-bold">
+                              {displayVal}
+                            </Badge>
+                          ) : (
+                            displayVal
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
           <DataTablePagination page={page} totalPages={totalPages} totalItems={totalItems} perPage={perPage} onPageChange={goToPage} />
         </div>
       )}
@@ -278,6 +454,7 @@ function CompanyDetailDialog({ company, onClose }: { company: any; onClose: () =
             {company.website && <div className="flex items-center gap-2 text-slate-600"><Globe className="w-3.5 h-3.5 text-slate-400" /><a href={company.website} target="_blank" rel="noreferrer" className="hover:underline text-indigo-600 truncate">{company.website}</a></div>}
             {(company.city || company.country) && <div className="flex items-center gap-2 text-slate-600"><MapPin className="w-3.5 h-3.5 text-slate-400" />{[company.city, company.country].filter(Boolean).join(', ')}</div>}
             {company.notes && <p className="text-xs text-slate-500 italic border-t border-slate-100 pt-3">{company.notes}</p>}
+            <DynamicCustomFieldsViewer entityType="companies" values={company.customFields} />
           </div>
 
           {/* Right: Chronological Timeline */}

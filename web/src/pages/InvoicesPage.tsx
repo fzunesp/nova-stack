@@ -15,6 +15,10 @@ import { toast } from 'sonner'
 import { useLocation, useNavigate, useParams } from 'react-router'
 import type { Status } from '@/services'
 import { generateInvoicePdf } from '@/lib/pdf'
+import { DynamicCustomFieldsForm, validateCustomFields } from '@/components/DynamicCustomFieldsForm'
+import { useCustomFieldDefinitions } from '@/hooks/useCustomFields'
+import { useColumnPicker, type ColumnDef } from '@/hooks/useColumnPicker'
+import { ColumnPicker } from '@/components/ColumnPicker'
 
 const statusLabels: Record<Status, string> = {
   draft: 'Draft',
@@ -69,14 +73,36 @@ export function InvoicesPage() {
   const { items, totalItems, totalPages, page, perPage, search, isLoading, toggleSort, goToPage, updateSearch } =
     usePaginatedQuery({ collection: 'invoices', searchFields: ['title'], expand: 'dealId,dealId.contactId,dealId.contactId.companyId', initialSearch })
 
-  const [formData, setFormData] = useState({ title: '', amount: '', status: 'draft' as Status, dueDate: '', dealId: '' })
+  const [formData, setFormData] = useState({ title: '', amount: '', status: 'draft' as Status, dueDate: '', dealId: '', customFields: {} as Record<string, any> })
   const [creating, setCreating] = useState(location.state?.openCreate === true)
   const [createLineItems, setCreateLineItems] = useState<LineItem[]>([])
   
   const [editing, setEditing] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState({ title: '', amount: '', status: 'draft' as Status, dueDate: '', dealId: '' })
+  const [editForm, setEditForm] = useState({ title: '', amount: '', status: 'draft' as Status, dueDate: '', dealId: '', customFields: {} as Record<string, any> })
   const [editLineItems, setEditLineItems] = useState<LineItem[]>([])
   const [expandedInvoices, setExpandedInvoices] = useState<Record<string, boolean>>({})
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const { data: customFieldDefs = [] } = useCustomFieldDefinitions('invoices')
+
+  const standardColumns: ColumnDef[] = [
+    { key: 'expand', label: '', width: 40, alwaysVisible: true },
+    { key: 'title', label: 'Title', flex: true, minWidth: 200, sortField: 'title' },
+    { key: 'amount', label: 'Amount', width: 130, sortField: 'amount' },
+    { key: 'status', label: 'Status', width: 150 },
+    { key: 'actions', label: 'Actions', width: 130, alwaysVisible: true, stickyRight: true }
+  ]
+
+  const customColumns: ColumnDef[] = customFieldDefs.map((def: any) => ({
+    key: def.key,
+    label: def.name,
+    width: 130,
+    isCustom: true
+  }))
+
+  const standardData = standardColumns.filter(c => !c.stickyRight)
+  const stickyActions = standardColumns.filter(c => c.stickyRight)
+  const allColumns = [...standardData, ...customColumns, ...stickyActions]
+  const { visibleKeys, visibleColumns, toggleColumn } = useColumnPicker('invoices', allColumns)
 
   useEffect(() => {
     if (id) {
@@ -92,6 +118,7 @@ export function InvoicesPage() {
         status: 'draft',
         dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         dealId: location.state.dealId,
+        customFields: {},
       })
       setCreateLineItems([
         {
@@ -143,8 +170,9 @@ export function InvoicesPage() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] })
-      setFormData({ title: '', amount: '', status: 'draft', dueDate: '', dealId: '' })
+      setFormData({ title: '', amount: '', status: 'draft', dueDate: '', dealId: '', customFields: {} })
       setCreateLineItems([])
+      setFormErrors({})
       setCreating(false)
       toast.success('Invoice created')
     },
@@ -163,6 +191,7 @@ export function InvoicesPage() {
       queryClient.invalidateQueries({ queryKey: ['invoices'] })
       setEditing(null)
       setEditLineItems([])
+      setFormErrors({})
       toast.success('Invoice updated')
     },
     onError: (err: any) => toast.error(err?.message || 'Failed to update invoice'),
@@ -363,7 +392,12 @@ export function InvoicesPage() {
           <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-1.5" />Add Invoice</Button></DialogTrigger>
           <DialogContent className="sm:max-w-2xl">
             <DialogHeader><DialogTitle>Add New Invoice</DialogTitle></DialogHeader>
-            <form onSubmit={(e) => { e.preventDefault(); createInvoice.mutate({ ...formData, lineItems: createLineItems }) }} className="space-y-4">
+            <form onSubmit={(e) => {
+              e.preventDefault()
+              const errs = validateCustomFields(customFieldDefs, formData.customFields || {})
+              if (Object.keys(errs).length > 0) { setFormErrors(errs); toast.error('Fill required custom fields'); return }
+              createInvoice.mutate({ ...formData, lineItems: createLineItems })
+            }} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2 space-y-1"><Label>Title</Label><Input placeholder="Invoice title" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} required /></div>
                 
@@ -446,6 +480,7 @@ export function InvoicesPage() {
                 <span className="text-lg font-bold text-slate-900">${(parseFloat(formData.amount) || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
               </div>
 
+              <DynamicCustomFieldsForm entityType="invoices" values={formData.customFields || {}} onChange={(cf) => setFormData({ ...formData, customFields: cf })} errors={formErrors} />
               <DialogFooter className="pt-2"><Button type="submit" disabled={createInvoice.isPending || !formData.dealId} className="bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white">{createInvoice.isPending ? 'Adding...' : 'Add Invoice'}</Button></DialogFooter>
             </form>
           </DialogContent>
@@ -465,233 +500,321 @@ export function InvoicesPage() {
         </div>
       </div>
 
-      <div className="relative mb-4 max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <Input value={search} onChange={(e) => updateSearch(e.target.value)} placeholder="Search invoices..." className="pl-10" />
+      <div className="flex items-center justify-between mb-4 gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Input value={search} onChange={(e) => updateSearch(e.target.value)} placeholder="Search invoices..." className="pl-10" />
+        </div>
+        <ColumnPicker allColumns={allColumns} visibleKeys={visibleKeys} onToggle={toggleColumn} />
       </div>
 
       {isLoading ? <TableSkeleton rows={5} /> : (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-          <div className="grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wide">
-            <button className="col-span-5 flex items-center gap-1 hover:text-slate-600" onClick={() => toggleSort('title')}>Title <ArrowUpDown className="w-3 h-3" /></button>
-            <button className="col-span-2 flex items-center gap-1 hover:text-slate-600" onClick={() => toggleSort('amount')}>Amount <ArrowUpDown className="w-3 h-3" /></button>
-            <div className="col-span-3">Status</div>
-            <div className="col-span-2 text-right">Actions</div>
-          </div>
-
-          {items.length === 0 ? (
-            <div className="text-center py-16">
-              <FileText className="w-10 h-10 mx-auto mb-3 text-slate-200" />
-              <p className="text-sm font-medium text-slate-500 mb-4">No invoices yet</p>
-              <Button size="sm" variant="outline" onClick={() => setCreating(true)}>Create your first invoice</Button>
-            </div>
-          ) : (
-            items.map((invoice: any) => (
-              <div key={invoice.id} className="border-b border-slate-50 last:border-0">
-                <div className="group grid grid-cols-12 gap-4 px-4 py-3 hover:bg-slate-50 transition-colors items-center">
-                  <div className="col-span-5 flex items-start gap-2">
-                    <button 
-                      onClick={() => toggleExpand(invoice.id)}
-                      className="p-1 mt-0.5 rounded hover:bg-slate-200/50 text-slate-400 hover:text-slate-600 transition-colors flex-shrink-0"
-                    >
-                      {expandedInvoices[invoice.id] ? (
-                        <ChevronDown className="w-3.5 h-3.5" />
-                      ) : (
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      )}
-                    </button>
-                    <div className="min-w-0">
-                      <span 
-                        onClick={() => toggleExpand(invoice.id)}
-                        className="font-medium text-slate-900 cursor-pointer hover:text-[rgb(var(--ns-accent))] transition-colors block truncate"
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <div className="min-w-full divide-y divide-slate-100">
+              <div className="flex items-center px-4 py-3 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                {visibleColumns.map(col => {
+                  const stickyClass = col.stickyRight ? 'sticky right-0 bg-white z-10 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.04)]' : ''
+                  if (col.sortField) {
+                    return (
+                      <button 
+                        key={col.key} 
+                        style={col.flex ? { flex: 1, minWidth: col.minWidth } : { width: col.width }}
+                        className={`flex items-center gap-1 hover:text-slate-600 text-left font-semibold uppercase animate-none ${stickyClass}`} 
+                        onClick={() => toggleSort(col.sortField!)}
                       >
-                        {invoice.title}
-                      </span>
-                      {invoice.expand?.dealId && (
-                        <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5 font-medium truncate">
-                          <span>Project:</span>
-                          <button
-                            onClick={() => navigate(`/crm/deals/${invoice.expand.dealId.id}`)}
-                            className="text-indigo-500 hover:text-indigo-700 hover:underline font-semibold"
-                          >
-                            {invoice.expand.dealId.title}
-                          </button>
-                          {invoice.expand.dealId.expand?.contactId && (
-                            <>
-                              <span className="text-slate-300">|</span>
-                              <button
-                                onClick={() => navigate(`/crm/contacts/${invoice.expand.dealId.expand.contactId.id}`)}
-                                className="text-indigo-500 hover:text-indigo-700 hover:underline font-semibold"
-                              >
-                                ({invoice.expand.dealId.expand.contactId.name})
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      )}
+                        {col.label} <ArrowUpDown className="w-3 h-3" />
+                      </button>
+                    )
+                  }
+                  return (
+                    <div 
+                      key={col.key} 
+                      style={col.flex ? { flex: 1, minWidth: col.minWidth } : { width: col.width }} 
+                      className={`truncate ${stickyClass}`}
+                    >
+                      {col.label}
                     </div>
-                  </div>
-                  <div className="col-span-2 text-sm font-semibold text-slate-700">${invoice.amount?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-                  <div className="col-span-3">
-                    <Badge className={`${statusColors[invoice.status as Status] || statusColors.draft} inline-flex items-center gap-1.5 text-xs`}>
-                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusDots[invoice.status as Status] || statusDots.draft}`} />
-                      {statusLabels[invoice.status as Status] || invoice.status}
-                    </Badge>
-                  </div>
-                  <div className="col-span-2 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Dialog open={editing === invoice.id} onOpenChange={(open) => {
-                      if (open) { 
-                        setEditing(invoice.id)
-                        setEditForm({ title: invoice.title || '', amount: String(invoice.amount || ''), status: invoice.status || 'draft', dueDate: invoice.dueDate?.split('T')[0] || '', dealId: invoice.dealId || '' })
-                        setEditLineItems(Array.isArray(invoice.lineItems) ? invoice.lineItems : [])
-                      } else {
-                        setEditing(null)
-                      }
-                    }}>
-                      <DialogTrigger asChild><Button variant="ghost" size="icon"><Pencil className="w-3.5 h-3.5" /></Button></DialogTrigger>
-                      <DialogContent className="sm:max-w-2xl">
-                        <DialogHeader><DialogTitle>Edit Invoice</DialogTitle></DialogHeader>
-                        <form onSubmit={(e) => { e.preventDefault(); updateInvoice.mutate({ id: invoice.id, data: editForm, lineItems: editLineItems }) }} className="space-y-4">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="col-span-2 space-y-1"><Label>Title</Label><Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required /></div>
-                            
-                            <div className="col-span-2 space-y-1">
-                              <Label>Deal / Project *</Label>
-                              <Select value={editForm.dealId} onValueChange={(v) => setEditForm({ ...editForm, dealId: v })}>
-                                <SelectTrigger className={!editForm.dealId ? 'border-red-200' : ''}>
-                                  <SelectValue placeholder="— Select a deal —" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {deals.map((d: any) => (
-                                    <SelectItem key={d.id} value={d.id}>
-                                      {d.title} {d.expand?.contactId ? `— ${d.expand.contactId.name}` : ''}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
+                  )
+                })}
+              </div>
 
-                            <div className="space-y-1"><Label>Due Date</Label><Input type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} /></div>
-                            <div className="space-y-1"><Label>Status</Label>
-                              <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v as Status })}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  {(Object.keys(statusLabels) as Status[]).map((s) => (
-                                    <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+              {items.length === 0 ? (
+                <div className="text-center py-16">
+                  <FileText className="w-10 h-10 mx-auto mb-3 text-slate-200" />
+                  <p className="text-sm font-medium text-slate-500 mb-4">No invoices yet</p>
+                  <Button size="sm" variant="outline" onClick={() => setCreating(true)}>Create your first invoice</Button>
+                </div>
+              ) : (
+                items.map((invoice: any) => (
+                  <div key={invoice.id} className="border-b border-slate-50 last:border-0">
+                    <div className="group flex items-center px-4 py-3 hover:bg-slate-50 transition-colors">
+                      {visibleColumns.map(col => {
+                        if (col.key === 'expand') {
+                          return (
+                            <div key={col.key} style={{ width: col.width }} className="flex items-center flex-shrink-0">
+                              <button 
+                                onClick={() => toggleExpand(invoice.id)}
+                                className="p-1 rounded hover:bg-slate-200/50 text-slate-400 hover:text-slate-600 transition-colors flex-shrink-0"
+                              >
+                                {expandedInvoices[invoice.id] ? (
+                                  <ChevronDown className="w-3.5 h-3.5" />
+                                ) : (
+                                  <ChevronRight className="w-3.5 h-3.5" />
+                                )}
+                              </button>
                             </div>
-                          </div>
+                          )
+                        }
+                        if (col.key === 'title') {
+                          return (
+                            <div key={col.key} style={{ flex: 1, minWidth: col.minWidth }} className="min-w-0 pr-4">
+                              <span 
+                                onClick={() => toggleExpand(invoice.id)}
+                                className="font-medium text-slate-900 cursor-pointer hover:text-[rgb(var(--ns-accent))] transition-colors block truncate"
+                              >
+                                {invoice.title}
+                              </span>
+                              {invoice.expand?.dealId && (
+                                <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5 font-medium truncate">
+                                  <span>Project:</span>
+                                  <button
+                                    onClick={() => navigate(`/crm/deals/${invoice.expand.dealId.id}`)}
+                                    className="text-indigo-500 hover:text-indigo-700 hover:underline font-semibold"
+                                  >
+                                    {invoice.expand.dealId.title}
+                                  </button>
+                                  {invoice.expand.dealId.expand?.contactId && (
+                                    <>
+                                      <span className="text-slate-300">|</span>
+                                      <button
+                                        onClick={() => navigate(`/crm/contacts/${invoice.expand.dealId.expand.contactId.id}`)}
+                                        className="text-indigo-500 hover:text-indigo-700 hover:underline font-semibold"
+                                      >
+                                        ({invoice.expand.dealId.expand.contactId.name})
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        }
+                        if (col.key === 'amount') {
+                          return (
+                            <div key={col.key} style={{ width: col.width }} className="text-sm font-semibold text-slate-700 flex-shrink-0">
+                              ${invoice.amount?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                            </div>
+                          )
+                        }
+                        if (col.key === 'status') {
+                          return (
+                            <div key={col.key} style={{ width: col.width }} className="flex-shrink-0">
+                              <Badge className={`${statusColors[invoice.status as Status] || statusColors.draft} inline-flex items-center gap-1.5 text-xs`}>
+                                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusDots[invoice.status as Status] || statusDots.draft}`} />
+                                {statusLabels[invoice.status as Status] || invoice.status}
+                              </Badge>
+                            </div>
+                          )
+                        }
+                        if (col.key === 'actions') {
+                          return (
+                            <div key={col.key} style={{ width: col.width }} className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 sticky right-0 bg-white group-hover:bg-slate-50 z-10 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.04)]">
+                              <Dialog open={editing === invoice.id} onOpenChange={(open) => {
+                                if (open) { 
+                                  setFormErrors({})
+                                  setEditing(invoice.id)
+                                  setEditForm({ title: invoice.title || '', amount: String(invoice.amount || ''), status: invoice.status || 'draft', dueDate: invoice.dueDate?.split('T')[0] || '', dealId: invoice.dealId || '', customFields: invoice.customFields || {} })
+                                  setEditLineItems(Array.isArray(invoice.lineItems) ? invoice.lineItems : [])
+                                } else {
+                                  setEditing(null)
+                                  setFormErrors({})
+                                }
+                              }}>
+                                <DialogTrigger asChild><Button variant="ghost" size="icon"><Pencil className="w-3.5 h-3.5" /></Button></DialogTrigger>
+                                <DialogContent className="sm:max-w-2xl">
+                                  <DialogHeader><DialogTitle>Edit Invoice</DialogTitle></DialogHeader>
+                                  <form onSubmit={(e) => { e.preventDefault(); updateInvoice.mutate({ id: invoice.id, data: editForm, lineItems: editLineItems }) }} className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                      <div className="col-span-2 space-y-1"><Label>Title</Label><Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required /></div>
+                                      
+                                      <div className="col-span-2 space-y-1">
+                                        <Label>Deal / Project *</Label>
+                                        <Select value={editForm.dealId} onValueChange={(v) => setEditForm({ ...editForm, dealId: v })}>
+                                          <SelectTrigger className={!editForm.dealId ? 'border-red-200' : ''}>
+                                            <SelectValue placeholder="— Select a deal —" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {deals.map((d: any) => (
+                                              <SelectItem key={d.id} value={d.id}>
+                                                {d.title} {d.expand?.contactId ? `— ${d.expand.contactId.name}` : ''}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
 
-                          {/* Line Items */}
-                          <div className="space-y-2 mt-4">
-                            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                              <Label className="text-sm font-semibold text-slate-700">Line Items</Label>
-                              <Button type="button" variant="outline" size="sm" onClick={addEditLineItem} className="h-8 text-xs">
-                                <Plus className="w-3.5 h-3.5 mr-1" /> Add Item
+                                      <div className="space-y-1"><Label>Due Date</Label><Input type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} /></div>
+                                      <div className="space-y-1"><Label>Status</Label>
+                                        <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v as Status })}>
+                                          <SelectTrigger><SelectValue /></SelectTrigger>
+                                          <SelectContent>
+                                            {(Object.keys(statusLabels) as Status[]).map((s) => (
+                                              <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                    </div>
+
+                                    {/* Line Items */}
+                                    <div className="space-y-2 mt-4">
+                                      <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                                        <Label className="text-sm font-semibold text-slate-700">Line Items</Label>
+                                        <Button type="button" variant="outline" size="sm" onClick={addEditLineItem} className="h-8 text-xs">
+                                          <Plus className="w-3.5 h-3.5 mr-1" /> Add Item
+                                        </Button>
+                                      </div>
+                                      
+                                      {editLineItems.length === 0 ? (
+                                        <div className="text-center py-6 border border-dashed border-slate-200 rounded-lg text-slate-400 text-xs">
+                                          No items added yet. Click 'Add Item' to start building this invoice.
+                                        </div>
+                                      ) : (
+                                        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                                          {editLineItems.map((item, index) => (
+                                            <div key={index} className="grid grid-cols-12 gap-2 items-center">
+                                              <div className="col-span-5">
+                                                <Select value={item.productId} onValueChange={(v) => updateEditLineItem(index, 'productId', v)}>
+                                                  <SelectTrigger className="h-9"><SelectValue placeholder="Select Product" /></SelectTrigger>
+                                                  <SelectContent>
+                                                    {products.map(p => (
+                                                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                                                    ))}
+                                                  </SelectContent>
+                                                </Select>
+                                              </div>
+                                              <div className="col-span-2">
+                                                <Input type="number" min="1" placeholder="Qty" value={item.quantity} onChange={e => updateEditLineItem(index, 'quantity', parseInt(e.target.value) || 0)} className="h-9" />
+                                              </div>
+                                              <div className="col-span-3">
+                                                <Input type="number" step="0.01" min="0" placeholder="Price" value={item.price} onChange={e => updateEditLineItem(index, 'price', parseFloat(e.target.value) || 0)} className="h-9" />
+                                              </div>
+                                              <div className="col-span-2 flex items-center justify-between gap-1 pl-1">
+                                                <span className="text-xs font-mono font-semibold text-slate-600">${item.total.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+                                                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500 hover:bg-red-50" onClick={() => removeEditLineItem(index)}>
+                                                  <X className="w-3.5 h-3.5" />
+                                                </Button>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div className="flex items-center justify-between border-t border-slate-100 pt-4 mt-2">
+                                      <span className="text-sm font-semibold text-slate-700">Total Invoice Amount:</span>
+                                      <span className="text-lg font-bold text-slate-900">${(parseFloat(editForm.amount) || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                    </div>
+
+                                    <DynamicCustomFieldsForm entityType="invoices" values={editForm.customFields || {}} onChange={(cf) => setEditForm({ ...editForm, customFields: cf })} errors={formErrors} />
+                                    <DialogFooter className="pt-2"><Button type="submit" disabled={updateInvoice.isPending || !editForm.dealId} className="bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white">Save</Button></DialogFooter>
+                                  </form>
+                                </DialogContent>
+                              </Dialog>
+                              <Button variant="ghost" size="icon" onClick={() => generateInvoicePdf(invoice)} title="Download PDF">
+                                <Download className="w-3.5 h-3.5 text-slate-400 hover:text-[rgb(var(--ns-accent))]" />
+                              </Button>
+                              {invoice.status === 'draft' && (
+                                <Button variant="ghost" size="icon" onClick={() => handleSendInvoiceInit(invoice)} disabled={sendInvoice.isPending} title="Send Invoice">
+                                  <Send className="w-3.5 h-3.5 text-indigo-500 hover:text-indigo-600" />
+                                </Button>
+                              )}
+                              <Button variant="ghost" size="icon" onClick={() => { if (confirm('Delete this invoice?')) deleteInvoice.mutate(invoice.id) }}>
+                                <Trash2 className="w-3.5 h-3.5 text-red-400" />
                               </Button>
                             </div>
-                            
-                            {editLineItems.length === 0 ? (
-                              <div className="text-center py-6 border border-dashed border-slate-200 rounded-lg text-slate-400 text-xs">
-                                No items added yet. Click 'Add Item' to start building this invoice.
-                              </div>
+                          )
+                        }
+
+                        // Render custom fields dynamically
+                        const rawVal = invoice.customFields?.[col.key]
+                        const fieldDef = customFieldDefs.find((f: any) => f.key === col.key)
+                        let displayVal = '—'
+                        if (rawVal !== undefined && rawVal !== null && rawVal !== '') {
+                          if (fieldDef?.type === 'checkbox') {
+                            displayVal = rawVal ? 'Yes' : 'No'
+                          } else if (fieldDef?.type === 'date') {
+                            try {
+                              displayVal = new Date(rawVal).toLocaleDateString(undefined, {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                              })
+                            } catch {
+                              displayVal = String(rawVal)
+                            }
+                          } else {
+                            displayVal = String(rawVal)
+                          }
+                        }
+
+                        return (
+                          <div key={col.key} style={{ width: col.width }} className="text-sm text-slate-500 truncate flex-shrink-0">
+                            {fieldDef?.type === 'checkbox' && (rawVal !== undefined && rawVal !== null && rawVal !== '') ? (
+                              <Badge className="bg-slate-200 text-slate-700 border-none text-[10px] px-1.5 py-0.5 font-bold">
+                                {displayVal}
+                              </Badge>
                             ) : (
-                              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                                {editLineItems.map((item, index) => (
-                                  <div key={index} className="grid grid-cols-12 gap-2 items-center">
-                                    <div className="col-span-5">
-                                      <Select value={item.productId} onValueChange={(v) => updateEditLineItem(index, 'productId', v)}>
-                                        <SelectTrigger className="h-9"><SelectValue placeholder="Select Product" /></SelectTrigger>
-                                        <SelectContent>
-                                          {products.map(p => (
-                                            <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
-                                    <div className="col-span-2">
-                                      <Input type="number" min="1" placeholder="Qty" value={item.quantity} onChange={e => updateEditLineItem(index, 'quantity', parseInt(e.target.value) || 0)} className="h-9" />
-                                    </div>
-                                    <div className="col-span-3">
-                                      <Input type="number" step="0.01" min="0" placeholder="Price" value={item.price} onChange={e => updateEditLineItem(index, 'price', parseFloat(e.target.value) || 0)} className="h-9" />
-                                    </div>
-                                    <div className="col-span-2 flex items-center justify-between gap-1 pl-1">
-                                      <span className="text-xs font-mono font-semibold text-slate-600">${item.total.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
-                                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500 hover:bg-red-50" onClick={() => removeEditLineItem(index)}>
-                                        <X className="w-3.5 h-3.5" />
-                                      </Button>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
+                              displayVal
                             )}
                           </div>
-
-                          <div className="flex items-center justify-between border-t border-slate-100 pt-4 mt-2">
-                            <span className="text-sm font-semibold text-slate-700">Total Invoice Amount:</span>
-                            <span className="text-lg font-bold text-slate-900">${(parseFloat(editForm.amount) || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                          </div>
-
-                          <DialogFooter className="pt-2"><Button type="submit" disabled={updateInvoice.isPending || !editForm.dealId} className="bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white">Save</Button></DialogFooter>
-                        </form>
-                      </DialogContent>
-                    </Dialog>
-                    <Button variant="ghost" size="icon" onClick={() => generateInvoicePdf(invoice)} title="Download PDF">
-                      <Download className="w-3.5 h-3.5 text-slate-400 hover:text-[rgb(var(--ns-accent))]" />
-                    </Button>
-                    {invoice.status === 'draft' && (
-                      <Button variant="ghost" size="icon" onClick={() => handleSendInvoiceInit(invoice)} disabled={sendInvoice.isPending} title="Send Invoice">
-                        <Send className="w-3.5 h-3.5 text-indigo-500 hover:text-indigo-600" />
-                      </Button>
-                    )}
-                    <Button variant="ghost" size="icon" onClick={() => { if (confirm('Delete this invoice?')) deleteInvoice.mutate(invoice.id) }}>
-                      <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                    </Button>
-                  </div>
-                </div>
-
-                {expandedInvoices[invoice.id] && (
-                  <div className="px-12 pb-4 pt-1 bg-slate-50/50 border-t border-slate-100/50">
-                    <div className="max-w-2xl mt-2 space-y-2">
-                      <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Line Items Breakdown</div>
-                      {(!invoice.lineItems || invoice.lineItems.length === 0) ? (
-                        <p className="text-xs text-slate-400 italic">No line items added to this invoice.</p>
-                      ) : (
-                        <div className="border border-slate-100 rounded-lg overflow-hidden bg-white shadow-sm">
-                          <table className="min-w-full divide-y divide-slate-100 text-xs">
-                            <thead className="bg-slate-50 text-slate-500 font-medium">
-                              <tr>
-                                <th className="px-4 py-2.5 text-left">Item / Product</th>
-                                <th className="px-4 py-2.5 text-right w-16">Qty</th>
-                                <th className="px-4 py-2.5 text-right w-24">Price</th>
-                                <th className="px-4 py-2.5 text-right w-28">Total</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50 text-slate-700">
-                              {invoice.lineItems.map((item: any, idx: number) => (
-                                <tr key={idx} className="hover:bg-slate-50/30">
-                                  <td className="px-4 py-2 font-medium text-slate-900">{item.name || 'Unknown Item'}</td>
-                                  <td className="px-4 py-2 text-right">{item.quantity}</td>
-                                  <td className="px-4 py-2 text-right">${(item.price || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                  <td className="px-4 py-2 text-right font-semibold text-slate-900">${(item.total || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                </tr>
-                              ))}
-                              <tr className="bg-slate-50/50 font-semibold text-slate-900 border-t border-slate-100">
-                                <td colSpan={3} className="px-4 py-2 text-right text-slate-500">Total:</td>
-                                <td className="px-4 py-2 text-right text-xs font-bold text-[rgb(var(--ns-accent))]">${(invoice.amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
+                        )
+                      })}
                     </div>
+
+                    {expandedInvoices[invoice.id] && (
+                      <div className="px-12 pb-4 pt-1 bg-slate-50/50 border-t border-slate-100/50">
+                        <div className="max-w-2xl mt-2 space-y-2">
+                          <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Line Items Breakdown</div>
+                          {(!invoice.lineItems || invoice.lineItems.length === 0) ? (
+                            <p className="text-xs text-slate-400 italic">No line items added to this invoice.</p>
+                          ) : (
+                            <div className="border border-slate-100 rounded-lg overflow-hidden bg-white shadow-sm">
+                              <table className="min-w-full divide-y divide-slate-100 text-xs">
+                                <thead className="bg-slate-50 text-slate-500 font-medium">
+                                  <tr>
+                                    <th className="px-4 py-2.5 text-left">Item / Product</th>
+                                    <th className="px-4 py-2.5 text-right w-16">Qty</th>
+                                    <th className="px-4 py-2.5 text-right w-24">Price</th>
+                                    <th className="px-4 py-2.5 text-right w-28">Total</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50 text-slate-700">
+                                  {invoice.lineItems.map((item: any, idx: number) => (
+                                    <tr key={idx} className="hover:bg-slate-50/30">
+                                      <td className="px-4 py-2 font-medium text-slate-900">{item.name || 'Unknown Item'}</td>
+                                      <td className="px-4 py-2 text-right">{item.quantity}</td>
+                                      <td className="px-4 py-2 text-right">${(item.price || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                      <td className="px-4 py-2 text-right font-semibold text-slate-900">${(item.total || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                    </tr>
+                                  ))}
+                                  <tr className="bg-slate-50/50 font-semibold text-slate-900 border-t border-slate-100">
+                                    <td colSpan={3} className="px-4 py-2 text-right text-slate-500">Total:</td>
+                                    <td className="px-4 py-2 text-right text-xs font-bold text-[rgb(var(--ns-accent))]">${(invoice.amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            ))
-          )}
+                ))
+              )}
+            </div>
+          </div>
           <DataTablePagination page={page} totalPages={totalPages} totalItems={totalItems} perPage={perPage} onPageChange={goToPage} />
         </div>
       )}

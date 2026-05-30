@@ -25,6 +25,7 @@ export interface CompanyRecord {
   status: 'lead' | 'active' | 'inactive'
   userId: string
   created_by: string
+  customFields?: Record<string, any>
   created?: string
   updated?: string
 }
@@ -44,6 +45,7 @@ export interface ContactRecord {
   status: Status
   assignedToId?: string
   assignedAt?: string
+  customFields?: Record<string, any>
   created?: string
   updated?: string
 }
@@ -63,6 +65,7 @@ export interface DealRecord {
   created_by: string
   status: Status
   intakeId?: string
+  customFields?: Record<string, any>
   created?: string
   updated?: string
 }
@@ -81,6 +84,7 @@ export interface TaskRecord {
   assignedToId?: string
   assignedAt?: string
   created_by: string
+  customFields?: Record<string, any>
   created?: string
   updated?: string
 }
@@ -103,6 +107,7 @@ export interface InvoiceRecord {
   assignedToId?: string
   assignedAt?: string
   lineItems?: any
+  customFields?: Record<string, any>
   created?: string
   updated?: string
 }
@@ -115,6 +120,7 @@ export interface ProductRecord {
   sku?: string
   status: Status
   created_by: string
+  customFields?: Record<string, any>
   created?: string
   updated?: string
 }
@@ -188,4 +194,18 @@ export interface ListResult<T> {
   totalPages: number
   page: number
   perPage: number
+}
+
+export interface CustomFieldDefinition {
+  id: string
+  name: string
+  key: string
+  entityType: 'companies' | 'contacts' | 'deals' | 'tasks' | 'invoices' | 'products'
+  type: 'text' | 'number' | 'select' | 'checkbox' | 'date'
+  options?: string[]
+  required?: boolean
+  isActive?: boolean
+  created_by?: string
+  created?: string
+  updated?: string
 }

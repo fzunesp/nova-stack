@@ -15,6 +15,10 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import type { Status } from '@/services'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
+import { DynamicCustomFieldsForm, validateCustomFields } from '@/components/DynamicCustomFieldsForm'
+import { useCustomFieldDefinitions } from '@/hooks/useCustomFields'
+import { useColumnPicker, type ColumnDef } from '@/hooks/useColumnPicker'
+import { ColumnPicker } from '@/components/ColumnPicker'
 
 const statusLabels: Record<Status, string> = {
   draft: 'Todo',
@@ -97,10 +101,33 @@ export function TasksPage() {
     enabled: viewMode === 'board',
   })
 
-  const [formData, setFormData] = useState({ title: '', description: '', status: 'draft' as Status, dueDate: '', contactId: '', dealId: '' })
+  const emptyTaskForm = { title: '', description: '', status: 'draft' as Status, dueDate: '', contactId: '', dealId: '', customFields: {} as Record<string, any> }
+  const [formData, setFormData] = useState(emptyTaskForm)
   const [creating, setCreating] = useState(location.state?.openCreate === true)
   const [editing, setEditing] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState({ title: '', description: '', status: 'draft' as Status, dueDate: '', contactId: '', dealId: '' })
+  const [editForm, setEditForm] = useState(emptyTaskForm)
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const { data: customFieldDefs = [] } = useCustomFieldDefinitions('tasks')
+
+  const standardColumns: ColumnDef[] = [
+    { key: 'checkbox', label: '', width: 40, alwaysVisible: true },
+    { key: 'task', label: 'Task', flex: true, minWidth: 200, sortField: 'title' },
+    { key: 'status', label: 'Status', width: 130, sortField: 'status' },
+    { key: 'due', label: 'Due', width: 130 },
+    { key: 'actions', label: 'Actions', width: 80, alwaysVisible: true, stickyRight: true }
+  ]
+
+  const customColumns: ColumnDef[] = customFieldDefs.map((def: any) => ({
+    key: def.key,
+    label: def.name,
+    width: 130,
+    isCustom: true
+  }))
+
+  const standardData = standardColumns.filter(c => !c.stickyRight)
+  const stickyActions = standardColumns.filter(c => c.stickyRight)
+  const allColumns = [...standardData, ...customColumns, ...stickyActions]
+  const { visibleKeys, visibleColumns, toggleColumn } = useColumnPicker('tasks', allColumns)
 
   const { data: contacts } = useQuery({
     queryKey: ['allContacts'],
@@ -117,7 +144,8 @@ export function TasksPage() {
       pb.collection('tasks').create({ ...data, dueDate: data.dueDate || undefined, userId: pb.authStore.record?.id }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
-      setFormData({ title: '', description: '', status: 'draft', dueDate: '', contactId: '', dealId: '' })
+      setFormData(emptyTaskForm)
+      setFormErrors({})
       setCreating(false)
       toast.success('Task created')
     },
@@ -130,6 +158,7 @@ export function TasksPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
       setEditing(null)
+      setFormErrors({})
       toast.success('Task updated')
     },
     onError: (err: any) => toast.error(err?.message || 'Failed to update task'),
@@ -201,11 +230,19 @@ export function TasksPage() {
             <HelpCircle className="w-3.5 h-3.5" />
             Help
           </button>
-          <Dialog open={creating} onOpenChange={setCreating}>
+          <Dialog open={creating} onOpenChange={(open) => {
+          if (open) { setFormData(emptyTaskForm); setFormErrors({}); setCreating(true) }
+          else { setCreating(false); setFormErrors({}) }
+          }}>
           <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-1.5" />Add Task</Button></DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>Add New Task</DialogTitle></DialogHeader>
-            <form onSubmit={(e) => { e.preventDefault(); createTask.mutate(formData) }} className="space-y-4">
+            <form onSubmit={(e) => {
+              e.preventDefault()
+              const errs = validateCustomFields(customFieldDefs, formData.customFields || {})
+              if (Object.keys(errs).length > 0) { setFormErrors(errs); toast.error('Fill required custom fields'); return }
+              createTask.mutate(formData)
+            }} className="space-y-4">
               <div className="space-y-2"><Label>Title</Label><Input placeholder="Task title" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} required /></div>
               <div className="space-y-2"><Label>Description</Label><Input placeholder="Description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} /></div>
               <div className="space-y-2"><Label>Due Date</Label><Input type="date" value={formData.dueDate} onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })} /></div>
@@ -238,6 +275,7 @@ export function TasksPage() {
                 </Select>
               </div>
 
+              <DynamicCustomFieldsForm entityType="tasks" values={formData.customFields || {}} onChange={(cf) => setFormData({ ...formData, customFields: cf })} errors={formErrors} />
               <DialogFooter><Button type="submit" disabled={createTask.isPending || !formData.contactId || !formData.dealId}>Add Task</Button></DialogFooter>
             </form>
           </DialogContent>
@@ -251,7 +289,7 @@ export function TasksPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <Input value={search} onChange={(e) => updateSearch(e.target.value)} placeholder="Search tasks..." className="pl-10" />
           </div>
-          <div className="flex items-center border border-slate-200 rounded-lg p-0.5 bg-slate-50">
+          <div className="flex items-center border border-slate-200 rounded-lg p-0.5 bg-slate-50 flex-shrink-0">
             <button
               onClick={() => setViewMode('list')}
               className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white text-slate-800 shadow-sm border border-slate-200/50' : 'text-slate-400 hover:text-slate-600'}`}
@@ -268,6 +306,9 @@ export function TasksPage() {
             </button>
           </div>
         </div>
+        {viewMode === 'list' && (
+          <ColumnPicker allColumns={allColumns} visibleKeys={visibleKeys} onToggle={toggleColumn} />
+        )}
       </div>
 
       {viewMode === 'board' ? (
@@ -313,7 +354,7 @@ export function TasksPage() {
                                     </div>
                                     <div className="absolute top-2 right-2 flex items-center gap-0.5">
                                       <Dialog open={editing === task.id} onOpenChange={(open) => {
-                                        if (open) { setEditing(task.id); setEditForm({ title: task.title || '', description: task.description || '', status: task.status || 'draft', dueDate: task.dueDate || '', contactId: task.contactId || '', dealId: task.dealId || '' }) }
+                                        if (open) { setEditing(task.id); setEditForm({ title: task.title || '', description: task.description || '', status: task.status || 'draft', dueDate: task.dueDate || '', contactId: task.contactId || '', dealId: task.dealId || '', customFields: task.customFields || {} }) }
                                         else setEditing(null)
                                       }}>
                                         <DialogTrigger asChild>
@@ -398,111 +439,193 @@ export function TasksPage() {
         )
       ) : (
         isLoading ? <TableSkeleton rows={6} /> : (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-            <div className="grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wide">
-              <div className="col-span-1" />
-              <button className="col-span-5 flex items-center gap-1 hover:text-slate-600" onClick={() => toggleSort('title')}>Task <ArrowUpDown className="w-3 h-3" /></button>
-              <button className="col-span-2 flex items-center gap-1 hover:text-slate-600" onClick={() => toggleSort('status')}>Status <ArrowUpDown className="w-3 h-3" /></button>
-              <div className="col-span-2">Due</div>
-              <div className="col-span-2 text-right">Actions</div>
-            </div>
-
-            {items.length === 0 ? (
-              <div className="text-center py-16">
-                <CheckSquare className="w-10 h-10 mx-auto mb-3 text-slate-200" />
-                <p className="text-sm font-medium text-slate-500 mb-4">No tasks yet</p>
-                <Button size="sm" variant="outline" onClick={() => setCreating(true)}>Create your first task</Button>
-              </div>
-            ) : (
-              items.map((task: any) => (
-                <div key={task.id} className="group grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors items-center">
-                  <div className="col-span-1 flex items-center">
-                    <button
-                      title="Cycle status: To Do → In Progress → Done"
-                      onClick={() => cycleStatus.mutate({ id: task.id, currentStatus: task.status as Status })}
-                      className={`w-5 h-5 rounded-full border-2 flex-shrink-0 transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-1 ${
-                        task.status === 'approved'
-                          ? 'bg-green-500 border-green-500'
-                          : task.status === 'active'
-                          ? 'border-blue-500 bg-transparent'
-                          : 'border-slate-300 bg-transparent'
-                      }`}
-                      style={task.status === 'approved' ? {} : task.status === 'active' ? { boxShadow: 'inset 0 0 0 2px rgb(59 130 246 / 0.3)' } : {}}
-                    />
-                  </div>
-                  <div className="col-span-5">
-                    <p className={`font-medium ${task.status === 'approved' ? 'line-through text-slate-400' : 'text-slate-900'}`}>{task.title}</p>
-                    {task.description && <p className="text-xs text-slate-400 mt-0.5 truncate">{task.description}</p>}
-                  </div>
-                  <div className="col-span-2">
-                    <Badge className={`${statusColors[task.status as Status] || statusColors.draft} inline-flex items-center gap-1.5 text-xs`}>
-                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusDots[task.status as Status] || statusDots.draft}`} />
-                      {statusLabels[task.status as Status] || task.status}
-                    </Badge>
-                  </div>
-                  <div className="col-span-2 text-sm text-slate-400">{task.dueDate || '\u2014'}</div>
-                  <div className="col-span-2 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Dialog open={editing === task.id} onOpenChange={(open) => {
-                      if (open) { setEditing(task.id); setEditForm({ title: task.title || '', description: task.description || '', status: task.status || 'draft', dueDate: task.dueDate || '', contactId: task.contactId || '', dealId: task.dealId || '' }) }
-                      else setEditing(null)
-                    }}>
-                      <DialogTrigger asChild><Button variant="ghost" size="icon"><Pencil className="w-3.5 h-3.5" /></Button></DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader><DialogTitle>Edit Task</DialogTitle></DialogHeader>
-                        <form onSubmit={(e) => { e.preventDefault(); updateTask.mutate({ id: task.id, data: editForm }) }} className="space-y-4">
-                          <div className="space-y-2"><Label>Title</Label><Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required /></div>
-                          <div className="space-y-2"><Label>Description</Label><Input value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} /></div>
-                          <div className="space-y-2"><Label>Status</Label>
-                            <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v as Status })}>
-                              <SelectTrigger><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                {(Object.keys(statusLabels) as Status[]).map((s) => (
-                                  <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2"><Label>Due Date</Label><Input type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} /></div>
-                          
-                          <div className="space-y-2">
-                            <Label>Contact *</Label>
-                            <Select value={editForm.contactId} onValueChange={(v) => setEditForm({ ...editForm, contactId: v })}>
-                              <SelectTrigger className={!editForm.contactId ? 'border-red-200' : ''}>
-                                <SelectValue placeholder="Select a contact" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {contacts?.map((c: any) => (
-                                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label>Deal *</Label>
-                            <Select value={editForm.dealId} onValueChange={(v) => setEditForm({ ...editForm, dealId: v })}>
-                              <SelectTrigger className={!editForm.dealId ? 'border-red-200' : ''}>
-                                <SelectValue placeholder="Select a deal" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {deals?.map((d: any) => (
-                                  <SelectItem key={d.id} value={d.id}>{d.title}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          <DialogFooter><Button type="submit" disabled={updateTask.isPending || !editForm.contactId || !editForm.dealId}>Save</Button></DialogFooter>
-                        </form>
-                      </DialogContent>
-                    </Dialog>
-                    <Button variant="ghost" size="icon" onClick={() => { if (confirm('Delete this task?')) deleteTask.mutate(task.id) }}>
-                      <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                    </Button>
-                  </div>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <div className="min-w-full divide-y divide-slate-100">
+                <div className="flex items-center px-4 py-3 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                  {visibleColumns.map(col => {
+                    const stickyClass = col.stickyRight ? 'sticky right-0 bg-white z-10 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.04)]' : ''
+                    if (col.sortField) {
+                      return (
+                        <button 
+                          key={col.key} 
+                          style={col.flex ? { flex: 1, minWidth: col.minWidth } : { width: col.width }}
+                          className={`flex items-center gap-1 hover:text-slate-600 text-left font-semibold uppercase animate-none ${stickyClass}`} 
+                          onClick={() => toggleSort(col.sortField!)}
+                        >
+                          {col.label} <ArrowUpDown className="w-3 h-3" />
+                        </button>
+                      )
+                    }
+                    return (
+                      <div 
+                        key={col.key} 
+                        style={col.flex ? { flex: 1, minWidth: col.minWidth } : { width: col.width }} 
+                        className={`truncate ${stickyClass}`}
+                      >
+                        {col.label}
+                      </div>
+                    )
+                  })}
                 </div>
-              ))
-            )}
+
+                {items.length === 0 ? (
+                  <div className="text-center py-16">
+                    <CheckSquare className="w-10 h-10 mx-auto mb-3 text-slate-200" />
+                    <p className="text-sm font-medium text-slate-500 mb-4">No tasks yet</p>
+                    <Button size="sm" variant="outline" onClick={() => setCreating(true)}>Create your first task</Button>
+                  </div>
+                ) : (
+                  items.map((task: any) => (
+                    <div key={task.id} className="group flex items-center px-4 py-3 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors">
+                      {visibleColumns.map(col => {
+                        if (col.key === 'checkbox') {
+                          return (
+                            <div key={col.key} style={{ width: col.width }} className="flex items-center flex-shrink-0">
+                              <button
+                                title="Cycle status: To Do → In Progress → Done"
+                                onClick={() => cycleStatus.mutate({ id: task.id, currentStatus: task.status as Status })}
+                                className={`w-5 h-5 rounded-full border-2 flex-shrink-0 transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-1 ${
+                                  task.status === 'approved'
+                                    ? 'bg-green-500 border-green-500'
+                                    : task.status === 'active'
+                                    ? 'border-blue-500 bg-transparent'
+                                    : 'border-slate-300 bg-transparent'
+                                }`}
+                                style={task.status === 'approved' ? {} : task.status === 'active' ? { boxShadow: 'inset 0 0 0 2px rgb(59 130 246 / 0.3)' } : {}}
+                              />
+                            </div>
+                          )
+                        }
+                        if (col.key === 'task') {
+                          return (
+                            <div key={col.key} style={{ flex: 1, minWidth: col.minWidth }} className="min-w-0 pr-4">
+                              <p className={`font-medium truncate ${task.status === 'approved' ? 'line-through text-slate-400' : 'text-slate-900'}`}>{task.title}</p>
+                              {task.description && <p className="text-xs text-slate-400 mt-0.5 truncate">{task.description}</p>}
+                            </div>
+                          )
+                        }
+                        if (col.key === 'status') {
+                          return (
+                            <div key={col.key} style={{ width: col.width }} className="flex-shrink-0">
+                              <Badge className={`${statusColors[task.status as Status] || statusColors.draft} inline-flex items-center gap-1.5 text-xs`}>
+                                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusDots[task.status as Status] || statusDots.draft}`} />
+                                {statusLabels[task.status as Status] || task.status}
+                              </Badge>
+                            </div>
+                          )
+                        }
+                        if (col.key === 'due') {
+                          return (
+                            <div key={col.key} style={{ width: col.width }} className="text-sm text-slate-400 flex-shrink-0">
+                              {task.dueDate || '—'}
+                            </div>
+                          )
+                        }
+                        if (col.key === 'actions') {
+                          return (
+                            <div key={col.key} style={{ width: col.width }} className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 sticky right-0 bg-white group-hover:bg-slate-50 z-10 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.04)]">
+                              <Dialog open={editing === task.id} onOpenChange={(open) => {
+                                if (open) { setFormErrors({}); setEditing(task.id); setEditForm({ title: task.title || '', description: task.description || '', status: task.status || 'draft', dueDate: task.dueDate || '', contactId: task.contactId || '', dealId: task.dealId || '', customFields: task.customFields || {} }) }
+                                else { setEditing(null); setFormErrors({}) }
+                              }}>
+                                <DialogTrigger asChild><Button variant="ghost" size="icon"><Pencil className="w-3.5 h-3.5" /></Button></DialogTrigger>
+                                <DialogContent>
+                                  <DialogHeader><DialogTitle>Edit Task</DialogTitle></DialogHeader>
+                                  <form onSubmit={(e) => { e.preventDefault(); updateTask.mutate({ id: task.id, data: editForm }) }} className="space-y-4">
+                                    <div className="space-y-2"><Label>Title</Label><Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required /></div>
+                                    <div className="space-y-2"><Label>Description</Label><Input value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} /></div>
+                                    <div className="space-y-2"><Label>Status</Label>
+                                      <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v as Status })}>
+                                        <SelectTrigger><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                          {(Object.keys(statusLabels) as Status[]).map((s) => (
+                                            <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="space-y-2"><Label>Due Date</Label><Input type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} /></div>
+                                    
+                                    <div className="space-y-2">
+                                      <Label>Contact *</Label>
+                                      <Select value={editForm.contactId} onValueChange={(v) => setEditForm({ ...editForm, contactId: v })}>
+                                        <SelectTrigger className={!editForm.contactId ? 'border-red-200' : ''}>
+                                          <SelectValue placeholder="Select a contact" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {contacts?.map((c: any) => (
+                                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                      <Label>Deal *</Label>
+                                      <Select value={editForm.dealId} onValueChange={(v) => setEditForm({ ...editForm, dealId: v })}>
+                                        <SelectTrigger className={!editForm.dealId ? 'border-red-200' : ''}>
+                                          <SelectValue placeholder="Select a deal" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {deals?.map((d: any) => (
+                                            <SelectItem key={d.id} value={d.id}>{d.title}</SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+
+                                    <DynamicCustomFieldsForm entityType="tasks" values={editForm.customFields || {}} onChange={(cf) => setEditForm({ ...editForm, customFields: cf })} errors={formErrors} />
+                                    <DialogFooter><Button type="submit" disabled={updateTask.isPending || !editForm.contactId || !editForm.dealId}>Save</Button></DialogFooter>
+                                  </form>
+                                </DialogContent>
+                              </Dialog>
+                              <Button variant="ghost" size="icon" onClick={() => { if (confirm('Delete this task?')) deleteTask.mutate(task.id) }}>
+                                <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                              </Button>
+                            </div>
+                          )
+                        }
+
+                        // Render custom fields dynamically
+                        const rawVal = task.customFields?.[col.key]
+                        const fieldDef = customFieldDefs.find((f: any) => f.key === col.key)
+                        let displayVal = '—'
+                        if (rawVal !== undefined && rawVal !== null && rawVal !== '') {
+                          if (fieldDef?.type === 'checkbox') {
+                            displayVal = rawVal ? 'Yes' : 'No'
+                          } else if (fieldDef?.type === 'date') {
+                            try {
+                              displayVal = new Date(rawVal).toLocaleDateString(undefined, {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                              })
+                            } catch {
+                              displayVal = String(rawVal)
+                            }
+                          } else {
+                            displayVal = String(rawVal)
+                          }
+                        }
+
+                        return (
+                          <div key={col.key} style={{ width: col.width }} className="text-sm text-slate-500 truncate flex-shrink-0">
+                            {fieldDef?.type === 'checkbox' && (rawVal !== undefined && rawVal !== null && rawVal !== '') ? (
+                              <Badge className="bg-slate-200 text-slate-700 border-none text-[10px] px-1.5 py-0.5 font-bold">
+                                {displayVal}
+                              </Badge>
+                            ) : (
+                              displayVal
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
             <DataTablePagination page={page} totalPages={totalPages} totalItems={totalItems} perPage={perPage} onPageChange={goToPage} />
           </div>
         )

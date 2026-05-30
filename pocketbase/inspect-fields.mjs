@@ -3,6 +3,7 @@ import fetch from 'node-fetch';
 async function run() {
   const base = 'http://localhost:8090/api';
   
+  // Authenticate as superuser to fetch contacts
   const authRes = await fetch(`${base}/collections/_superusers/auth-with-password`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -11,13 +12,11 @@ async function run() {
   const auth = await authRes.json();
   const headers = { 'Authorization': auth.token };
 
-  const res = await fetch(`${base}/collections/users/records`, { headers });
+  const res = await fetch(`${base}/collections/contacts/records?perPage=1`, { headers });
   const data = await res.json();
   
-  console.log('=== USERS LIST ===');
-  data.items.forEach(u => {
-    console.log(`User: ${u.name || u.email} | ID: ${u.id} | Email: ${u.email} | Role: ${u.role} | IsActive: ${u.isActive}`);
-  });
+  console.log('=== ONE CONTACT RECORD FROM DB ===');
+  console.log(JSON.stringify(data.items?.[0] || 'No contacts found', null, 2));
 }
 
 run().catch(console.error);

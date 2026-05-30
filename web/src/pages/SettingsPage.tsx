@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import pb from '@/lib/pocketbase'
-import { User, Users, Mail, Building2, Lock, Save, Palette, Check, Shield, Trash2, UserPlus, Loader2, Database, Download, Webhook, Plus, Play, Copy, FileText, Edit, MessageSquare, HelpCircle, Keyboard, ArrowUpRight, ChevronRight, Settings, UserMinus, UserCheck, Eye, EyeOff } from 'lucide-react'
+import { User, Users, Mail, Building2, Lock, Save, Palette, Check, Shield, Trash2, UserPlus, Loader2, Database, Download, Webhook, Plus, Play, Copy, FileText, Edit, MessageSquare, HelpCircle, Keyboard, ArrowUpRight, ChevronRight, Settings, UserMinus, UserCheck, Eye, EyeOff, Layers } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { useTheme, type ThemeName } from '@/contexts/ThemeContext'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
+import { CustomFieldsTab } from '@/components/CustomFieldsTab'
 
 const THEMES: { id: ThemeName; label: string; description: string; hex: string; hexDark: string }[] = [
   { id: 'indigo', label: 'Indigo', description: 'Classic & trustworthy', hex: '#4f46e5', hexDark: '#4338ca' },
@@ -37,6 +38,7 @@ export function SettingsPage() {
     { id: 'appearance', label: 'Appearance', icon: Palette },
     { id: 'templates', label: 'Templates', icon: FileText },
     ...(isAdmin ? [
+      { id: 'custom-fields', label: 'Custom Fields', icon: Layers },
       { id: 'users', label: 'Users', icon: Users },
       { id: 'data', label: 'Data & Export', icon: Database },
       { id: 'webhooks', label: 'Webhooks', icon: Webhook }
@@ -108,6 +110,7 @@ export function SettingsPage() {
     security: ['Change Password', 'Current password', 'New password', 'Confirm password'],
     appearance: ['Accent Colour'],
     templates: ['Templates', 'Create Template'],
+    'custom-fields': ['Custom Fields Manager'],
     users: ['User Management', 'Add User', 'Role Permissions'],
     data: ['System Backup', 'Data Export (CSV)'],
     webhooks: ['Outbound Webhooks', 'Add Webhook'],
@@ -303,6 +306,13 @@ export function SettingsPage() {
 
           {/* Templates Tab */}
           {activeTab === 'templates' && <div id="templates-tab"><TemplatesTab /></div>}
+
+          {/* Custom Fields Tab — Admin Only */}
+          {activeTab === 'custom-fields' && isAdmin && (
+            <div id="custom-fields-tab">
+              <CustomFieldsTab />
+            </div>
+          )}
 
           {/* Users Tab — Admin Only */}
           {activeTab === 'users' && isAdmin && <div id="users-tab"><UsersTab currentUserId={(user as any)?.id} /></div>}
