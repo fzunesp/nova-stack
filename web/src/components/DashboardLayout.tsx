@@ -39,6 +39,7 @@ const quickCreateItems = [
   { label: 'Deal', icon: Briefcase, path: '/crm', iconBg: 'bg-orange-100', iconColor: 'text-orange-600', tab: 'deals' },
   { label: 'Task', icon: CheckSquare, path: '/tasks', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600' },
   { label: 'Invoice', icon: FileText, path: '/invoices', iconBg: 'bg-violet-100', iconColor: 'text-violet-600' },
+  { label: 'Product', icon: Package, path: '/products', iconBg: 'bg-amber-100', iconColor: 'text-amber-600' },
   { label: 'Intake', icon: Inbox, path: '/intake', iconBg: 'bg-pink-100', iconColor: 'text-pink-600' },
   { label: 'HR Request', icon: Briefcase, path: '/hr', iconBg: 'bg-slate-100', iconColor: 'text-slate-600' },
 ]

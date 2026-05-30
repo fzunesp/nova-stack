@@ -58,13 +58,6 @@ const statusDots: Record<Status, string> = {
 
 const boardStatuses = ['draft', 'active', 'pending', 'approved']
 
-const columnColors: Record<string, string> = {
-  draft: 'bg-gray-50/50 border-gray-200 hover:bg-gray-50/70',
-  active: 'bg-blue-50/50 border-blue-100 hover:bg-blue-50/70',
-  pending: 'bg-amber-50/50 border-amber-100 hover:bg-amber-50/70',
-  approved: 'bg-green-50/50 border-green-100 hover:bg-green-50/70',
-}
-
 const columnHeaderStyles: Record<string, string> = {
   draft: 'bg-white border-gray-200 text-gray-600',
   active: 'bg-blue-50 border-blue-200 text-blue-700',
@@ -169,14 +162,20 @@ export function TasksPage() {
       pb.collection('tasks').update(id, { status }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      if (viewMode === 'board') {
+        queryClient.invalidateQueries({ queryKey: ['tasks-all'] })
+      }
     },
-    onError: () => toast.error('Failed to update task status'),
+    onError: () => toast.error('Failed to update status'),
   })
 
   const deleteTask = useMutation({
     mutationFn: (id: string) => pb.collection('tasks').delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      if (viewMode === 'board') {
+        queryClient.invalidateQueries({ queryKey: ['tasks-all'] })
+      }
       toast.success('Task deleted')
     },
     onError: () => toast.error('Failed to delete task'),
@@ -215,6 +214,20 @@ export function TasksPage() {
     return acc
   }, {} as Record<string, any[]>)
 
+  const handleCreateSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    const errs = validateCustomFields(customFieldDefs, formData.customFields || {})
+    if (Object.keys(errs).length > 0) { setFormErrors(errs); toast.error('Fill required custom fields'); return }
+    createTask.mutate(formData)
+  }
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    const errs = validateCustomFields(customFieldDefs, editForm.customFields || {})
+    if (Object.keys(errs).length > 0) { setFormErrors(errs); toast.error('Fill required custom fields'); return }
+    if (editing) updateTask.mutate({ id: editing, data: editForm })
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -231,52 +244,49 @@ export function TasksPage() {
             Help
           </button>
           <Dialog open={creating} onOpenChange={(open) => {
-          if (open) { setFormData(emptyTaskForm); setFormErrors({}); setCreating(true) }
-          else { setCreating(false); setFormErrors({}) }
+            if (open) { setFormData(emptyTaskForm); setFormErrors({}); setCreating(true) }
+            else { setCreating(false); setFormErrors({}) }
           }}>
           <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-1.5" />Add Task</Button></DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Add New Task</DialogTitle></DialogHeader>
-            <form onSubmit={(e) => {
-              e.preventDefault()
-              const errs = validateCustomFields(customFieldDefs, formData.customFields || {})
-              if (Object.keys(errs).length > 0) { setFormErrors(errs); toast.error('Fill required custom fields'); return }
-              createTask.mutate(formData)
-            }} className="space-y-4">
-              <div className="space-y-2"><Label>Title</Label><Input placeholder="Task title" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} required /></div>
-              <div className="space-y-2"><Label>Description</Label><Input placeholder="Description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Due Date</Label><Input type="date" value={formData.dueDate} onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })} /></div>
-              
-              <div className="space-y-2">
-                <Label>Contact *</Label>
-                <Select value={formData.contactId} onValueChange={(v) => setFormData({ ...formData, contactId: v })} required>
-                  <SelectTrigger className={!formData.contactId ? 'border-red-200' : ''}>
-                    <SelectValue placeholder="Select a contact" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {contacts?.map((c: any) => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col p-0 overflow-hidden">
+            <DialogHeader className="px-6 py-4 border-b border-slate-100 flex-shrink-0"><DialogTitle>Add New Task</DialogTitle></DialogHeader>
+            <form onSubmit={handleCreateSubmit} className="flex flex-col min-h-0">
+              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                <div className="space-y-2"><Label>Title</Label><Input placeholder="Task title" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} required /></div>
+                <div className="space-y-2"><Label>Description</Label><Input placeholder="Description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Due Date</Label><Input type="date" value={formData.dueDate} onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })} /></div>
 
-              <div className="space-y-2">
-                <Label>Deal *</Label>
-                <Select value={formData.dealId} onValueChange={(v) => setFormData({ ...formData, dealId: v })} required>
-                  <SelectTrigger className={!formData.dealId ? 'border-red-200' : ''}>
-                    <SelectValue placeholder="Select a deal" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {deals?.map((d: any) => (
-                      <SelectItem key={d.id} value={d.id}>{d.title}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                <div className="space-y-2">
+                  <Label>Contact *</Label>
+                  <Select value={formData.contactId} onValueChange={(v) => setFormData({ ...formData, contactId: v })} required>
+                    <SelectTrigger className={!formData.contactId ? 'border-red-200' : ''}>
+                      <SelectValue placeholder="Select a contact" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {contacts?.map((c: any) => (
+                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <DynamicCustomFieldsForm entityType="tasks" values={formData.customFields || {}} onChange={(cf) => setFormData({ ...formData, customFields: cf })} errors={formErrors} />
-              <DialogFooter><Button type="submit" disabled={createTask.isPending || !formData.contactId || !formData.dealId}>Add Task</Button></DialogFooter>
+                <div className="space-y-2">
+                  <Label>Deal *</Label>
+                  <Select value={formData.dealId} onValueChange={(v) => setFormData({ ...formData, dealId: v })} required>
+                    <SelectTrigger className={!formData.dealId ? 'border-red-200' : ''}>
+                      <SelectValue placeholder="Select a deal" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {deals?.map((d: any) => (
+                        <SelectItem key={d.id} value={d.id}>{d.title}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <DynamicCustomFieldsForm entityType="tasks" values={formData.customFields || {}} onChange={(cf) => setFormData({ ...formData, customFields: cf })} errors={formErrors} />
+              </div>
+              <DialogFooter className="px-6 py-4 border-t border-slate-100 flex-shrink-0"><Button type="submit" disabled={createTask.isPending || !formData.contactId || !formData.dealId}>Add Task</Button></DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
@@ -289,122 +299,131 @@ export function TasksPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <Input value={search} onChange={(e) => updateSearch(e.target.value)} placeholder="Search tasks..." className="pl-10" />
           </div>
-          <div className="flex items-center border border-slate-200 rounded-lg p-0.5 bg-slate-50 flex-shrink-0">
+          <div className="flex items-center border border-slate-200 rounded-lg p-1 bg-white shadow-sm flex-shrink-0">
             <button
               onClick={() => setViewMode('list')}
-              className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white text-slate-800 shadow-sm border border-slate-200/50' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-slate-100 text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
               title="List View"
             >
               <List className="w-4 h-4" />
             </button>
             <button
               onClick={() => setViewMode('board')}
-              className={`p-1.5 rounded-md transition-all ${viewMode === 'board' ? 'bg-white text-slate-800 shadow-sm border border-slate-200/50' : 'text-slate-400 hover:text-slate-600'}`}
-              title="Kanban Board"
+              className={`p-1.5 rounded-md transition-all ${viewMode === 'board' ? 'bg-slate-100 text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              title="Board View"
             >
               <Kanban className="w-4 h-4" />
             </button>
           </div>
         </div>
-        {viewMode === 'list' && (
-          <ColumnPicker allColumns={allColumns} visibleKeys={visibleKeys} onToggle={toggleColumn} />
-        )}
+        <ColumnPicker allColumns={allColumns} visibleKeys={visibleKeys} onToggle={toggleColumn} />
       </div>
 
       {viewMode === 'board' ? (
-        allTasksLoading ? <TableSkeleton rows={6} /> : (
+        allTasksLoading ? <TableSkeleton rows={3} /> : (
           <DragDropContext onDragEnd={handleDragEnd}>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 overflow-x-auto pb-4 items-start min-h-[500px]">
+            <div className="flex gap-4 h-[calc(100vh-280px)] overflow-hidden">
               {boardStatuses.map((status) => {
-                const statusTasks = groupedTasks[status] || []
+                const tasks = groupedTasks[status] || []
                 return (
-                  <div key={status} className={`flex flex-col rounded-xl border p-3 transition-all min-h-[500px] ${columnColors[status]}`}>
-                    <div className={`flex items-center justify-between px-3 py-1.5 rounded-lg border text-xs font-bold uppercase tracking-wider mb-3 ${columnHeaderStyles[status]}`}>
+                  <div key={status} className="flex-1 min-w-[280px] flex flex-col">
+                    <div className={`mb-3 p-3 rounded-xl border flex items-center justify-between font-bold text-xs uppercase tracking-wider ${columnHeaderStyles[status]}`}>
                       <div className="flex items-center gap-2">
-                        <span>{statusLabels[status as Status] || status}</span>
-                        <span className="bg-white/90 px-1.5 py-0.5 rounded-full text-[10px]">{statusTasks.length}</span>
+                        <span className={`w-2 h-2 rounded-full ${statusDots[status as Status]}`} />
+                        {statusLabels[status as Status]}
                       </div>
+                      <Badge variant="outline" className="bg-white/50 border-none text-[10px] px-2">{tasks.length}</Badge>
                     </div>
+
                     <Droppable droppableId={status}>
                       {(provided, snapshot) => (
                         <div
-                          ref={provided.innerRef}
                           {...provided.droppableProps}
-                          className={`flex flex-col gap-2 flex-1 transition-colors rounded-lg p-1 min-h-[400px] ${snapshot.isDraggingOver ? 'bg-slate-100/50' : ''}`}
+                          ref={provided.innerRef}
+                          className={`flex-1 overflow-y-auto rounded-xl border-2 border-dashed p-3 transition-colors ${snapshot.isDraggingOver ? 'bg-slate-50 border-slate-300' : 'border-transparent'}`}
                         >
-                          {statusTasks.length === 0 && !snapshot.isDraggingOver && (
-                            <div className="text-center py-8 text-xs text-slate-300 font-medium">
-                              Drop tasks here
-                            </div>
-                          )}
-                          {statusTasks.map((task: any, index: number) => (
+                          {tasks.map((task, index) => (
                             <Draggable key={task.id} draggableId={task.id} index={index}>
                               {(provided, snapshot) => (
                                 <div
                                   ref={provided.innerRef}
                                   {...provided.draggableProps}
                                   {...provided.dragHandleProps}
-                                  className={`bg-white rounded-lg border border-slate-200 p-3 transition-all relative ${snapshot.isDragging ? 'shadow-lg border-indigo-400 rotate-1' : 'hover:shadow-md hover:border-slate-300'}`}
-                                  style={{ ...provided.draggableProps.style }}
+                                  className={`bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-3 group hover:border-indigo-200 transition-all ${snapshot.isDragging ? 'shadow-lg rotate-2 scale-105 border-indigo-300 ring-2 ring-indigo-500/20' : ''}`}
                                 >
-                                  <div className="flex items-start justify-between gap-2 pr-6">
-                                    <div className="flex-1 min-w-0">
-                                      <p className={`text-sm font-medium ${task.status === 'approved' ? 'line-through text-slate-400' : 'text-slate-900'}`}>{task.title}</p>
-                                      {task.description && <p className="text-xs text-slate-400 mt-1 truncate">{task.description}</p>}
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0 flex-1">
+                                      <h4 className="font-bold text-slate-800 text-sm mb-1 truncate group-hover:text-indigo-600 transition-colors">{task.title}</h4>
+                                      {task.expand?.contactId && (
+                                        <p className="text-[11px] text-slate-500 font-medium truncate flex items-center gap-1">
+                                          <span className="w-1 h-1 rounded-full bg-slate-300" />
+                                          {task.expand.contactId.name}
+                                        </p>
+                                      )}
+                                      {task.expand?.dealId && (
+                                        <p className="text-[11px] text-indigo-500 font-semibold truncate flex items-center gap-1 mt-0.5">
+                                          <span className="w-1 h-1 rounded-full bg-indigo-200" />
+                                          {task.expand.dealId.title}
+                                        </p>
+                                      )}
                                     </div>
-                                    <div className="absolute top-2 right-2 flex items-center gap-0.5">
+                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                                       <Dialog open={editing === task.id} onOpenChange={(open) => {
-                                        if (open) { setEditing(task.id); setEditForm({ title: task.title || '', description: task.description || '', status: task.status || 'draft', dueDate: task.dueDate || '', contactId: task.contactId || '', dealId: task.dealId || '', customFields: task.customFields || {} }) }
-                                        else setEditing(null)
+                                        if (open) {
+                                          setFormErrors({});
+                                          setEditing(task.id);
+                                          setEditForm({
+                                            title: task.title || '',
+                                            description: task.description || '',
+                                            status: task.status || 'draft',
+                                            dueDate: task.dueDate || '',
+                                            contactId: task.contactId || '',
+                                            dealId: task.dealId || '',
+                                            customFields: task.customFields || {}
+                                          });
+                                        } else {
+                                          setEditing(null);
+                                          setFormErrors({});
+                                        }
                                       }}>
-                                        <DialogTrigger asChild>
-                                          <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-slate-600">
-                                            <Pencil className="w-3 h-3" />
-                                          </Button>
-                                        </DialogTrigger>
-                                        <DialogContent>
-                                          <DialogHeader><DialogTitle>Edit Task</DialogTitle></DialogHeader>
-                                          <form onSubmit={(e) => { e.preventDefault(); updateTask.mutate({ id: task.id, data: editForm }) }} className="space-y-4">
-                                            <div className="space-y-2"><Label>Title</Label><Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required /></div>
-                                            <div className="space-y-2"><Label>Description</Label><Input value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} /></div>
-                                            <div className="space-y-2"><Label>Status</Label>
-                                              <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v as Status })}>
-                                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                                <SelectContent>
-                                                  {(Object.keys(statusLabels) as Status[]).map((s) => (
-                                                    <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>
-                                                  ))}
-                                                </SelectContent>
-                                              </Select>
+                                        <DialogTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-slate-600"><Pencil className="w-3 h-3" /></Button></DialogTrigger>
+                                        <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col p-0 overflow-hidden">
+                                          <DialogHeader className="px-6 py-4 border-b border-slate-100 flex-shrink-0"><DialogTitle>Edit Task</DialogTitle></DialogHeader>
+                                          <form onSubmit={handleEditSubmit} className="flex flex-col min-h-0">
+                                            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                                              <div className="space-y-2"><Label>Title</Label><Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required /></div>
+                                              <div className="space-y-2"><Label>Description</Label><Input value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} /></div>
+                                              <div className="space-y-2"><Label>Due Date</Label><Input type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} /></div>
+
+                                              <div className="space-y-2">
+                                                <Label>Contact *</Label>
+                                                <Select value={editForm.contactId} onValueChange={(v) => setEditForm({ ...editForm, contactId: v })} required>
+                                                  <SelectTrigger className={!editForm.contactId ? 'border-red-200' : ''}>
+                                                    <SelectValue placeholder="Select a contact" />
+                                                  </SelectTrigger>
+                                                  <SelectContent>
+                                                    {contacts?.map((c: any) => (
+                                                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                                    ))}
+                                                  </SelectContent>
+                                                </Select>
+                                              </div>
+                                              <div className="space-y-2">
+                                                <Label>Deal *</Label>
+                                                <Select value={editForm.dealId} onValueChange={(v) => setEditForm({ ...editForm, dealId: v })}>
+                                                  <SelectTrigger className={!editForm.dealId ? 'border-red-200' : ''}>
+                                                    <SelectValue placeholder="Select a deal" />
+                                                  </SelectTrigger>
+                                                  <SelectContent>
+                                                    {deals?.map((d: any) => (
+                                                      <SelectItem key={d.id} value={d.id}>{d.title}</SelectItem>
+                                                    ))}
+                                                  </SelectContent>
+                                                </Select>
+                                              </div>
+                                              <DynamicCustomFieldsForm entityType="tasks" values={editForm.customFields || {}} onChange={(cf) => { setEditForm({ ...editForm, customFields: cf }); setFormErrors({}) }} errors={formErrors} />
                                             </div>
-                                            <div className="space-y-2"><Label>Due Date</Label><Input type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} /></div>
-                                            <div className="space-y-2">
-                                              <Label>Contact *</Label>
-                                              <Select value={editForm.contactId} onValueChange={(v) => setEditForm({ ...editForm, contactId: v })}>
-                                                <SelectTrigger className={!editForm.contactId ? 'border-red-200' : ''}>
-                                                  <SelectValue placeholder="Select a contact" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                  {contacts?.map((c: any) => (
-                                                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                                                  ))}
-                                                </SelectContent>
-                                              </Select>
-                                            </div>
-                                            <div className="space-y-2">
-                                              <Label>Deal *</Label>
-                                              <Select value={editForm.dealId} onValueChange={(v) => setEditForm({ ...editForm, dealId: v })}>
-                                                <SelectTrigger className={!editForm.dealId ? 'border-red-200' : ''}>
-                                                  <SelectValue placeholder="Select a deal" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                  {deals?.map((d: any) => (
-                                                    <SelectItem key={d.id} value={d.id}>{d.title}</SelectItem>
-                                                  ))}
-                                                </SelectContent>
-                                              </Select>
-                                            </div>
-                                            <DialogFooter><Button type="submit" disabled={updateTask.isPending || !editForm.contactId || !editForm.dealId}>Save</Button></DialogFooter>
+                                            <DialogFooter className="px-6 py-4 border-t border-slate-100 flex-shrink-0"><Button type="submit" disabled={updateTask.isPending || !editForm.contactId || !editForm.dealId}>Save</Button></DialogFooter>
                                           </form>
                                         </DialogContent>
                                       </Dialog>
@@ -444,7 +463,7 @@ export function TasksPage() {
               <div className="min-w-full divide-y divide-slate-100">
                 <div className="flex items-center px-4 py-3 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wide">
                   {visibleColumns.map(col => {
-                    const stickyClass = col.stickyRight ? 'sticky right-0 bg-white z-10 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.04)]' : ''
+                    const stickyClass = col.stickyRight ? 'sticky right-0 bg-white pl-4 z-10 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.04)]' : ''
                     if (col.sortField) {
                       return (
                         <button 
@@ -492,7 +511,6 @@ export function TasksPage() {
                                     ? 'border-blue-500 bg-transparent'
                                     : 'border-slate-300 bg-transparent'
                                 }`}
-                                style={task.status === 'approved' ? {} : task.status === 'active' ? { boxShadow: 'inset 0 0 0 2px rgb(59 130 246 / 0.3)' } : {}}
                               />
                             </div>
                           )
@@ -500,16 +518,33 @@ export function TasksPage() {
                         if (col.key === 'task') {
                           return (
                             <div key={col.key} style={{ flex: 1, minWidth: col.minWidth }} className="min-w-0 pr-4">
-                              <p className={`font-medium truncate ${task.status === 'approved' ? 'line-through text-slate-400' : 'text-slate-900'}`}>{task.title}</p>
-                              {task.description && <p className="text-xs text-slate-400 mt-0.5 truncate">{task.description}</p>}
+                              <span className={`font-medium text-slate-900 block truncate ${task.status === 'approved' ? 'line-through text-slate-400' : ''}`}>
+                                {task.title}
+                              </span>
+                              {task.expand?.contactId && (
+                                <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5 truncate">
+                                  <span>For:</span>
+                                  <button onClick={(e) => { e.stopPropagation(); navigate(`/crm/contacts/${task.expand.contactId.id}`) }} className="text-indigo-500 hover:underline font-medium">
+                                    {task.expand.contactId.name}
+                                  </button>
+                                  {task.expand.dealId && (
+                                    <>
+                                      <span className="text-slate-300">|</span>
+                                      <button onClick={(e) => { e.stopPropagation(); navigate(`/crm/deals/${task.expand.dealId.id}`) }} className="text-indigo-500 hover:underline font-medium">
+                                        {task.expand.dealId.title}
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           )
                         }
                         if (col.key === 'status') {
                           return (
                             <div key={col.key} style={{ width: col.width }} className="flex-shrink-0">
-                              <Badge className={`${statusColors[task.status as Status] || statusColors.draft} inline-flex items-center gap-1.5 text-xs`}>
-                                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusDots[task.status as Status] || statusDots.draft}`} />
+                              <Badge className={`${statusColors[task.status as Status] || statusColors.draft} inline-flex items-center gap-1.5 text-[10px] font-bold px-1.5 py-0.5`}>
+                                <span className={`w-1 h-1 rounded-full ${statusDots[task.status as Status] || statusDots.draft}`} />
                                 {statusLabels[task.status as Status] || task.status}
                               </Badge>
                             </div>
@@ -517,66 +552,72 @@ export function TasksPage() {
                         }
                         if (col.key === 'due') {
                           return (
-                            <div key={col.key} style={{ width: col.width }} className="text-sm text-slate-400 flex-shrink-0">
-                              {task.dueDate || '—'}
+                            <div key={col.key} style={{ width: col.width }} className="text-xs text-slate-500 flex-shrink-0">
+                              {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : '—'}
                             </div>
                           )
                         }
                         if (col.key === 'actions') {
                           return (
-                            <div key={col.key} style={{ width: col.width }} className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 sticky right-0 bg-white group-hover:bg-slate-50 z-10 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.04)]">
+                            <div key={col.key} style={{ width: col.width }} className="flex justify-end gap-1 flex-shrink-0 sticky right-0 bg-white pl-4 group-hover:bg-slate-50 z-10 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.04)]">
                               <Dialog open={editing === task.id} onOpenChange={(open) => {
-                                if (open) { setFormErrors({}); setEditing(task.id); setEditForm({ title: task.title || '', description: task.description || '', status: task.status || 'draft', dueDate: task.dueDate || '', contactId: task.contactId || '', dealId: task.dealId || '', customFields: task.customFields || {} }) }
-                                else { setEditing(null); setFormErrors({}) }
+                                if (open) {
+                                  setFormErrors({});
+                                  setEditing(task.id);
+                                  setEditForm({
+                                    title: task.title || '',
+                                    description: task.description || '',
+                                    status: task.status || 'draft',
+                                    dueDate: task.dueDate || '',
+                                    contactId: task.contactId || '',
+                                    dealId: task.dealId || '',
+                                    customFields: task.customFields || {}
+                                  });
+                                } else {
+                                  setEditing(null);
+                                  setFormErrors({});
+                                }
                               }}>
                                 <DialogTrigger asChild><Button variant="ghost" size="icon"><Pencil className="w-3.5 h-3.5" /></Button></DialogTrigger>
-                                <DialogContent>
-                                  <DialogHeader><DialogTitle>Edit Task</DialogTitle></DialogHeader>
-                                  <form onSubmit={(e) => { e.preventDefault(); updateTask.mutate({ id: task.id, data: editForm }) }} className="space-y-4">
-                                    <div className="space-y-2"><Label>Title</Label><Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required /></div>
-                                    <div className="space-y-2"><Label>Description</Label><Input value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} /></div>
-                                    <div className="space-y-2"><Label>Status</Label>
-                                      <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v as Status })}>
-                                        <SelectTrigger><SelectValue /></SelectTrigger>
-                                        <SelectContent>
-                                          {(Object.keys(statusLabels) as Status[]).map((s) => (
-                                            <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
-                                    <div className="space-y-2"><Label>Due Date</Label><Input type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} /></div>
-                                    
-                                    <div className="space-y-2">
-                                      <Label>Contact *</Label>
-                                      <Select value={editForm.contactId} onValueChange={(v) => setEditForm({ ...editForm, contactId: v })}>
-                                        <SelectTrigger className={!editForm.contactId ? 'border-red-200' : ''}>
-                                          <SelectValue placeholder="Select a contact" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {contacts?.map((c: any) => (
-                                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
+                                <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col p-0 overflow-hidden">
+                                  <DialogHeader className="px-6 py-4 border-b border-slate-100 flex-shrink-0"><DialogTitle>Edit Task</DialogTitle></DialogHeader>
+                                  <form onSubmit={handleEditSubmit} className="flex flex-col min-h-0">
+                                    <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                                      <div className="space-y-2"><Label>Title</Label><Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required /></div>
+                                      <div className="space-y-2"><Label>Description</Label><Input value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} /></div>
+                                      <div className="space-y-2"><Label>Due Date</Label><Input type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} /></div>
 
-                                    <div className="space-y-2">
-                                      <Label>Deal *</Label>
-                                      <Select value={editForm.dealId} onValueChange={(v) => setEditForm({ ...editForm, dealId: v })}>
-                                        <SelectTrigger className={!editForm.dealId ? 'border-red-200' : ''}>
-                                          <SelectValue placeholder="Select a deal" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {deals?.map((d: any) => (
-                                            <SelectItem key={d.id} value={d.id}>{d.title}</SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
+                                      <div className="space-y-2">
+                                        <Label>Contact *</Label>
+                                        <Select value={editForm.contactId} onValueChange={(v) => setEditForm({ ...editForm, contactId: v })} required>
+                                          <SelectTrigger className={!editForm.contactId ? 'border-red-200' : ''}>
+                                            <SelectValue placeholder="Select a contact" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {contacts?.map((c: any) => (
+                                              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
 
-                                    <DynamicCustomFieldsForm entityType="tasks" values={editForm.customFields || {}} onChange={(cf) => setEditForm({ ...editForm, customFields: cf })} errors={formErrors} />
-                                    <DialogFooter><Button type="submit" disabled={updateTask.isPending || !editForm.contactId || !editForm.dealId}>Save</Button></DialogFooter>
+                                      <div className="space-y-2">
+                                        <Label>Deal *</Label>
+                                        <Select value={editForm.dealId} onValueChange={(v) => setEditForm({ ...editForm, dealId: v })} required>
+                                          <SelectTrigger className={!editForm.dealId ? 'border-red-200' : ''}>
+                                            <SelectValue placeholder="Select a deal" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {deals?.map((d: any) => (
+                                              <SelectItem key={d.id} value={d.id}>{d.title}</SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+
+                                      <DynamicCustomFieldsForm entityType="tasks" values={editForm.customFields || {}} onChange={(cf) => { setEditForm({ ...editForm, customFields: cf }); setFormErrors({}) }} errors={formErrors} />
+                                    </div>
+                                    <DialogFooter className="px-6 py-4 border-t border-slate-100 flex-shrink-0"><Button type="submit" disabled={updateTask.isPending || !editForm.contactId || !editForm.dealId}>Save</Button></DialogFooter>
                                   </form>
                                 </DialogContent>
                               </Dialog>

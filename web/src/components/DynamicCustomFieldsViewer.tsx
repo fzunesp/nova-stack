@@ -12,6 +12,7 @@ export function DynamicCustomFieldsViewer({
   values = {},
   layout = 'grid'
 }: DynamicCustomFieldsViewerProps) {
+  console.log('DynamicCustomFieldsViewer: entityType=', entityType, 'values=', values);
   const { data: fields = [], isLoading } = useCustomFieldDefinitions(entityType)
 
   if (isLoading) return null

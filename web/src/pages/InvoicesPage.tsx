@@ -390,98 +390,100 @@ export function InvoicesPage() {
           </button>
           <Dialog open={creating} onOpenChange={setCreating}>
           <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-1.5" />Add Invoice</Button></DialogTrigger>
-          <DialogContent className="sm:max-w-2xl">
-            <DialogHeader><DialogTitle>Add New Invoice</DialogTitle></DialogHeader>
+          <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
+            <DialogHeader className="px-6 py-4 border-b border-slate-100 flex-shrink-0"><DialogTitle>Add New Invoice</DialogTitle></DialogHeader>
             <form onSubmit={(e) => {
               e.preventDefault()
               const errs = validateCustomFields(customFieldDefs, formData.customFields || {})
               if (Object.keys(errs).length > 0) { setFormErrors(errs); toast.error('Fill required custom fields'); return }
               createInvoice.mutate({ ...formData, lineItems: createLineItems })
-            }} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2 space-y-1"><Label>Title</Label><Input placeholder="Invoice title" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} required /></div>
-                
-                <div className="col-span-2 space-y-1">
-                  <Label>Deal / Project *</Label>
-                  <Select value={formData.dealId} onValueChange={(v) => setFormData({ ...formData, dealId: v })}>
-                    <SelectTrigger className={!formData.dealId ? 'border-red-200' : ''}>
-                      <SelectValue placeholder="— Select a deal —" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {deals.map((d: any) => (
-                        <SelectItem key={d.id} value={d.id}>
-                          {d.title} {d.expand?.contactId ? `— ${d.expand.contactId.name}` : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1"><Label>Due Date</Label><Input type="date" value={formData.dueDate} onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })} /></div>
-                <div className="space-y-1"><Label>Status</Label>
-                  <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v as Status })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {(Object.keys(statusLabels) as Status[]).map((s) => (
-                        <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Line Items */}
-              <div className="space-y-2 mt-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                  <Label className="text-sm font-semibold text-slate-700">Line Items</Label>
-                  <Button type="button" variant="outline" size="sm" onClick={addCreateLineItem} className="h-8 text-xs">
-                    <Plus className="w-3.5 h-3.5 mr-1" /> Add Item
-                  </Button>
-                </div>
-                
-                {createLineItems.length === 0 ? (
-                  <div className="text-center py-6 border border-dashed border-slate-200 rounded-lg text-slate-400 text-xs">
-                    No items added yet. Click 'Add Item' to start building this invoice.
+            }} className="flex flex-col min-h-0">
+              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2 space-y-1"><Label>Title</Label><Input placeholder="Invoice title" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} required /></div>
+                  
+                  <div className="col-span-2 space-y-1">
+                    <Label>Deal / Project *</Label>
+                    <Select value={formData.dealId} onValueChange={(v) => setFormData({ ...formData, dealId: v })}>
+                      <SelectTrigger className={!formData.dealId ? 'border-red-200' : ''}>
+                        <SelectValue placeholder="— Select a deal —" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {deals.map((d: any) => (
+                          <SelectItem key={d.id} value={d.id}>
+                            {d.title} {d.expand?.contactId ? `— ${d.expand.contactId.name}` : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                ) : (
-                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                    {createLineItems.map((item, index) => (
-                      <div key={index} className="grid grid-cols-12 gap-2 items-center">
-                        <div className="col-span-5">
-                          <Select value={item.productId} onValueChange={(v) => updateCreateLineItem(index, 'productId', v)}>
-                            <SelectTrigger className="h-9"><SelectValue placeholder="Select Product" /></SelectTrigger>
-                            <SelectContent>
-                              {products.map(p => (
-                                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="col-span-2">
-                          <Input type="number" min="1" placeholder="Qty" value={item.quantity} onChange={e => updateCreateLineItem(index, 'quantity', parseInt(e.target.value) || 0)} className="h-9" />
-                        </div>
-                        <div className="col-span-3">
-                          <Input type="number" step="0.01" min="0" placeholder="Price" value={item.price} onChange={e => updateCreateLineItem(index, 'price', parseFloat(e.target.value) || 0)} className="h-9" />
-                        </div>
-                        <div className="col-span-2 flex items-center justify-between gap-1 pl-1">
-                          <span className="text-xs font-mono font-semibold text-slate-600">${item.total.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
-                          <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500 hover:bg-red-50" onClick={() => removeCreateLineItem(index)}>
-                            <X className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+
+                  <div className="space-y-1"><Label>Due Date</Label><Input type="date" value={formData.dueDate} onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })} /></div>
+                  <div className="space-y-1"><Label>Status</Label>
+                    <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v as Status })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {(Object.keys(statusLabels) as Status[]).map((s) => (
+                          <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                )}
-              </div>
+                </div>
 
-              <div className="flex items-center justify-between border-t border-slate-100 pt-4 mt-2">
-                <span className="text-sm font-semibold text-slate-700">Total Invoice Amount:</span>
-                <span className="text-lg font-bold text-slate-900">${(parseFloat(formData.amount) || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-              </div>
+                {/* Line Items */}
+                <div className="space-y-2 mt-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <Label className="text-sm font-semibold text-slate-700">Line Items</Label>
+                    <Button type="button" variant="outline" size="sm" onClick={addCreateLineItem} className="h-8 text-xs">
+                      <Plus className="w-3.5 h-3.5 mr-1" /> Add Item
+                    </Button>
+                  </div>
+                  
+                  {createLineItems.length === 0 ? (
+                    <div className="text-center py-6 border border-dashed border-slate-200 rounded-lg text-slate-400 text-xs">
+                      No items added yet. Click 'Add Item' to start building this invoice.
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                      {createLineItems.map((item, index) => (
+                        <div key={index} className="grid grid-cols-12 gap-2 items-center">
+                          <div className="col-span-5">
+                            <Select value={item.productId} onValueChange={(v) => updateCreateLineItem(index, 'productId', v)}>
+                              <SelectTrigger className="h-9"><SelectValue placeholder="Select Product" /></SelectTrigger>
+                              <SelectContent>
+                                {products.map(p => (
+                                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="col-span-2">
+                            <Input type="number" min="1" placeholder="Qty" value={item.quantity} onChange={e => updateCreateLineItem(index, 'quantity', parseInt(e.target.value) || 0)} className="h-9" />
+                          </div>
+                          <div className="col-span-3">
+                            <Input type="number" step="0.01" min="0" placeholder="Price" value={item.price} onChange={e => updateCreateLineItem(index, 'price', parseFloat(e.target.value) || 0)} className="h-9" />
+                          </div>
+                          <div className="col-span-2 flex items-center justify-between gap-1 pl-1">
+                            <span className="text-xs font-mono font-semibold text-slate-600">${item.total.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+                            <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500 hover:bg-red-50" onClick={() => removeCreateLineItem(index)}>
+                              <X className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
-              <DynamicCustomFieldsForm entityType="invoices" values={formData.customFields || {}} onChange={(cf) => setFormData({ ...formData, customFields: cf })} errors={formErrors} />
-              <DialogFooter className="pt-2"><Button type="submit" disabled={createInvoice.isPending || !formData.dealId} className="bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white">{createInvoice.isPending ? 'Adding...' : 'Add Invoice'}</Button></DialogFooter>
+                <div className="flex items-center justify-between border-t border-slate-100 pt-4 mt-2">
+                  <span className="text-sm font-semibold text-slate-700">Total Invoice Amount:</span>
+                  <span className="text-lg font-bold text-slate-900">${(parseFloat(formData.amount) || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                </div>
+
+                <DynamicCustomFieldsForm entityType="invoices" values={formData.customFields || {}} onChange={(cf) => setFormData({ ...formData, customFields: cf })} errors={formErrors} />
+              </div>
+              <DialogFooter className="px-6 py-4 border-t border-slate-100 flex-shrink-0 pt-2"><Button type="submit" disabled={createInvoice.isPending || !formData.dealId} className="bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white">{createInvoice.isPending ? 'Adding...' : 'Add Invoice'}</Button></DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
@@ -514,7 +516,7 @@ export function InvoicesPage() {
             <div className="min-w-full divide-y divide-slate-100">
               <div className="flex items-center px-4 py-3 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wide">
                 {visibleColumns.map(col => {
-                  const stickyClass = col.stickyRight ? 'sticky right-0 bg-white z-10 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.04)]' : ''
+                  const stickyClass = col.stickyRight ? 'sticky right-0 bg-white pl-4 z-10 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.04)]' : ''
                   if (col.sortField) {
                     return (
                       <button 
@@ -619,7 +621,7 @@ export function InvoicesPage() {
                         }
                         if (col.key === 'actions') {
                           return (
-                            <div key={col.key} style={{ width: col.width }} className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 sticky right-0 bg-white group-hover:bg-slate-50 z-10 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.04)]">
+                            <div key={col.key} style={{ width: col.width }} className="flex justify-end gap-1 flex-shrink-0 sticky right-0 bg-white pl-4 group-hover:bg-slate-50 z-10 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.04)]">
                               <Dialog open={editing === invoice.id} onOpenChange={(open) => {
                                 if (open) { 
                                   setFormErrors({})
@@ -632,93 +634,100 @@ export function InvoicesPage() {
                                 }
                               }}>
                                 <DialogTrigger asChild><Button variant="ghost" size="icon"><Pencil className="w-3.5 h-3.5" /></Button></DialogTrigger>
-                                <DialogContent className="sm:max-w-2xl">
-                                  <DialogHeader><DialogTitle>Edit Invoice</DialogTitle></DialogHeader>
-                                  <form onSubmit={(e) => { e.preventDefault(); updateInvoice.mutate({ id: invoice.id, data: editForm, lineItems: editLineItems }) }} className="space-y-4">
-                                    <div className="grid grid-cols-2 gap-4">
-                                      <div className="col-span-2 space-y-1"><Label>Title</Label><Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required /></div>
-                                      
-                                      <div className="col-span-2 space-y-1">
-                                        <Label>Deal / Project *</Label>
-                                        <Select value={editForm.dealId} onValueChange={(v) => setEditForm({ ...editForm, dealId: v })}>
-                                          <SelectTrigger className={!editForm.dealId ? 'border-red-200' : ''}>
-                                            <SelectValue placeholder="— Select a deal —" />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            {deals.map((d: any) => (
-                                              <SelectItem key={d.id} value={d.id}>
-                                                {d.title} {d.expand?.contactId ? `— ${d.expand.contactId.name}` : ''}
-                                              </SelectItem>
-                                            ))}
-                                          </SelectContent>
-                                        </Select>
-                                      </div>
-
-                                      <div className="space-y-1"><Label>Due Date</Label><Input type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} /></div>
-                                      <div className="space-y-1"><Label>Status</Label>
-                                        <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v as Status })}>
-                                          <SelectTrigger><SelectValue /></SelectTrigger>
-                                          <SelectContent>
-                                            {(Object.keys(statusLabels) as Status[]).map((s) => (
-                                              <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>
-                                            ))}
-                                          </SelectContent>
-                                        </Select>
-                                      </div>
-                                    </div>
-
-                                    {/* Line Items */}
-                                    <div className="space-y-2 mt-4">
-                                      <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                                        <Label className="text-sm font-semibold text-slate-700">Line Items</Label>
-                                        <Button type="button" variant="outline" size="sm" onClick={addEditLineItem} className="h-8 text-xs">
-                                          <Plus className="w-3.5 h-3.5 mr-1" /> Add Item
-                                        </Button>
-                                      </div>
-                                      
-                                      {editLineItems.length === 0 ? (
-                                        <div className="text-center py-6 border border-dashed border-slate-200 rounded-lg text-slate-400 text-xs">
-                                          No items added yet. Click 'Add Item' to start building this invoice.
+                                <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
+                                  <DialogHeader className="px-6 py-4 border-b border-slate-100 flex-shrink-0"><DialogTitle>Edit Invoice</DialogTitle></DialogHeader>
+                                  <form onSubmit={(e) => {
+                                    e.preventDefault()
+                                    const errs = validateCustomFields(customFieldDefs, editForm.customFields || {})
+                                    if (Object.keys(errs).length > 0) { setFormErrors(errs); toast.error('Fill required custom fields'); return }
+                                    updateInvoice.mutate({ id: invoice.id, data: editForm, lineItems: editLineItems })
+                                  }} className="flex flex-col flex-1 min-h-0">
+                                    <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                                      <div className="grid grid-cols-2 gap-4">
+                                        <div className="col-span-2 space-y-1"><Label>Title</Label><Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required /></div>
+                                        
+                                        <div className="col-span-2 space-y-1">
+                                          <Label>Deal / Project *</Label>
+                                          <Select value={editForm.dealId} onValueChange={(v) => setEditForm({ ...editForm, dealId: v })}>
+                                            <SelectTrigger className={!editForm.dealId ? 'border-red-200' : ''}>
+                                              <SelectValue placeholder="— Select a deal —" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              {deals.map((d: any) => (
+                                                <SelectItem key={d.id} value={d.id}>
+                                                  {d.title} {d.expand?.contactId ? `— ${d.expand.contactId.name}` : ''}
+                                                </SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
                                         </div>
-                                      ) : (
-                                        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                                          {editLineItems.map((item, index) => (
-                                            <div key={index} className="grid grid-cols-12 gap-2 items-center">
-                                              <div className="col-span-5">
-                                                <Select value={item.productId} onValueChange={(v) => updateEditLineItem(index, 'productId', v)}>
-                                                  <SelectTrigger className="h-9"><SelectValue placeholder="Select Product" /></SelectTrigger>
-                                                  <SelectContent>
-                                                    {products.map(p => (
-                                                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                                                    ))}
-                                                  </SelectContent>
-                                                </Select>
-                                              </div>
-                                              <div className="col-span-2">
-                                                <Input type="number" min="1" placeholder="Qty" value={item.quantity} onChange={e => updateEditLineItem(index, 'quantity', parseInt(e.target.value) || 0)} className="h-9" />
-                                              </div>
-                                              <div className="col-span-3">
-                                                <Input type="number" step="0.01" min="0" placeholder="Price" value={item.price} onChange={e => updateEditLineItem(index, 'price', parseFloat(e.target.value) || 0)} className="h-9" />
-                                              </div>
-                                              <div className="col-span-2 flex items-center justify-between gap-1 pl-1">
-                                                <span className="text-xs font-mono font-semibold text-slate-600">${item.total.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
-                                                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500 hover:bg-red-50" onClick={() => removeEditLineItem(index)}>
-                                                  <X className="w-3.5 h-3.5" />
-                                                </Button>
-                                              </div>
-                                            </div>
-                                          ))}
+
+                                        <div className="space-y-1"><Label>Due Date</Label><Input type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} /></div>
+                                        <div className="space-y-1"><Label>Status</Label>
+                                          <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v as Status })}>
+                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                              {(Object.keys(statusLabels) as Status[]).map((s) => (
+                                                <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
                                         </div>
-                                      )}
-                                    </div>
+                                      </div>
 
-                                    <div className="flex items-center justify-between border-t border-slate-100 pt-4 mt-2">
-                                      <span className="text-sm font-semibold text-slate-700">Total Invoice Amount:</span>
-                                      <span className="text-lg font-bold text-slate-900">${(parseFloat(editForm.amount) || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                                    </div>
+                                      {/* Line Items */}
+                                      <div className="space-y-2 mt-4">
+                                        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                                          <Label className="text-sm font-semibold text-slate-700">Line Items</Label>
+                                          <Button type="button" variant="outline" size="sm" onClick={addEditLineItem} className="h-8 text-xs">
+                                            <Plus className="w-3.5 h-3.5 mr-1" /> Add Item
+                                          </Button>
+                                        </div>
+                                        
+                                        {editLineItems.length === 0 ? (
+                                          <div className="text-center py-6 border border-dashed border-slate-200 rounded-lg text-slate-400 text-xs">
+                                            No items added yet. Click 'Add Item' to start building this invoice.
+                                          </div>
+                                        ) : (
+                                          <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                                            {editLineItems.map((item, index) => (
+                                              <div key={index} className="grid grid-cols-12 gap-2 items-center">
+                                                <div className="col-span-5">
+                                                  <Select value={item.productId} onValueChange={(v) => updateEditLineItem(index, 'productId', v)}>
+                                                    <SelectTrigger className="h-9"><SelectValue placeholder="Select Product" /></SelectTrigger>
+                                                    <SelectContent>
+                                                      {products.map(p => (
+                                                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                                                      ))}
+                                                    </SelectContent>
+                                                  </Select>
+                                                </div>
+                                                <div className="col-span-2">
+                                                  <Input type="number" min="1" placeholder="Qty" value={item.quantity} onChange={e => updateEditLineItem(index, 'quantity', parseInt(e.target.value) || 0)} className="h-9" />
+                                                </div>
+                                                <div className="col-span-3">
+                                                  <Input type="number" step="0.01" min="0" placeholder="Price" value={item.price} onChange={e => updateEditLineItem(index, 'price', parseFloat(e.target.value) || 0)} className="h-9" />
+                                                </div>
+                                                <div className="col-span-2 flex items-center justify-between gap-1 pl-1">
+                                                  <span className="text-xs font-mono font-semibold text-slate-600">${item.total.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+                                                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500 hover:bg-red-50" onClick={() => removeEditLineItem(index)}>
+                                                    <X className="w-3.5 h-3.5" />
+                                                  </Button>
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
 
-                                    <DynamicCustomFieldsForm entityType="invoices" values={editForm.customFields || {}} onChange={(cf) => setEditForm({ ...editForm, customFields: cf })} errors={formErrors} />
-                                    <DialogFooter className="pt-2"><Button type="submit" disabled={updateInvoice.isPending || !editForm.dealId} className="bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white">Save</Button></DialogFooter>
+                                      <div className="flex items-center justify-between border-t border-slate-100 pt-4 mt-2">
+                                        <span className="text-sm font-semibold text-slate-700">Total Invoice Amount:</span>
+                                        <span className="text-lg font-bold text-slate-900">${(parseFloat(editForm.amount) || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                      </div>
+
+                                      <DynamicCustomFieldsForm entityType="invoices" values={editForm.customFields || {}} onChange={(cf) => setEditForm({ ...editForm, customFields: cf })} errors={formErrors} />
+                                    </div>
+                                    <DialogFooter className="px-6 py-4 border-t border-slate-100 flex-shrink-0 bg-slate-50/50"><Button type="submit" disabled={updateInvoice.isPending || !editForm.dealId} className="bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white">Save</Button></DialogFooter>
                                   </form>
                                 </DialogContent>
                               </Dialog>

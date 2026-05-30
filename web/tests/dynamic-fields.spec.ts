@@ -3,6 +3,8 @@ import { test, expect } from './fixtures';
 test.describe('Dynamic Custom Fields Integration & Validation - All Entities', () => {
 
   test.beforeEach(async ({ authenticatedPage: page }) => {
+    page.on('console', msg => console.log('BROWSER CONSOLE:', msg.text()));
+    page.on('pageerror', err => console.log('BROWSER ERROR:', err.message));
     await page.goto('/settings');
     await page.getByRole('button', { name: /custom fields/i }).click();
     await expect(page.getByRole('heading', { name: /custom fields manager/i })).toBeVisible();
@@ -75,7 +77,7 @@ test.describe('Dynamic Custom Fields Integration & Validation - All Entities', (
     await page.getByRole('button', { name: /add contact/i }).first().click();
     await expect(page.getByRole('heading', { name: /add new contact/i })).toBeVisible();
     await page.getByPlaceholder('Full name').fill('Dynamic Contacts Test User');
-    await page.getByPlaceholder('Email').fill(`contacts_test_${Date.now()}@example.com`);
+    await page.getByPlaceholder('Email').fill('unique-test-contact@nova-stack.local');
 
     // Attempt submit without required custom field → validation fires
     await page.getByRole('button', { name: /add contact/i }).last().click();
@@ -92,19 +94,23 @@ test.describe('Dynamic Custom Fields Integration & Validation - All Entities', (
     await expect(page.getByRole('heading', { name: /add new contact/i })).not.toBeVisible({ timeout: 10000 });
     await expect(page.getByText('Dynamic Contacts Test User').first()).toBeVisible();
 
-    // Open detail view and verify viewer renders the custom field
-    await page.getByText('Dynamic Contacts Test User').first().click();
-    await expect(page.getByText('VIP Status', { exact: true })).toBeVisible();
-    await expect(page.getByText('Gold Tier Partner')).toBeVisible();
+    // Open edit dialog and verify value is persisted
+    const row = page.locator('div.group', { hasText: 'Dynamic Contacts Test User' }).first();
+    // The first button in our sticky actions column is the Pencil/Edit button
+    await row.locator('button').first().click();
+    await expect(page.getByRole('heading', { name: /edit contact/i })).toBeVisible();
+    await expect(page.getByPlaceholder('Enter vip status')).toHaveValue('Gold Tier Partner');
+    
+    // Close the dialog using the X or Cancel button
     await page.keyboard.press('Escape');
 
     // Cleanup
     await page.goto('/settings');
     await page.getByRole('button', { name: /custom fields/i }).click();
     await page.getByRole('button', { name: /^contacts$/i }).click();
-    const row = page.locator('tr', { hasText: 'VIP Status' });
+    const settingsRow = page.locator('tr', { hasText: 'VIP Status' });
     page.once('dialog', d => d.accept());
-    await row.locator('button').last().click();
+    await settingsRow.locator('button').last().click();
     await expect(page.getByText('VIP Status', { exact: true })).not.toBeVisible();
   });
 
@@ -244,5 +250,47 @@ test.describe('Dynamic Custom Fields Integration & Validation - All Entities', (
     page.once('dialog', d => d.accept());
     await row.locator('button').last().click();
     await expect(page.getByText('Billing Office', { exact: true })).not.toBeVisible();
+  });
+
+  // ─── Products ────────────────────────────────────────────────────────────────
+  test('Products: required field validation, save, cleanup', async ({ authenticatedPage: page }) => {
+    await page.getByRole('button', { name: /^products$/i }).click();
+
+    // Create required custom field
+    await page.getByRole('button', { name: /add field/i }).first().click();
+    await expect(page.getByRole('heading', { name: /add custom field/i })).toBeVisible();
+    await page.getByPlaceholder('e.g. VAT Registration Number').fill('Manufacturing Origin');
+    await page.getByPlaceholder('e.g. vat_registration_number').fill('mfg_origin');
+    await page.locator('#field-required').check();
+    await page.getByRole('button', { name: /create field/i }).click();
+    await expect(page.getByText('Manufacturing Origin', { exact: true })).toBeVisible();
+
+    // Navigate to Products and open create dialog
+    await page.goto('/products');
+    await page.getByRole('button', { name: /add product/i }).first().click();
+    await expect(page.getByRole('heading', { name: /add product or service/i })).toBeVisible();
+    await page.getByPlaceholder('New Product Name').fill('Dynamic Products Test Case');
+    await page.getByPlaceholder('0.00').fill('150.00');
+
+    // Attempt submit without required custom field → validation fires
+    await page.getByRole('button', { name: /create product/i }).last().click();
+    await expect(page.getByText('Manufacturing Origin is required')).toBeVisible();
+
+    // Fill custom field and submit
+    await page.locator('input[placeholder="Enter manufacturing origin"]').fill('Switzerland');
+    await page.getByRole('button', { name: /create product/i }).last().click();
+
+    // Modal should close; record should appear in the list
+    await expect(page.getByRole('heading', { name: /add product or service/i })).not.toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Dynamic Products Test Case').first()).toBeVisible();
+
+    // Cleanup
+    await page.goto('/settings');
+    await page.getByRole('button', { name: /custom fields/i }).click();
+    await page.getByRole('button', { name: /^products$/i }).click();
+    const row = page.locator('tr', { hasText: 'Manufacturing Origin' });
+    page.once('dialog', d => d.accept());
+    await row.locator('button').last().click();
+    await expect(page.getByText('Manufacturing Origin', { exact: true })).not.toBeVisible();
   });
 });

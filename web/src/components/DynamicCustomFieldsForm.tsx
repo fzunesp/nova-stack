@@ -1,5 +1,6 @@
 import { useCustomFieldDefinitions } from '@/hooks/useCustomFields'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 
@@ -45,8 +46,6 @@ export function DynamicCustomFieldsForm({
     })
   }
 
-  const inputClass = 'w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ns-accent))] focus:border-transparent bg-white placeholder-slate-400'
-
   return (
     <div className="border-t border-slate-100 pt-6 mt-6">
       <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-4">
@@ -67,36 +66,36 @@ export function DynamicCustomFieldsForm({
               )}
 
               {field.type === 'text' && (
-                <input
+                <Input
                   type="text"
                   value={val}
                   onChange={(e) => handleFieldChange(field.key, e.target.value)}
                   placeholder={`Enter ${field.name.toLowerCase()}`}
-                  className={`${inputClass} ${hasError ? 'border-red-300 focus:ring-red-500' : ''}`}
+                  className={hasError ? 'border-red-300 focus:ring-red-500 bg-red-50/50' : ''}
                 />
               )}
 
               {field.type === 'number' && (
-                <input
+                <Input
                   type="number"
                   value={val}
                   onChange={(e) => handleFieldChange(field.key, e.target.value === '' ? '' : Number(e.target.value))}
                   placeholder={`Enter ${field.name.toLowerCase()}`}
-                  className={`${inputClass} ${hasError ? 'border-red-300 focus:ring-red-500' : ''}`}
+                  className={hasError ? 'border-red-300 focus:ring-red-500 bg-red-50/50' : ''}
                 />
               )}
 
               {field.type === 'date' && (
-                <input
+                <Input
                   type="date"
                   value={val}
                   onChange={(e) => handleFieldChange(field.key, e.target.value)}
-                  className={`${inputClass} ${hasError ? 'border-red-300 focus:ring-red-500' : ''}`}
+                  className={hasError ? 'border-red-300 focus:ring-red-500 bg-red-50/50' : ''}
                 />
               )}
 
               {field.type === 'checkbox' && (
-                <div className="flex items-center gap-2 py-2.5">
+                <div className={`flex items-center gap-2 py-2.5 px-2 rounded-md ${hasError ? 'bg-red-50 border border-red-200' : ''}`}>
                   <Checkbox
                     id={`custom-${field.key}`}
                     checked={!!val}
@@ -114,7 +113,7 @@ export function DynamicCustomFieldsForm({
                   value={val || undefined}
                   onValueChange={(value) => handleFieldChange(field.key, value)}
                 >
-                  <SelectTrigger className={`w-full ${hasError ? 'border-red-300 focus:ring-red-500' : ''}`}>
+                  <SelectTrigger className={`w-full ${hasError ? 'border-red-300 focus:ring-red-500 bg-red-50/50' : ''}`}>
                     <SelectValue placeholder={`Select ${field.name.toLowerCase()}`} />
                   </SelectTrigger>
                   <SelectContent>
@@ -128,7 +127,7 @@ export function DynamicCustomFieldsForm({
               )}
 
               {hasError && (
-                <span className="text-[10px] font-semibold text-red-500">
+                <span className="text-[10px] font-bold text-red-500 mt-0.5 animate-in fade-in slide-in-from-top-1">
                   {errors[field.key]}
                 </span>
               )}

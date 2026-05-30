@@ -42,7 +42,7 @@ export function ScratchpadWidget() {
             <button
               onClick={clear}
               className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded hover:bg-black/10 transition-colors"
-              style={{ color: `${selectedColor.border}bb` }}
+              style={{ color: '#374151' }}
               title="Clear note"
             >
               <Eraser className="w-3 h-3" />
@@ -52,7 +52,7 @@ export function ScratchpadWidget() {
               <button
                 onClick={() => setShowColors(!showColors)}
                 className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded hover:bg-black/10 transition-colors"
-                style={{ color: `${selectedColor.border}bb` }}
+                style={{ color: '#374151' }}
                 title="Change color"
               >
                 <Palette className="w-3 h-3" />
@@ -104,10 +104,10 @@ export function ScratchpadWidget() {
 
         {/* Footer */}
         <div className="relative px-4 py-1.5 flex items-center justify-between" style={{ borderTop: `1px solid ${selectedColor.border}60` }}>
-          <span className="text-[10px]" style={{ color: `${selectedColor.border}88` }}>
+          <span className="text-[10px]" style={{ color: '#374151' }}>
             {content.length} characters
           </span>
-          <span className="text-[10px]" style={{ color: `${selectedColor.border}66` }}>
+          <span className="text-[10px]" style={{ color: '#6b7280' }}>
             Auto-saves
           </span>
         </div>

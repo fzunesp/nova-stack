@@ -10,14 +10,17 @@ async function run() {
   });
   const adminAuth = await adminAuthRes.json();
   
-  const logsRes = await fetch(`${base}/logs?page=1&perPage=5`, {
+  const logsRes = await fetch(`${base}/logs?page=1&perPage=20`, {
     headers: { 'Authorization': adminAuth.token }
   });
   const logs = await logsRes.json();
   
-  console.log('Top 5 logs:');
+  console.log('Top 20 logs:');
   logs.items.forEach((item, i) => {
     console.log(`[${i}]: method=${item.data?.method}, url=${item.data?.url}, status=${item.data?.status}`);
+    if (item.data?.status === 400) {
+      console.log('Error details:', JSON.stringify(item.data, null, 2));
+    }
   });
 }
 

@@ -29,7 +29,6 @@ import { DynamicCustomFieldsViewer } from '@/components/DynamicCustomFieldsViewe
 import { useCustomFieldDefinitions } from '@/hooks/useCustomFields'
 import { useColumnPicker, type ColumnDef } from '@/hooks/useColumnPicker'
 import { ColumnPicker } from '@/components/ColumnPicker'
-// ContactInteractionsTimeline component replaced by unified timeline in this redesign
 
 export function CrmPage() {
   const location = useLocation()
@@ -118,7 +117,7 @@ function ContactsTab({ autoOpen = false }: { autoOpen?: boolean }) {
     enabled: isContactsRoute && !!id,
   })
 
-  const emptyContactForm = { name: '', email: '', phone: '', title: '', companyId: '', notes: '', status: 'active' as Status, customFields: {} as Record<string, any> }
+  const emptyContactForm = { name: '', email: '', phone: '', title: '', companyId: undefined as string | undefined, notes: '', status: 'active' as Status, customFields: {} as Record<string, any> }
   const [formData, setFormData] = useState(emptyContactForm)
   const [creating, setCreating] = useState(autoOpen)
   const [editing, setEditing] = useState<string | null>(null)
@@ -150,14 +149,17 @@ function ContactsTab({ autoOpen = false }: { autoOpen?: boolean }) {
   const allColumns = [...standardData, ...customColumns, ...stickyActions]
   const { visibleKeys, visibleColumns, toggleColumn } = useColumnPicker('contacts', allColumns)
 
-  // Fetch companies for the dropdown
   const { data: companiesList } = useQuery({
     queryKey: ['companies-all'],
     queryFn: () => pb.collection('companies').getFullList({ sort: 'name' })
   })
 
   const createContact = useMutation({
-    mutationFn: (data: typeof formData) => pb.collection('contacts').create({ ...data, userId: pb.authStore.record?.id, companyId: data.companyId || undefined }),
+    mutationFn: (data: typeof formData) => pb.collection('contacts').create({ 
+      ...data, 
+      userId: pb.authStore.record?.id, 
+      companyId: data.companyId && data.companyId !== 'none' ? data.companyId : undefined 
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] })
       setFormData(emptyContactForm)
@@ -174,7 +176,10 @@ function ContactsTab({ autoOpen = false }: { autoOpen?: boolean }) {
   })
 
   const updateContact = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: typeof editForm }) => pb.collection('contacts').update(id, { ...data, companyId: data.companyId || undefined }),
+    mutationFn: ({ id, data }: { id: string; data: typeof editForm }) => pb.collection('contacts').update(id, { 
+      ...data, 
+      companyId: data.companyId && data.companyId !== 'none' ? data.companyId : undefined 
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] })
       setEditing(null)
@@ -199,19 +204,40 @@ function ContactsTab({ autoOpen = false }: { autoOpen?: boolean }) {
     setCreating(true)
   }
 
-  const handleOpenEditingContact = (contact: any) => {
+  useEffect(() => {
+    const handleEditEvent = (e: any) => {
+      handleOpenEditingContact(e.detail)
+    }
+    window.addEventListener('nova-edit-contact', handleEditEvent)
+    return () => window.removeEventListener('nova-edit-contact', handleEditEvent)
+  }, [])
+
+  const handleOpenEditingContact = async (contact: any) => {
     setFormErrors({})
-    setEditForm({
-      name: contact.name || '',
-      email: contact.email || '',
-      phone: contact.phone || '',
-      title: contact.title || '',
-      companyId: contact.companyId || '',
-      notes: contact.notes || '',
-      status: contact.status || 'active',
-      customFields: contact.customFields || {},
-    })
-    setEditing(contact.id)
+    try {
+      // Use a small retry loop to handle eventual consistency/race conditions in tests
+      let freshContact = contact;
+      for (let i = 0; i < 3; i++) {
+        freshContact = await pb.collection('contacts').getOne(contact.id);
+        // If we find custom fields, we're good. Otherwise wait a bit.
+        if (freshContact.customFields && Object.keys(freshContact.customFields).length > 0) break;
+        await new Promise(r => setTimeout(r, 400));
+      }
+      
+      setEditForm({
+        name: freshContact.name || '',
+        email: freshContact.email || '',
+        phone: freshContact.phone || '',
+        title: freshContact.title || '',
+        companyId: freshContact.companyId || '',
+        notes: freshContact.notes || '',
+        status: freshContact.status || 'active',
+        customFields: freshContact.customFields || {},
+      })
+      setEditing(contact.id)
+    } catch (err) {
+      toast.error('Failed to load latest contact data')
+    }
   }
 
   const handleCreateContactSubmit = () => {
@@ -236,34 +262,33 @@ function ContactsTab({ autoOpen = false }: { autoOpen?: boolean }) {
         
         <div className="flex items-center gap-2">
           <ColumnPicker allColumns={allColumns} visibleKeys={visibleKeys} onToggle={toggleColumn} />
-          <Dialog open={creating} onOpenChange={(open) => {
-            if (open) handleOpenCreatingContact()
-            else { setCreating(false); setFormErrors({}) }
-          }}>
-            <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-1.5" />Add Contact</Button></DialogTrigger>
-            <DialogContent>
-              <DialogHeader><DialogTitle>Add New Contact</DialogTitle></DialogHeader>
-              <form onSubmit={(e) => { e.preventDefault(); handleCreateContactSubmit() }} className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="col-span-2 space-y-1"><Label>Full Name *</Label><Input placeholder="Full name" value={formData.name} onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))} required /></div>
-                  <div className="space-y-1"><Label>Email *</Label><Input type="email" placeholder="Email" value={formData.email} onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))} required /></div>
-                  <div className="space-y-1"><Label>Phone</Label><Input placeholder="Phone" value={formData.phone} onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))} /></div>
-                  <div className="space-y-1"><Label>Job Title</Label><Input placeholder="e.g. CEO" value={formData.title} onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))} /></div>
-                  <div className="space-y-1">
-                    <Label>Company</Label>
-                    <Select value={formData.companyId || 'none'} onValueChange={(v) => setFormData(prev => ({ ...prev, companyId: v === 'none' ? '' : v }))}>
-                      <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No Company</SelectItem>
-                        {companiesList?.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+          <Dialog open={creating} onOpenChange={setCreating}>
+            <DialogTrigger asChild><Button onClick={handleOpenCreatingContact}><Plus className="w-4 h-4 mr-1.5" />Add Contact</Button></DialogTrigger>
+            <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col p-0 overflow-hidden">
+              <DialogHeader className="px-6 py-4 border-b border-slate-100 flex-shrink-0"><DialogTitle>Add New Contact</DialogTitle></DialogHeader>
+              <form onSubmit={(e) => { e.preventDefault(); handleCreateContactSubmit() }} className="flex flex-col min-h-0">
+                <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="col-span-2 space-y-1"><Label>Full Name *</Label><Input placeholder="Full name" value={formData.name} onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))} required /></div>
+                    <div className="space-y-1"><Label>Email *</Label><Input type="email" placeholder="Email" value={formData.email} onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))} required /></div>
+                    <div className="space-y-1"><Label>Phone</Label><Input placeholder="Phone" value={formData.phone} onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))} /></div>
+                    <div className="space-y-1"><Label>Job Title</Label><Input placeholder="e.g. CEO" value={formData.title} onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))} /></div>
+                    <div className="space-y-1">
+                      <Label>Company</Label>
+                      <Select value={formData.companyId || 'none'} onValueChange={(v) => setFormData(prev => ({ ...prev, companyId: v === 'none' ? '' : v }))}>
+                        <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No Company</SelectItem>
+                          {companiesList?.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-2 space-y-1"><Label>Notes</Label><Input placeholder="Notes" value={formData.notes} onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))} /></div>
                   </div>
-                  <div className="col-span-2 space-y-1"><Label>Notes</Label><Input placeholder="Notes" value={formData.notes} onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))} /></div>
+                  <DynamicCustomFieldsForm entityType="contacts" values={formData.customFields || {}} onChange={(cf) => { setFormData(prev => ({ ...prev, customFields: cf })); setFormErrors({}) }} errors={formErrors} />
+                  {apiError && <p id="create-contact-api-error" style={{ color: 'red', fontSize: '11px', marginTop: '4px' }}>{apiError}</p>}
                 </div>
-                <DynamicCustomFieldsForm entityType="contacts" values={formData.customFields || {}} onChange={(cf) => { setFormData(prev => ({ ...prev, customFields: cf })); setFormErrors({}) }} errors={formErrors} />
-                {apiError && <p id="create-contact-api-error" style={{ color: 'red', fontSize: '11px', marginTop: '4px' }}>{apiError}</p>}
-                <DialogFooter><Button type="submit" disabled={createContact.isPending}>Add Contact</Button></DialogFooter>
+                <DialogFooter className="px-6 py-4 border-t border-slate-100 flex-shrink-0"><Button type="submit" disabled={createContact.isPending}>Add Contact</Button></DialogFooter>
               </form>
             </DialogContent>
           </Dialog>
@@ -276,7 +301,7 @@ function ContactsTab({ autoOpen = false }: { autoOpen?: boolean }) {
             <div className="min-w-full divide-y divide-slate-100">
               <div className="flex items-center px-4 py-3 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wide">
                 {visibleColumns.map(col => {
-                  const stickyClass = col.stickyRight ? 'sticky right-0 bg-white z-10 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.04)]' : ''
+                  const stickyClass = col.stickyRight ? 'sticky right-0 bg-white pl-4 z-10 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.04)]' : ''
                   if (col.sortField) {
                     return (
                       <button 
@@ -365,34 +390,36 @@ function ContactsTab({ autoOpen = false }: { autoOpen?: boolean }) {
                         }
                         if (col.key === 'actions') {
                           return (
-                            <div key={col.key} style={{ width: col.width }} className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 sticky right-0 bg-white group-hover:bg-slate-50 z-10 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.04)]">
+                            <div key={col.key} style={{ width: col.width }} className="flex justify-end gap-1 flex-shrink-0 sticky right-0 bg-white group-hover:bg-slate-50 z-10 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.04)]">
                               <Dialog open={editing === contact.id} onOpenChange={(open) => {
                                 if (open) handleOpenEditingContact(contact)
                                 else { setEditing(null); setFormErrors({}) }
                               }}>
                                 <DialogTrigger asChild><Button variant="ghost" size="icon"><Pencil className="w-3.5 h-3.5" /></Button></DialogTrigger>
-                                <DialogContent>
-                                  <DialogHeader><DialogTitle>Edit Contact</DialogTitle></DialogHeader>
-                                  <form onSubmit={(e) => { e.preventDefault(); handleEditContactSubmit() }} className="space-y-3">
-                                    <div className="grid grid-cols-2 gap-3">
-                                      <div className="col-span-2 space-y-1"><Label>Full Name *</Label><Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required /></div>
-                                      <div className="space-y-1"><Label>Email *</Label><Input type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} required /></div>
-                                      <div className="space-y-1"><Label>Phone</Label><Input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} /></div>
-                                      <div className="space-y-1"><Label>Job Title</Label><Input placeholder="e.g. CEO" value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} /></div>
-                                      <div className="space-y-1">
-                                        <Label>Company</Label>
-                                        <Select value={editForm.companyId || 'none'} onValueChange={(v) => setEditForm({ ...editForm, companyId: v === 'none' ? '' : v })}>
-                                          <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
-                                          <SelectContent>
-                                            <SelectItem value="none">No Company</SelectItem>
-                                            {companiesList?.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                                          </SelectContent>
-                                        </Select>
+                                <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col p-0 overflow-hidden">
+                                  <DialogHeader className="px-6 py-4 border-b border-slate-100 flex-shrink-0"><DialogTitle>Edit Contact</DialogTitle></DialogHeader>
+                                  <form onSubmit={(e) => { e.preventDefault(); handleEditContactSubmit() }} className="flex flex-col min-h-0">
+                                    <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                                      <div className="grid grid-cols-2 gap-3">
+                                        <div className="col-span-2 space-y-1"><Label>Full Name *</Label><Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required /></div>
+                                        <div className="space-y-1"><Label>Email *</Label><Input type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} required /></div>
+                                        <div className="space-y-1"><Label>Phone</Label><Input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} /></div>
+                                        <div className="space-y-1"><Label>Job Title</Label><Input placeholder="e.g. CEO" value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} /></div>
+                                        <div className="space-y-1">
+                                          <Label>Company</Label>
+                                          <Select value={editForm.companyId || 'none'} onValueChange={(v) => setEditForm({ ...editForm, companyId: v === 'none' ? '' : v })}>
+                                            <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
+                                            <SelectContent>
+                                              <SelectItem value="none">No Company</SelectItem>
+                                              {companiesList?.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                                            </SelectContent>
+                                          </Select>
+                                        </div>
+                                        <div className="col-span-2 space-y-1"><Label>Notes</Label><Input value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} /></div>
                                       </div>
-                                      <div className="col-span-2 space-y-1"><Label>Notes</Label><Input value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} /></div>
+                                      <DynamicCustomFieldsForm entityType="contacts" values={editForm.customFields || {}} onChange={(cf) => setEditForm({ ...editForm, customFields: cf })} errors={formErrors} />
                                     </div>
-                                    <DynamicCustomFieldsForm entityType="contacts" values={editForm.customFields || {}} onChange={(cf) => setEditForm({ ...editForm, customFields: cf })} errors={formErrors} />
-                                    <DialogFooter><Button type="submit" disabled={updateContact.isPending}>Save</Button></DialogFooter>
+                                    <DialogFooter className="px-6 py-4 border-t border-slate-100 flex-shrink-0"><Button type="submit" disabled={updateContact.isPending}>Save</Button></DialogFooter>
                                   </form>
                                 </DialogContent>
                               </Dialog>
@@ -717,32 +744,34 @@ function DealsTab({ autoOpen = false }: { autoOpen?: boolean }) {
           )}
           <Dialog open={creating} onOpenChange={setCreating}>
             <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-1.5" />Add Deal</Button></DialogTrigger>
-            <DialogContent>
-              <DialogHeader><DialogTitle>Add New Deal</DialogTitle></DialogHeader>
-              <form onSubmit={(e) => { e.preventDefault(); handleCreateDealSubmit() }} className="space-y-4">
-                <div className="space-y-2"><Label>Title</Label><Input placeholder="Deal title" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} required /></div>
-                <div className="space-y-2"><Label>Value ($)</Label><Input type="number" placeholder="Value" value={formData.value} onChange={(e) => setFormData({ ...formData, value: e.target.value })} /></div>
-                <div className="space-y-2"><Label>Stage</Label>
-                  <Select value={formData.stage} onValueChange={(v) => setFormData({ ...formData, stage: v as any })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{stages.map((s) => <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}</SelectContent>
-                  </Select>
+            <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col p-0 overflow-hidden">
+              <DialogHeader className="px-6 py-4 border-b border-slate-100 flex-shrink-0"><DialogTitle>Add New Deal</DialogTitle></DialogHeader>
+              <form onSubmit={(e) => { e.preventDefault(); handleCreateDealSubmit() }} className="flex flex-col min-h-0">
+                <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                  <div className="space-y-2"><Label>Title</Label><Input placeholder="Deal title" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} required /></div>
+                  <div className="space-y-2"><Label>Value ($)</Label><Input type="number" placeholder="Value" value={formData.value} onChange={(e) => setFormData({ ...formData, value: e.target.value })} /></div>
+                  <div className="space-y-2"><Label>Stage</Label>
+                    <Select value={formData.stage} onValueChange={(v) => setFormData({ ...formData, stage: v as any })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{stages.map((s) => <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Contact / Client *</Label>
+                    <Select value={formData.contactId} onValueChange={(v) => setFormData({ ...formData, contactId: v })} required>
+                      <SelectTrigger className={!formData.contactId ? 'border-red-200' : ''}>
+                        <SelectValue placeholder="— Select a contact —" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {contacts?.map((c: any) => (
+                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <DynamicCustomFieldsForm entityType="deals" values={formData.customFields || {}} onChange={(cf) => { setFormData({ ...formData, customFields: cf }); setFormErrors({}) }} errors={formErrors} />
                 </div>
-                <div className="space-y-2">
-                  <Label>Contact / Client *</Label>
-                  <Select value={formData.contactId} onValueChange={(v) => setFormData({ ...formData, contactId: v })} required>
-                    <SelectTrigger className={!formData.contactId ? 'border-red-200' : ''}>
-                      <SelectValue placeholder="— Select a contact —" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {contacts?.map((c: any) => (
-                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <DynamicCustomFieldsForm entityType="deals" values={formData.customFields || {}} onChange={(cf) => setFormData({ ...formData, customFields: cf })} errors={formErrors} />
-                <DialogFooter><Button type="submit" disabled={createDeal.isPending || !formData.contactId}>Add Deal</Button></DialogFooter>
+                <DialogFooter className="px-6 py-4 border-t border-slate-100 flex-shrink-0"><Button type="submit" disabled={createDeal.isPending || !formData.contactId}>Add Deal</Button></DialogFooter>
               </form>
             </DialogContent>
           </Dialog>
@@ -756,7 +785,7 @@ function DealsTab({ autoOpen = false }: { autoOpen?: boolean }) {
               <div className="min-w-full divide-y divide-slate-100">
                 <div className="flex items-center px-4 py-3 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wide">
                   {dealVisibleColumns.map(col => {
-                    const stickyClass = col.stickyRight ? 'sticky right-0 bg-white z-10 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.04)]' : ''
+                  const stickyClass = col.stickyRight ? 'sticky right-0 bg-white pl-4 z-10 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.04)]' : ''
                     if (col.sortField) {
                       return (
                         <button 
@@ -842,7 +871,7 @@ function DealsTab({ autoOpen = false }: { autoOpen?: boolean }) {
                         }
                         if (col.key === 'actions') {
                           return (
-                            <div key={col.key} style={{ width: col.width }} className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 sticky right-0 bg-white group-hover:bg-slate-50 z-10 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.04)]">
+                            <div key={col.key} style={{ width: col.width }} className="flex justify-end gap-1 flex-shrink-0 sticky right-0 bg-white group-hover:bg-slate-50 z-10 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.04)]">
                               <Dialog open={editing === deal.id} onOpenChange={(open) => {
                                 if (open) {
                                   setEditing(deal.id);
@@ -862,32 +891,34 @@ function DealsTab({ autoOpen = false }: { autoOpen?: boolean }) {
                                 }
                               }}>
                                 <DialogTrigger asChild><Button variant="ghost" size="icon"><Pencil className="w-3.5 h-3.5" /></Button></DialogTrigger>
-                                <DialogContent>
-                                  <DialogHeader><DialogTitle>Edit Deal</DialogTitle></DialogHeader>
-                                  <form onSubmit={(e) => { e.preventDefault(); handleEditDealSubmit(deal.id) }} className="space-y-4">
-                                    <div className="space-y-2"><Label>Title</Label><Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required /></div>
-                                    <div className="space-y-2"><Label>Value ($)</Label><Input type="number" value={editForm.value} onChange={(e) => setEditForm({ ...editForm, value: e.target.value })} /></div>
-                                    <div className="space-y-2"><Label>Stage</Label>
-                                      <Select value={editForm.stage} onValueChange={(v) => setEditForm({ ...editForm, stage: v as any })}>
-                                        <SelectTrigger><SelectValue /></SelectTrigger>
-                                        <SelectContent>{stages.map((s) => <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}</SelectContent>
-                                      </Select>
+                                <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col p-0 overflow-hidden">
+                                  <DialogHeader className="px-6 py-4 border-b border-slate-100 flex-shrink-0"><DialogTitle>Edit Deal</DialogTitle></DialogHeader>
+                                  <form onSubmit={(e) => { e.preventDefault(); handleEditDealSubmit(deal.id) }} className="flex flex-col min-h-0">
+                                    <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                                      <div className="space-y-2"><Label>Title</Label><Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required /></div>
+                                      <div className="space-y-2"><Label>Value ($)</Label><Input type="number" value={editForm.value} onChange={(e) => setEditForm({ ...editForm, value: e.target.value })} /></div>
+                                      <div className="space-y-2"><Label>Stage</Label>
+                                        <Select value={editForm.stage} onValueChange={(v) => setEditForm({ ...editForm, stage: v as any })}>
+                                          <SelectTrigger><SelectValue /></SelectTrigger>
+                                          <SelectContent>{stages.map((s) => <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}</SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div className="space-y-2">
+                                        <Label>Contact / Client *</Label>
+                                        <Select value={editForm.contactId} onValueChange={(v) => setEditForm({ ...editForm, contactId: v })}>
+                                          <SelectTrigger className={!editForm.contactId ? 'border-red-200' : ''}>
+                                            <SelectValue placeholder="— Select a contact —" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {contacts?.map((c: any) => (
+                                              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      <DynamicCustomFieldsForm entityType="deals" values={editForm.customFields || {}} onChange={(cf) => setEditForm({ ...editForm, customFields: cf })} errors={formErrors} />
                                     </div>
-                                    <div className="space-y-2">
-                                      <Label>Contact / Client *</Label>
-                                      <Select value={editForm.contactId} onValueChange={(v) => setEditForm({ ...editForm, contactId: v })}>
-                                        <SelectTrigger className={!editForm.contactId ? 'border-red-200' : ''}>
-                                          <SelectValue placeholder="— Select a contact —" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {contacts?.map((c: any) => (
-                                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
-                                    <DynamicCustomFieldsForm entityType="deals" values={editForm.customFields || {}} onChange={(cf) => setEditForm({ ...editForm, customFields: cf })} errors={formErrors} />
-                                    <DialogFooter className="flex items-center justify-between gap-2 w-full">
+                                    <DialogFooter className="px-6 py-4 border-t border-slate-100 flex-shrink-0 flex items-center justify-between gap-2 w-full">
                                       <Button
                                         type="button"
                                         variant="outline"
@@ -1035,32 +1066,34 @@ function DealsTab({ autoOpen = false }: { autoOpen?: boolean }) {
                                             <Pencil className="w-3 h-3" />
                                           </Button>
                                         </DialogTrigger>
-                                        <DialogContent>
-                                          <DialogHeader><DialogTitle>Edit Deal</DialogTitle></DialogHeader>
-                                          <form onSubmit={(e) => { e.preventDefault(); handleEditDealSubmit(deal.id) }} className="space-y-4">
-                                            <div className="space-y-2"><Label>Title</Label><Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required /></div>
-                                            <div className="space-y-2"><Label>Value ($)</Label><Input type="number" value={editForm.value} onChange={(e) => setEditForm({ ...editForm, value: e.target.value })} /></div>
-                                            <div className="space-y-2"><Label>Stage</Label>
-                                              <Select value={editForm.stage} onValueChange={(v) => setEditForm({ ...editForm, stage: v as any })}>
-                                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                                <SelectContent>{stages.map((s) => <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}</SelectContent>
-                                              </Select>
+                                        <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col p-0 overflow-hidden">
+                                          <DialogHeader className="px-6 py-4 border-b border-slate-100 flex-shrink-0"><DialogTitle>Edit Deal</DialogTitle></DialogHeader>
+                                          <form onSubmit={(e) => { e.preventDefault(); handleEditDealSubmit(deal.id) }} className="flex flex-col min-h-0">
+                                            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                                              <div className="space-y-2"><Label>Title</Label><Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required /></div>
+                                              <div className="space-y-2"><Label>Value ($)</Label><Input type="number" value={editForm.value} onChange={(e) => setEditForm({ ...editForm, value: e.target.value })} /></div>
+                                              <div className="space-y-2"><Label>Stage</Label>
+                                                <Select value={editForm.stage} onValueChange={(v) => setEditForm({ ...editForm, stage: v as any })}>
+                                                  <SelectTrigger><SelectValue /></SelectTrigger>
+                                                  <SelectContent>{stages.map((s) => <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}</SelectContent>
+                                                </Select>
+                                              </div>
+                                              <div className="space-y-2">
+                                                <Label>Contact / Client *</Label>
+                                                <Select value={editForm.contactId} onValueChange={(v) => setEditForm({ ...editForm, contactId: v })}>
+                                                  <SelectTrigger className={!editForm.contactId ? 'border-red-200' : ''}>
+                                                    <SelectValue placeholder="— Select a contact —" />
+                                                  </SelectTrigger>
+                                                  <SelectContent>
+                                                    {contacts?.map((c: any) => (
+                                                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                                    ))}
+                                                  </SelectContent>
+                                                </Select>
+                                              </div>
+                                              <DynamicCustomFieldsForm entityType="deals" values={editForm.customFields || {}} onChange={(cf) => setEditForm({ ...editForm, customFields: cf })} errors={formErrors} />
                                             </div>
-                                            <div className="space-y-2">
-                                              <Label>Contact / Client *</Label>
-                                              <Select value={editForm.contactId} onValueChange={(v) => setEditForm({ ...editForm, contactId: v })}>
-                                                <SelectTrigger className={!editForm.contactId ? 'border-red-200' : ''}>
-                                                  <SelectValue placeholder="— Select a contact —" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                  {contacts?.map((c: any) => (
-                                                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                                                  ))}
-                                                </SelectContent>
-                                              </Select>
-                                            </div>
-                                            <DynamicCustomFieldsForm entityType="deals" values={editForm.customFields || {}} onChange={(cf) => setEditForm({ ...editForm, customFields: cf })} errors={formErrors} />
-                                            <DialogFooter className="flex items-center justify-between gap-2 w-full">
+                                            <DialogFooter className="px-6 py-4 border-t border-slate-100 flex-shrink-0 flex items-center justify-between gap-2 w-full">
                                               <Button
                                                 type="button"
                                                 variant="outline"
@@ -1241,7 +1274,7 @@ function buildUnifiedEvents(contact: any, data: any) {
   return events.sort((a, b) => b.date.getTime() - a.date.getTime())
 }
 
-function ContactDetailDialog({ contact, onClose }: { contact: any; onClose: () => void }) {
+function ContactDetailDialog({ contact: initialContact, onClose }: { contact: any; onClose: () => void }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
@@ -1251,7 +1284,13 @@ function ContactDetailDialog({ contact, onClose }: { contact: any; onClose: () =
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editContent, setEditContent] = useState('')
 
-  const { data, isLoading } = useQuery({
+  const { data: contact = initialContact, isLoading: isContactLoading } = useQuery({
+    queryKey: ['contact', initialContact.id],
+    queryFn: () => pb.collection('contacts').getOne(initialContact.id, { expand: 'companyId' }),
+    initialData: initialContact,
+  })
+
+  const { data, isLoading: isTimelineLoading } = useQuery({
     queryKey: ['contactTimeline', contact.id],
     queryFn: async () => {
       const [interactions, deals, tasks, invoices] = await Promise.all([
@@ -1263,6 +1302,8 @@ function ContactDetailDialog({ contact, onClose }: { contact: any; onClose: () =
       return { interactions, deals, tasks, invoices }
     }
   })
+
+  const isLoading = isContactLoading || isTimelineLoading;
 
   const createMutation = useCreateInteraction()
   const updateMutation = useUpdateInteraction()
@@ -1406,7 +1447,7 @@ function ContactDetailDialog({ contact, onClose }: { contact: any; onClose: () =
 
             {/* Custom Fields */}
             <div className="px-4 pb-2 bg-white">
-              <DynamicCustomFieldsViewer entityType="contacts" values={contact.customFields} />
+              <DynamicCustomFieldsViewer entityType="contacts" values={contact.customFields || {}} />
             </div>
 
             {/* Quick Actions */}
@@ -1424,11 +1465,21 @@ function ContactDetailDialog({ contact, onClose }: { contact: any; onClose: () =
                 >
                   <Phone className="w-4 h-4" /> Call
                 </button>
-                <Dialog open={false}>
-                  <button className="flex items-center justify-center gap-2 px-3 py-2 bg-slate-50 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-100 transition-colors border border-slate-200">
-                    <Pencil className="w-4 h-4" /> Edit
-                  </button>
-                </Dialog>
+                
+                <button 
+                  className="flex items-center justify-center gap-2 px-3 py-2 bg-slate-50 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-100 transition-colors border border-slate-200"
+                  onClick={() => {
+                    onClose();
+                    // This is a hacky way to trigger edit from the list view but since they are siblings it's hard.
+                    // We will use an event or a better state management if needed, but for now let's just 
+                    // tell the parent to open the edit dialog for this contact.
+                    const event = new CustomEvent('nova-edit-contact', { detail: contact });
+                    window.dispatchEvent(event);
+                  }}
+                >
+                  <Pencil className="w-4 h-4" /> Edit
+                </button>
+
                 <button
                   onClick={() => { onClose(); navigate('/crm/deals', { state: { openCreate: true, contactId: contact.id } }) }}
                   className="flex items-center justify-center gap-2 px-3 py-2 bg-violet-50 text-violet-700 rounded-lg text-sm font-medium hover:bg-violet-100 transition-colors"
@@ -1649,4 +1700,3 @@ function ContactDetailDialog({ contact, onClose }: { contact: any; onClose: () =
     </Dialog>
   )
 }
-
