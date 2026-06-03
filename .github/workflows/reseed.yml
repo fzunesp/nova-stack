@@ -24,3 +24,5 @@ jobs:
           PB_ADMIN_EMAIL: ${{ secrets.PB_ADMIN_EMAIL }}
           PB_ADMIN_PASSWORD: ${{ secrets.PB_ADMIN_PASSWORD }}
         run: node pocketbase/clean_reseed.mjs
+
+# trigger scan
