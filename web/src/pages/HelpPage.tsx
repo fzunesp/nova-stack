@@ -4,9 +4,9 @@ import {
   LayoutDashboard, Users, CheckSquare, FileText, Inbox,
   HelpCircle, TrendingUp, ChevronRight, Briefcase,
   Search, Keyboard, ArrowUpRight, BookOpen, Building2, Package, Settings, Zap,
-  Send, Download, ShieldCheck, StickyNote, Bell, Plus, Kanban, List,
-  Palette, Database, Webhook, MessageSquare, Layers, UserPlus,
-  Laptop, Smartphone, Key, Lock, Shield, Copy, Edit, Trash2, Play, Loader2, LayoutList, LayoutGrid
+  Send, Download, ShieldCheck, Bell, Kanban, List,
+  Palette, Database,
+  Laptop, Smartphone, LayoutList, LayoutGrid
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
