@@ -17,7 +17,7 @@
  * 11. Approvals (dep: submissionId)
  */
 
-const base = 'http://localhost:8090/api';
+const base = process.env.PB_URL || 'http://localhost:8090/api';
 
 async function api(method, path, body = null, token) {
   const opts = {
@@ -42,8 +42,8 @@ async function api(method, path, body = null, token) {
 async function seed() {
   // Authenticate as app admin user (users collection)
   const auth = await api('POST', '/collections/users/auth-with-password', {
-    identity: 'admin@nova-stack.local',
-    password: 'password123'
+    identity: process.env.PB_ADMIN_EMAIL || 'admin@nova-stack.local',
+    password: process.env.PB_ADMIN_PASSWORD || 'password123'
   });
   if (!auth?.token) { console.error('Auth failed'); return; }
   const token = auth.token;
