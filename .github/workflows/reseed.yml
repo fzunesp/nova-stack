@@ -1,0 +1,26 @@
+name: Daily Database Reseed
+
+on:
+  schedule:
+    # Runs at 3 AM PDT (10 AM UTC) every day
+    - cron: '0 10 * * *'
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  reseed:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run Reseed Script
+        env:
+          PB_URL: ${{ secrets.PB_URL }}
+          PB_ADMIN_EMAIL: ${{ secrets.PB_ADMIN_EMAIL }}
+          PB_ADMIN_PASSWORD: ${{ secrets.PB_ADMIN_PASSWORD }}
+        run: node pocketbase/clean_reseed.mjs

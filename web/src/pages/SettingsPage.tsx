@@ -1,79 +1,97 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import pb from '@/lib/pocketbase'
-import { User, Users, Mail, Building2, Lock, Save, Palette, Check, Shield, Trash2, UserPlus, Loader2, Database, Download, Webhook, Plus, Play, Copy, FileText, Edit, MessageSquare, HelpCircle, Keyboard, ArrowUpRight, ChevronRight, Settings, UserMinus, UserCheck, Eye, EyeOff, Layers } from 'lucide-react'
-import { useNavigate, useSearchParams } from 'react-router'
-import { useTheme, type ThemeName } from '@/contexts/ThemeContext'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
-import { Badge } from '@/components/ui/badge'
+import { 
+  User, Users, Mail, Building2, Lock, Save, Palette, Check, 
+  Loader2, FileText, Briefcase, Database, Webhook, Layers,
+  Plus, Shield, HelpCircle, MessageSquare, Copy, Edit, Trash2,
+  Download, Play
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Badge } from '@/components/ui/badge'
+import { toast } from 'sonner'
+import { useTheme, type ThemeName } from '@/contexts/ThemeContext'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Checkbox } from '@/components/ui/checkbox'
 import { CustomFieldsTab } from '@/components/CustomFieldsTab'
+import { UsersTab } from '@/components/UsersTab'
+import { useEmployee } from '@/hooks/useEmployee'
+import { useNavigate } from 'react-router'
+import { cn } from '@/lib/utils'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
-const THEMES: { id: ThemeName; label: string; description: string; hex: string; hexDark: string }[] = [
-  { id: 'indigo', label: 'Indigo', description: 'Classic & trustworthy', hex: '#4f46e5', hexDark: '#4338ca' },
-  { id: 'violet', label: 'Violet', description: 'Bold & premium', hex: '#7c3aed', hexDark: '#6d28d9' },
-  { id: 'emerald', label: 'Emerald', description: 'Fresh & distinctive', hex: '#10b981', hexDark: '#059669' },
-  { id: 'orange', label: 'Orange', description: 'Warm & energetic', hex: '#ea580c', hexDark: '#c2410c' },
-]
+const inputClass = "w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ns-accent))]/20 focus:border-[rgb(var(--ns-accent))] transition-all bg-white"
 
-const ROLE_COLORS: Record<string, string> = {
-  admin: 'bg-red-50 text-red-700 border-red-100',
-  hr:    'bg-amber-50 text-amber-700 border-amber-100',
-  user:  'bg-slate-100 text-slate-600 border-slate-200',
+const EVENT_COLORS: Record<string, string> = {
+  'contact.created': 'bg-indigo-50 text-indigo-700 border-indigo-100',
+  'intake.approved': 'bg-purple-50 text-purple-700 border-purple-100',
+  'deal.won':        'bg-emerald-50 text-emerald-700 border-emerald-100',
+  'invoice.paid':    'bg-amber-50 text-amber-700 border-amber-100',
 }
 
 export function SettingsPage() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
   const { user, isAdmin } = useAuth()
   const { theme, setTheme } = useTheme()
-  const tabs = [
-    { id: 'profile', label: 'Profile', icon: User },
-    { id: 'security', label: 'Security', icon: Lock },
-    { id: 'appearance', label: 'Appearance', icon: Palette },
-    { id: 'templates', label: 'Templates', icon: FileText },
-    ...(isAdmin ? [
-      { id: 'custom-fields', label: 'Custom Fields', icon: Layers },
-      { id: 'users', label: 'Users', icon: Users },
-      { id: 'data', label: 'Data & Export', icon: Database },
-      { id: 'webhooks', label: 'Webhooks', icon: Webhook }
-    ] : []),
-  ] as any
-  type TabId = typeof tabs[number]['id']
+  const { data: employee } = useEmployee()
 
-  const [activeTab, setActiveTab] = useState<TabId>('profile')
+  const personalTabs = [
+    { id: 'appearance', label: 'Appearance', icon: Palette },
+    { id: 'security', label: 'Security', icon: Lock },
+    { id: 'work', label: 'Work Profile', icon: Briefcase },
+  ]
+
+  const teamTabs = isAdmin ? [
+    { id: 'users', label: 'Users', icon: Users },
+  ] : []
+
+  const systemTabs = isAdmin ? [
+    { id: 'custom-fields', label: 'Custom Fields', icon: Layers },
+    { id: 'canned-responses', label: 'Canned Responses', icon: FileText },
+    { id: 'data', label: 'Data & Export', icon: Database },
+    { id: 'webhooks', label: 'Webhooks', icon: Webhook }
+  ] : [
+    { id: 'canned-responses', label: 'Canned Responses', icon: FileText },
+  ]
+  
+  const allTabs = [...personalTabs, ...teamTabs, ...systemTabs]
+  type TabId = 'work' | 'security' | 'appearance' | 'canned-responses' | 'custom-fields' | 'users' | 'data' | 'webhooks'
+  const [activeTab, setActiveTab] = useState<TabId>('appearance')
+  
+  // Profile state
+  const [name, setName] = useState('')
+  const [company, setCompany] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
-  const [name, setName] = useState((user as any)?.name || '')
-  const [company, setCompany] = useState((user as any)?.companyName || '')
+
+  // Password state
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [pwError, setPwError] = useState('')
-  const [showPwCurrent, setShowPwCurrent] = useState(false)
-  const [showPwNew, setShowPwNew] = useState(false)
-  const [showPwConfirm, setShowPwConfirm] = useState(false)
+  const [changingPassword, setChangingPassword] = useState(false)
 
   useEffect(() => {
-    if (searchParams.get('forceChange') === 'true') {
-      setActiveTab('security' as TabId)
+    if (user) {
+      setName(user.name || '')
+      setCompany(user.companyName || '')
     }
-  }, [searchParams])
+  }, [user])
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!user) return
     setSaving(true)
     try {
-      await pb.collection('users').update((user as any).id, { name, companyName: company })
+      await pb.collection('users').update(user.id, {
+        name,
+        companyName: company
+      })
       setSaved(true)
-      setTimeout(() => setSaved(false), 2500)
-    } catch {
-      // silently fail
+      setTimeout(() => setSaved(false), 3000)
+      toast.success('Profile updated successfully')
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update profile')
     } finally {
       setSaving(false)
     }
@@ -81,103 +99,114 @@ export function SettingsPage() {
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault()
-    setPwError('')
-    if (newPassword !== confirmPassword) { setPwError('Passwords do not match'); return }
-    if (newPassword.length < 8) { setPwError('Password must be at least 8 characters'); return }
-    setSaving(true)
+    if (newPassword !== confirmPassword) {
+      toast.error('New passwords do not match')
+      return
+    }
+    setChangingPassword(true)
     try {
-      await pb.collection('users').update((user as any).id, {
-        oldPassword: currentPassword, password: newPassword, passwordConfirm: confirmPassword,
-        mustChangePassword: false,
+      await pb.collection('users').update(user!.id, {
+        oldPassword: currentPassword,
+        password: newPassword,
+        passwordConfirm: confirmPassword,
       })
-      setCurrentPassword(''); setNewPassword(''); setConfirmPassword('')
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2500)
-      if (searchParams.get('forceChange') === 'true') {
-        navigate('/settings', { replace: true })
-      }
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      toast.success('Password changed successfully')
     } catch (err: any) {
-      setPwError(err.message || 'Failed to update password')
+      toast.error(err.message || 'Failed to change password')
     } finally {
-      setSaving(false)
+      setChangingPassword(false)
     }
   }
 
-  const inputClass = 'w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ns-accent))] focus:border-transparent bg-white placeholder-slate-400 transition-shadow'
-
-  const tabHeadings: Record<string, string[]> = {
-    profile: ['Profile Information', 'Full name', 'Email address', 'Company name'],
-    security: ['Change Password', 'Current password', 'New password', 'Confirm password'],
-    appearance: ['Accent Colour'],
-    templates: ['Templates', 'Create Template'],
-    'custom-fields': ['Custom Fields Manager'],
-    users: ['User Management', 'Add User', 'Role Permissions'],
-    data: ['System Backup', 'Data Export (CSV)'],
-    webhooks: ['Outbound Webhooks', 'Add Webhook'],
+  const renderNavItems = (tabsList: any[]) => {
+    return tabsList.map((tab) => {
+      const Icon = tab.icon
+      const isActive = activeTab === tab.id
+      return (
+        <button
+          key={tab.id}
+          onClick={() => setActiveTab(tab.id as TabId)}
+          className={cn(
+            "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-left transition-all cursor-pointer",
+            isActive 
+              ? "text-white shadow-sm" 
+              : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+          )}
+          style={isActive ? { backgroundColor: 'rgb(var(--ns-accent))' } : undefined}
+        >
+          <Icon className="w-4 h-4 flex-shrink-0" />
+          {tab.label}
+        </button>
+      )
+    })
   }
 
-  const currentHeadings = tabHeadings[activeTab] || []
-  const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-
   return (
-    <div className="flex gap-6 h-full">
-      {/* LEFT SIDEBAR */}
-      <aside className="w-56 flex-shrink-0">
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden sticky top-0">
-          <div className="px-4 py-3 border-b border-slate-100">
-            <div className="flex items-center gap-2">
-              <Settings className="w-4 h-4 text-slate-400" />
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Settings</p>
+    <div className="flex min-h-[calc(100vh-4rem)]">
+      {/* Sidebar Nav */}
+      <aside className="w-56 flex-shrink-0 hidden md:block">
+        <div className="sticky top-0 pt-6 px-4">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-4">
+              <div className="flex items-center gap-2 mb-4 px-2">
+                <Shield className="w-4 h-4 text-slate-400" />
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Settings</p>
+              </div>
+              <nav className="p-2 space-y-4">
+                <div className="space-y-0.5">
+                  {renderNavItems(personalTabs)}
+                </div>
+                
+                {teamTabs.length > 0 && (
+                  <>
+                    <div className="h-px bg-slate-100 mx-2" />
+                    <div className="space-y-0.5">
+                      {renderNavItems(teamTabs)}
+                    </div>
+                  </>
+                )}
+
+                <div className="h-px bg-slate-100 mx-2" />
+                <div className="space-y-0.5">
+                  {renderNavItems(systemTabs)}
+                </div>
+              </nav>
+              <div className="mt-4 pt-4 border-t border-slate-200">
+                <button
+                  onClick={() => navigate('/help?tab=settings')}
+                  className="cursor-pointer flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-[rgb(var(--ns-accent))] bg-slate-50 hover:bg-[rgb(var(--ns-accent))]/10 border border-slate-200 hover:border-[rgb(var(--ns-accent))]/30 rounded-lg px-3 py-2 transition-colors w-full"
+                >
+                  <HelpCircle className="w-3.5 h-3.5" />
+                  Help
+                </button>
+              </div>
             </div>
           </div>
-          <nav className="p-2 space-y-0.5">
-            {tabs.map((tab: { id: string; label: string; icon: any }) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as TabId)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-left transition-all cursor-pointer ${
-                  activeTab === tab.id
-                    ? 'text-white shadow-sm'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                }`}
-                style={activeTab === tab.id ? { backgroundColor: 'rgb(var(--ns-accent))' } : undefined}
-              >
-                <tab.icon className="w-4 h-4 flex-shrink-0" />
-                {tab.label}
-              </button>
-            ))}
-          </nav>
         </div>
       </aside>
 
-      {/* CENTER CONTENT */}
-      <div className="flex-1 min-w-0 flex flex-col">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-slate-900">Settings</h2>
-            <p className="text-sm text-slate-500 mt-0.5">Manage your account preferences</p>
-          </div>
-          <button
-            onClick={() => navigate('/help?tab=settings')}
-            className="cursor-pointer flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-[rgb(var(--ns-accent))] bg-slate-50 hover:bg-[rgb(var(--ns-accent))]/10 border border-slate-200 hover:border-[rgb(var(--ns-accent))]/30 rounded-lg px-3 py-2 transition-colors"
-          >
-            <HelpCircle className="w-3.5 h-3.5" />
-            Help
-          </button>
+      {/* Main Content */}
+      <main className="flex-1 px-8 py-8 max-w-5xl overflow-auto">
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-slate-900">{allTabs.find((t: any) => t.id === activeTab)?.label}</h1>
+          <p className="text-slate-500 mt-1">Manage your {activeTab.replace('-', ' ')} preferences and information</p>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 flex-1 overflow-y-auto">
-          {/* Profile Tab */}
-          {activeTab === 'profile' && (
+        <div className="min-w-0 flex-1">
+          {/* Work Profile Tab */}
+          {activeTab === 'work' && (
             <div className="space-y-8">
-              <div id="profile-information" className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div id="account-information" className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-8">
                 <div className="px-6 py-5 border-b border-slate-100 flex items-center gap-4">
                   <div className="w-14 h-14 rounded-full bg-[rgb(var(--ns-accent))] flex items-center justify-center text-white text-xl font-bold flex-shrink-0">
-                    {(user as any)?.name?.charAt(0)?.toUpperCase() || 'U'}
+                    {user?.name?.charAt(0)?.toUpperCase() || 'U'}
                   </div>
                   <div>
-                    <p className="font-semibold text-slate-900">{(user as any)?.name || 'User'}</p>
-                    <p className="text-sm text-slate-500">{(user as any)?.email || ''}</p>
+                    <p className="font-semibold text-slate-900">{user?.name || 'User'}</p>
+                    <p className="text-sm text-slate-500">{user?.email || ''}</p>
                   </div>
                 </div>
                 <form onSubmit={handleSaveProfile} className="p-6 space-y-5">
@@ -187,7 +216,7 @@ export function SettingsPage() {
                   </div>
                   <div id="email-address">
                     <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 mb-1.5"><Mail className="w-3.5 h-3.5" /> Email address</label>
-                    <input type="email" value={(user as any)?.email || ''} disabled className={`${inputClass} bg-slate-50 text-slate-400 cursor-not-allowed`} />
+                    <input type="email" value={user?.email || ''} disabled className={`${inputClass} bg-slate-50 text-slate-400 cursor-not-allowed`} />
                     <p className="text-xs text-slate-400 mt-1">Email cannot be changed</p>
                   </div>
                   <div id="company-name">
@@ -203,61 +232,87 @@ export function SettingsPage() {
                   </div>
                 </form>
               </div>
+
+              <div id="official-work-profile" className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="px-6 py-5 border-b border-slate-100">
+                  <div className="flex items-center gap-2"><Briefcase className="w-4 h-4 text-slate-400" /><h3 className="font-semibold text-slate-900">Work Profile</h3></div>
+                  <p className="text-sm text-slate-500 mt-1">This is your official company information.</p>
+                </div>
+                {employee ? (
+                  <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-1">
+                      <Label className="text-xs font-bold uppercase text-slate-400">Employee ID</Label>
+                      <p className="text-sm font-semibold text-slate-900">{employee.employee_id || '—'}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-bold uppercase text-slate-400">Department</Label>
+                      <p className="text-sm font-semibold text-slate-900">{employee.department || '—'}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-bold uppercase text-slate-400">Job Title</Label>
+                      <p className="text-sm font-semibold text-slate-900">{employee.job_title || '—'}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-bold uppercase text-slate-400">Manager</Label>
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-400">
+                          {(employee as any).expand?.managerId?.name?.charAt(0) || '?'}
+                        </div>
+                        <p className="text-sm font-semibold text-slate-900">{(employee as any).expand?.managerId?.name || 'No Manager'}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-bold uppercase text-slate-400">Hire Date</Label>
+                      <p className="text-sm font-semibold text-slate-900">{employee.hire_date ? new Date(employee.hire_date).toLocaleDateString() : '—'}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-bold uppercase text-slate-400">Role Type</Label>
+                      <Badge className="bg-slate-100 text-slate-600 border-none capitalize">{employee.rol_type}</Badge>
+                    </div>
+                    
+                    <div className="col-span-2 pt-4 border-t border-slate-50">
+                      <Button variant="outline" size="sm" onClick={() => navigate('/hr')} className="text-xs">
+                        <Users className="w-3.5 h-3.5 mr-1.5" /> View Company Directory
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-12 text-center text-slate-400">
+                    <Loader2 className="w-8 h-8 animate-spin mx-auto mb-3" />
+                    <p className="text-sm font-medium">Loading your workforce record...</p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
           {/* Security Tab */}
           {activeTab === 'security' && (
             <div className="space-y-8">
-              {searchParams.get('forceChange') === 'true' && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 shadow-sm">
-                  <Lock className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm font-semibold text-amber-800">Password change required</p>
-                    <p className="text-sm text-amber-700 mt-0.5">You're using a temporary password. Please set a new password to continue.</p>
-                  </div>
-                </div>
-              )}
               <div id="change-password" className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="px-6 py-5 border-b border-slate-100">
-                  <div className="flex items-center gap-2"><Lock className="w-4 h-4 text-slate-400" /><h3 className="font-semibold text-slate-900">Change password</h3></div>
-                  <p className="text-sm text-slate-500 mt-1">Use a strong password you don't use elsewhere.</p>
+                  <h3 className="font-semibold text-slate-900">Change Password</h3>
+                  <p className="text-sm text-slate-500 mt-1">Update your login credentials</p>
                 </div>
-                <form onSubmit={handleChangePassword} className="p-6 space-y-4">
-                  {pwError && <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">{pwError}</div>}
-                  <div id="current-password">
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Current password</label>
-                    <div className="relative">
-                      <input type={showPwCurrent ? 'text' : 'password'} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required className="w-full px-3.5 py-2.5 pr-10 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ns-accent))] focus:border-transparent bg-white placeholder-slate-400" placeholder="••••••••" />
-                      <button type="button" onClick={() => setShowPwCurrent(!showPwCurrent)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer" tabIndex={-1}>
-                        {showPwCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
+                <form onSubmit={handleChangePassword} className="p-6 space-y-5">
+                  <div>
+                    <label className="text-sm font-medium text-slate-700 block mb-1.5">Current password</label>
+                    <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className={inputClass} placeholder="••••••••" />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div>
+                      <label className="text-sm font-medium text-slate-700 block mb-1.5">New password</label>
+                      <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className={inputClass} placeholder="••••••••" />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-slate-700 block mb-1.5">Confirm password</label>
+                      <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className={inputClass} placeholder="••••••••" />
                     </div>
                   </div>
-                  <div id="new-password">
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">New password</label>
-                    <div className="relative">
-                      <input type={showPwNew ? 'text' : 'password'} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required className="w-full px-3.5 py-2.5 pr-10 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ns-accent))] focus:border-transparent bg-white placeholder-slate-400" placeholder="Min. 8 characters" />
-                      <button type="button" onClick={() => setShowPwNew(!showPwNew)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer" tabIndex={-1}>
-                        {showPwNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-                  <div id="confirm-password">
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Confirm new password</label>
-                    <div className="relative">
-                      <input type={showPwConfirm ? 'text' : 'password'} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required className="w-full px-3.5 py-2.5 pr-10 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ns-accent))] focus:border-transparent bg-white placeholder-slate-400" placeholder="••••••••" />
-                      <button type="button" onClick={() => setShowPwConfirm(!showPwConfirm)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer" tabIndex={-1}>
-                        {showPwConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 pt-1">
-                    <button type="submit" disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 shadow-sm">
-                      <Lock className="w-3.5 h-3.5" />
-                      {saving ? 'Updating...' : 'Update password'}
+                  <div className="pt-1">
+                    <button type="submit" disabled={changingPassword} className="flex items-center gap-2 px-4 py-2 bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white text-sm font-medium rounded-lg transition-colors shadow-sm">
+                      {changingPassword ? 'Updating...' : 'Update password'}
                     </button>
-                    {saved && <span className="text-sm text-green-600 font-medium">✓ Updated!</span>}
                   </div>
                 </form>
               </div>
@@ -266,511 +321,432 @@ export function SettingsPage() {
 
           {/* Appearance Tab */}
           {activeTab === 'appearance' && (
-            <div className="space-y-8">
-              <div id="accent-colour" className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="px-6 py-5 border-b border-slate-100">
-                  <div className="flex items-center gap-2"><Palette className="w-4 h-4 text-slate-400" /><h3 className="font-semibold text-slate-900">Accent colour</h3></div>
-                  <p className="text-sm text-slate-500 mt-1">Changes the sidebar highlight, buttons, and interactive elements across the entire app.</p>
-                </div>
-                <div className="p-6">
-                  <div className="grid grid-cols-2 gap-3">
-                    {THEMES.map((t) => (
-                      <button
-                        key={t.id}
-                        onClick={() => setTheme(t.id)}
-                        className={`relative flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all ${
-                          theme === t.id ? 'border-[rgb(var(--ns-accent))] bg-slate-50' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                        }`}
-                      >
-                        <div className="flex-shrink-0 flex gap-1">
-                          <div className="w-8 h-8 rounded-lg shadow-sm" style={{ backgroundColor: t.hex }} />
-                          <div className="w-3 h-8 rounded-r-lg shadow-sm" style={{ backgroundColor: t.hexDark }} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-slate-900">{t.label}</p>
-                          <p className="text-xs text-slate-500">{t.description}</p>
-                        </div>
-                        {theme === t.id && (
-                          <div className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: t.hex }}>
-                            <Check className="w-3 h-3 text-white" strokeWidth={3} />
-                          </div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-xs text-slate-400 mt-4">Your preference is saved automatically and persists between sessions.</p>
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="px-6 py-5 border-b border-slate-100">
+                <h3 className="font-semibold text-slate-900">Accent Colour</h3>
+                <p className="text-sm text-slate-500 mt-1">Personalize the application's look</p>
+              </div>
+              <div className="p-6">
+                <div className="flex flex-wrap gap-4">
+                  {(['indigo', 'violet', 'emerald', 'orange'] as ThemeName[]).map((tName) => (
+                    <button
+                      key={tName}
+                      onClick={() => setTheme(tName)}
+                      className={cn(
+                        "flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all cursor-pointer",
+                        theme === tName 
+                          ? "border-[rgb(var(--ns-accent))] bg-[rgb(var(--ns-accent))]/5 text-[rgb(var(--ns-accent))] ring-2 ring-[rgb(var(--ns-accent))]/10" 
+                          : "border-slate-200 hover:border-slate-300 text-slate-600"
+                      )}
+                    >
+                      <div className={cn("w-4 h-4 rounded-full", tName === 'indigo' ? 'bg-indigo-600' : tName === 'violet' ? 'bg-violet-600' : tName === 'emerald' ? 'bg-emerald-600' : 'bg-orange-600')} />
+                      <span className="text-sm font-semibold capitalize">{tName}</span>
+                      {theme === tName && <Check className="w-3.5 h-3.5" />}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
           )}
 
-          {/* Templates Tab */}
-          {activeTab === 'templates' && <div id="templates-tab"><TemplatesTab /></div>}
+          {/* Restored Tabs */}
+          {activeTab === 'custom-fields' && isAdmin && <CustomFieldsTab />}
+          
+          {activeTab === 'users' && isAdmin && <UsersTab currentUserId={user?.id || ''} />}
 
-          {/* Custom Fields Tab — Admin Only */}
-          {activeTab === 'custom-fields' && isAdmin && (
-            <div id="custom-fields-tab">
-              <CustomFieldsTab />
+          {activeTab === 'data' && isAdmin && <DataTab />}
+
+          {activeTab === 'webhooks' && isAdmin && <WebhooksTab />}
+
+          {activeTab === 'canned-responses' && (
+            <div className="space-y-8">
+              <TemplatesTab />
             </div>
           )}
-
-          {/* Users Tab — Admin Only */}
-          {activeTab === 'users' && isAdmin && <div id="users-tab"><UsersTab currentUserId={(user as any)?.id} /></div>}
-
-          {/* Data Tab — Admin Only */}
-          {activeTab === 'data' && isAdmin && <div id="data-tab"><DataTab /></div>}
-
-          {/* Webhooks Tab — Admin Only */}
-          {activeTab === 'webhooks' && isAdmin && <div id="webhooks-tab"><WebhooksTab /></div>}
         </div>
-      </div>
-
-      {/* RIGHT SIDEBAR TOC */}
-      <aside className="w-56 flex-shrink-0 hidden xl:block">
-        <div className="sticky top-0 space-y-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
-              <ArrowUpRight className="w-3.5 h-3.5" />
-              On This Page
-            </h4>
-            <nav className="space-y-1">
-              {currentHeadings.map((heading) => {
-                const anchor = slugify(heading)
-                return (
-                  <a
-                    key={heading}
-                    href={`#${anchor}`}
-                    onClick={(e) => {
-                      e.preventDefault()
-                      const el = document.getElementById(anchor)
-                      if (el) {
-                        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                      }
-                    }}
-                    className="block text-xs text-slate-500 hover:text-slate-900 transition-colors py-1 border-l-2 border-transparent hover:border-slate-300 pl-2"
-                  >
-                    {heading}
-                  </a>
-                )
-              })}
-            </nav>
-          </div>
-
-          {/* Keyboard Shortcuts Mini-Card */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Keyboard className="w-4 h-4 text-slate-400" />
-              <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Shortcuts</h4>
-            </div>
-            <div className="space-y-2">
-              {[
-                { key: 'Ctrl + K', desc: 'Global Search' },
-                { key: 'Ctrl + Enter', desc: 'Submit Forms' },
-                { key: 'Esc', desc: 'Close Dialogs' },
-              ].map((s) => (
-                <div key={s.key} className="flex items-center justify-between text-sm">
-                  <span className="text-xs text-slate-600">{s.desc}</span>
-                  <kbd className="bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-[11px] font-mono font-bold text-slate-700 shadow-sm">
-                    {s.key}
-                  </kbd>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Quick Links */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Quick Links</h4>
-            <div className="space-y-2">
-              <a href="/dashboard" className="flex items-center gap-2 text-xs text-slate-600 hover:text-indigo-600 transition-colors">
-                <ChevronRight className="w-3 h-3" /> Dashboard
-              </a>
-              <a href="/crm/contacts" className="flex items-center gap-2 text-xs text-slate-600 hover:text-indigo-600 transition-colors">
-                <ChevronRight className="w-3 h-3" /> CRM Contacts
-              </a>
-              <a href="/invoices" className="flex items-center gap-2 text-xs text-slate-600 hover:text-indigo-600 transition-colors">
-                <ChevronRight className="w-3 h-3" /> Invoices
-              </a>
-            </div>
-          </div>
-        </div>
-      </aside>
+      </main>
     </div>
   )
 }
 
-// ─── Users Tab ────────────────────────────────────────────────────────────────
+// ─── Templates Tab ────────────────────────────────────────────────────────────
 
-function UsersTab({ currentUserId }: { currentUserId: string }) {
+function TemplatesTab() {
   const queryClient = useQueryClient()
-  const [inviteOpen, setInviteOpen] = useState(false)
-  const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteName, setInviteName] = useState('')
-  const [inviteRole, setInviteRole] = useState<'admin' | 'hr' | 'user'>('user')
-  const [invitePassword, setInvitePassword] = useState('')
-  const [showInvitePassword, setShowInvitePassword] = useState(false)
+  const [open, setOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
 
-  // Edit User State
-  const [editOpen, setEditOpen] = useState(false)
-  const [editingUser, setEditingUser] = useState<any>(null)
-  const [editName, setEditName] = useState('')
-  const [editEmail, setEditEmail] = useState('')
-  const [editIsActive, setEditIsActive] = useState(true)
+  // Form states
+  const [title, setTitle] = useState('')
+  const [subject, setSubject] = useState('')
+  const [content, setContent] = useState('')
+  const [category, setCategory] = useState<string>('email')
 
-  useEffect(() => {
-    if (editingUser) {
-      setEditName(editingUser.name || '')
-      setEditEmail(editingUser.email || '')
-      setEditIsActive(editingUser.isActive)
-    }
-  }, [editingUser])
+  // Filter/Search states
+  const [search, setSearch] = useState('')
+  const [activeCategory, setActiveCategory] = useState<string>('all')
 
-  const { data: users, isLoading, error } = useQuery({
-    queryKey: ['admin-users'],
-    queryFn: () => pb.collection('users').getFullList({ sort: 'name' }),
-  })
-
-  const createUser = useMutation({
-    mutationFn: async () => {
-      const newUser = await pb.collection('users').create({
-        name: inviteName,
-        email: inviteEmail,
-        role: inviteRole,
-        password: invitePassword,
-        passwordConfirm: invitePassword,
-        emailVisibility: true,
-        isActive: true,
-        mustChangePassword: true,
+  // Fetch templates
+  const { data: templates = [], isLoading } = useQuery({
+    queryKey: ['templates'],
+    queryFn: async () => {
+      return await pb.collection('templates').getFullList({
+        sort: '-created',
       })
-      return { user: newUser, password: invitePassword }
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['admin-users'] })
-      setInviteOpen(false)
-      
-      // Send welcome email (fire and forget, don't block UI)
-      pb.send('/api/send-welcome', {
-        method: 'POST',
-        body: { userId: data.user.id, password: data.password }
-      }).catch(err => console.error('Failed to send welcome email:', err))
-
-      setInviteEmail(''); setInviteName(''); setInvitePassword(''); setInviteRole('user')
-      toast.success('User created and welcome email queued')
-    },
-    onError: (err: any) => toast.error(err.message || 'Failed to create user'),
   })
 
-  const updateUser = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) =>
-      pb.collection('users').update(id, { ...data, emailVisibility: true }),
+  // Mutations
+  const createTemplate = useMutation({
+    mutationFn: async (data: any) => {
+      return await pb.collection('templates').create(data)
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-users'] })
-      setEditOpen(false)
-      setEditingUser(null)
-      toast.success('User updated successfully')
+      queryClient.invalidateQueries({ queryKey: ['templates'] })
+      toast.success('Template created successfully')
+      handleClose()
     },
-    onError: (err: any) => toast.error(err.message || 'Failed to update user'),
+    onError: (err: any) => {
+      toast.error(err.message || 'Failed to create template')
+    }
   })
 
-  const changeRole = useMutation({
-    mutationFn: ({ id, role }: { id: string; role: string }) =>
-      pb.collection('users').update(id, { role }),
+  const updateTemplate = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      return await pb.collection('templates').update(id, data)
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-users'] })
-      toast.success('Role updated')
+      queryClient.invalidateQueries({ queryKey: ['templates'] })
+      toast.success('Template updated successfully')
+      handleClose()
     },
-    onError: () => toast.error('Failed to update role'),
+    onError: (err: any) => {
+      toast.error(err.message || 'Failed to update template')
+    }
   })
 
-  const toggleUserStatus = useMutation({
-    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) => 
-      pb.collection('users').update(id, { isActive }),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['admin-users'] })
-      toast.success(variables.isActive ? 'User activated' : 'User deactivated')
+  const deleteTemplate = useMutation({
+    mutationFn: async (id: string) => {
+      return await pb.collection('templates').delete(id)
     },
-    onError: () => toast.error('Failed to update user status'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['templates'] })
+      toast.success('Template deleted')
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Failed to delete template')
+    }
   })
 
-  const handleEditInit = (u: any) => {
-    console.log('Editing user:', u)
-    setEditingUser(u)
-    setEditName(u.name || '')
-    setEditEmail(u.email || '')
-    setEditOpen(true)
+  const handleClose = () => {
+    setOpen(false)
+    setEditingId(null)
+    setTitle('')
+    setSubject('')
+    setContent('')
+    setCategory('email')
   }
 
-  const handleEditSubmit = (e: React.FormEvent) => {
+  const handleEditInit = (tmpl: any) => {
+    setEditingId(tmpl.id)
+    setTitle(tmpl.title || '')
+    setSubject(tmpl.subject || '')
+    setContent(tmpl.content || '')
+    setCategory(tmpl.category || 'email')
+    setOpen(true)
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!editingUser) return
-    updateUser.mutate({
-      id: editingUser.id,
-      data: { name: editName, email: editEmail, isActive: editIsActive }
-    })
+    if (!title || !content || !category) {
+      toast.error('Title, Content, and Category are required')
+      return
+    }
+
+    const payload = {
+      title,
+      subject: ['email', 'invoice_reminder', 'proposal'].includes(category) ? subject : '',
+      content,
+      category,
+    }
+
+    if (editingId) {
+      updateTemplate.mutate({ id: editingId, data: payload })
+    } else {
+      createTemplate.mutate(payload)
+    }
   }
 
-  const inputClass = 'w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ns-accent))] focus:border-transparent bg-white placeholder-slate-400'
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text)
+    toast.success('Template content copied to clipboard!')
+  }
+
+  // Filter templates
+  const filteredTemplates = templates.filter((tmpl: any) => {
+    const matchesSearch =
+      tmpl.title?.toLowerCase().includes(search.toLowerCase()) ||
+      tmpl.subject?.toLowerCase().includes(search.toLowerCase()) ||
+      tmpl.content?.toLowerCase().includes(search.toLowerCase())
+
+    const matchesCategory = activeCategory === 'all' || tmpl.category === activeCategory
+
+    return matchesSearch && matchesCategory
+  })
+
+  const categoryColors: Record<string, string> = {
+    email: 'bg-blue-50 text-blue-700 border-blue-100',
+    invoice_reminder: 'bg-orange-50 text-orange-700 border-orange-100',
+    proposal: 'bg-purple-50 text-purple-700 border-purple-100',
+    sms: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+    other: 'bg-slate-100 text-slate-600 border-slate-200',
+  }
+
+  const categoryLabels: Record<string, string> = {
+    email: 'Email',
+    invoice_reminder: 'Invoice Reminder',
+    proposal: 'Proposal',
+    sms: 'SMS',
+    other: 'Other',
+  }
+
+  const categories = ['all', 'email', 'invoice_reminder', 'proposal', 'sms', 'other']
+
+  const textareaClass = 'w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ns-accent))] focus:border-transparent bg-white placeholder-slate-400 transition-shadow min-h-[140px] resize-y font-mono text-xs'
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <Shield className="w-4 h-4 text-slate-400" />
-              <h3 className="font-semibold text-slate-900">User Management</h3>
-            </div>
-            <p className="text-sm text-slate-500 mt-1">Add, manage roles, and remove workspace members.</p>
-          </div>
-          <Button onClick={() => setInviteOpen(true)} size="sm" className="flex items-center gap-1.5">
-            <UserPlus className="w-3.5 h-3.5" /> Add User
-          </Button>
+      {/* Header and Add Button */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-slate-500" />
+            Canned Responses & Templates
+          </h3>
+          <p className="text-xs text-slate-500 mt-0.5">Quickly copy canned messages or use them to send invoices.</p>
         </div>
+        <Button onClick={() => setOpen(true)} className="flex items-center gap-1.5 self-start bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white text-xs font-semibold px-3 py-1.5 h-8">
+          <Plus className="w-3.5 h-3.5" />
+          Add Template
+        </Button>
+      </div>
 
-        {/* User List */}
-        <div className="px-6 py-2 bg-slate-50 text-[10px] text-slate-400 border-b border-slate-100">
-          Debug: {isLoading ? 'Loading...' : `Fetched ${(users || []).length} users`}
-        </div>
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-6 h-6 animate-spin text-slate-300" />
-          </div>
-        ) : error ? (
-          <div className="p-8 text-center bg-red-50 rounded-lg m-6 border border-red-100">
-            <p className="text-sm font-semibold text-red-600">Failed to load workspace members</p>
-            <p className="text-xs text-red-500 mt-1">{(error as any).message || 'Verification failed or permission denied'}</p>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="mt-4 border-red-200 text-red-600 hover:bg-red-100"
-              onClick={() => queryClient.invalidateQueries({ queryKey: ['admin-users'] })}
+      {/* Filter and Search Bar */}
+      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between">
+        {/* Category Pills */}
+        <div className="flex flex-wrap gap-1 w-full md:w-auto">
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setActiveCategory(cat)}
+              className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-all ${
+                activeCategory === cat
+                  ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                  : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+              }`}
             >
-              Retry Connection
-            </Button>
-          </div>
-        ) : !users || users.length === 0 ? (
-          <div className="text-center py-16">
-            <Users className="w-10 h-10 mx-auto mb-3 text-slate-200" />
-            <p className="text-sm font-medium text-slate-500">No workspace members found</p>
-          </div>
-        ) : (
-          <div className="divide-y divide-slate-50">
-            {users.map((u: any) => (
-              <div key={u.id} className="flex items-center gap-4 px-6 py-4 hover:bg-slate-50 transition-colors">
-                {/* Avatar */}
-                <div className="w-9 h-9 rounded-full bg-[rgb(var(--ns-accent))] flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-                  {u.name?.charAt(0)?.toUpperCase() || '?'}
+              {cat === 'all' ? 'All' : categoryLabels[cat] || cat}
+            </button>
+          ))}
+        </div>
+
+        {/* Search Input */}
+        <div className="relative w-full md:w-64">
+          <input
+            type="text"
+            placeholder="Search templates..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ns-accent))] focus:border-transparent bg-white placeholder-slate-400"
+          />
+          <span className="absolute left-2.5 top-2 text-slate-400">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </span>
+        </div>
+      </div>
+
+      {/* Templates List */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12 bg-white rounded-xl border border-slate-200 shadow-sm">
+          <Loader2 className="w-6 h-6 animate-spin text-slate-300" />
+        </div>
+      ) : filteredTemplates.length === 0 ? (
+        <div className="text-center py-12 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col items-center justify-center">
+          <FileText className="w-10 h-10 text-slate-200 mb-2" />
+          <p className="text-sm font-semibold text-slate-500">No templates found</p>
+          <p className="text-xs text-slate-400 max-w-xs mt-1">
+            {search || activeCategory !== 'all'
+              ? 'No templates match your filters. Try clearing your search.'
+              : 'Create your first canned response template to get started!'}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {filteredTemplates.map((tmpl: any) => (
+            <div key={tmpl.id} className="bg-white rounded-xl border border-slate-200 shadow-sm hover:border-slate-300 transition-all flex flex-col justify-between overflow-hidden group">
+              <div className="p-4 space-y-3">
+                {/* Card Title & Category */}
+                <div className="flex items-start justify-between gap-2">
+                  <h4 className="font-semibold text-slate-900 text-sm group-hover:text-[rgb(var(--ns-accent))] transition-colors truncate">
+                    {tmpl.title}
+                  </h4>
+                  <Badge className={`${categoryColors[tmpl.category] || categoryColors.other} text-[9px] px-1.5 py-0.5 whitespace-nowrap`}>
+                    {categoryLabels[tmpl.category] || tmpl.category}
+                  </Badge>
                 </div>
 
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-slate-900 truncate">{u.name || '—'}</span>
-                    {u.id === currentUserId && (
-                      <span className="text-[10px] font-semibold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">You</span>
-                    )}
+                {/* Subject (if applicable) */}
+                {tmpl.subject && (
+                  <div className="text-[11px] bg-slate-50 border border-slate-100 p-2 rounded-lg text-slate-600 font-medium truncate">
+                    <span className="text-slate-400 font-semibold mr-1.5">Subject:</span>
+                    {tmpl.subject}
                   </div>
-                  <p className={`text-xs truncate ${!u.email ? 'text-slate-300 italic' : 'text-slate-400'}`}>
-                    {u.email || '(Email Hidden)'}
-                  </p>
+                )}
+
+                {/* Content Area */}
+                <div className="relative">
+                  <pre className="text-xs text-slate-500 font-mono whitespace-pre-wrap line-clamp-4 bg-slate-50/50 p-2.5 rounded-lg border border-slate-100/50 min-h-[80px] break-words">
+                    {tmpl.content}
+                  </pre>
+                  <div className="absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-white to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
+              </div>
 
-                {/* Role badge + selector */}
-                <div className="flex items-center gap-2">
-                  <Badge className={`${ROLE_COLORS[u.role] || ROLE_COLORS.user} text-[10px] px-2 py-0.5 capitalize font-semibold`}>
-                    {u.role || 'user'}
-                  </Badge>
-                  
-                  {/* Status Badge */}
-                  <Badge className={`${u.isActive ? 'bg-green-50 text-green-700 border-green-100' : 'bg-slate-100 text-slate-400 border-slate-200'} text-[10px] px-2 py-0.5 font-semibold`}>
-                    {u.isActive ? 'Active' : 'Inactive'}
-                  </Badge>
-
-                  {u.id !== currentUserId && (
-                    <Select
-                      value={u.role || 'user'}
-                      onValueChange={(val) => changeRole.mutate({ id: u.id, role: val })}
-                    >
-                      <SelectTrigger className="h-7 text-xs w-24 border-slate-200">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="hr">HR</SelectItem>
-                        <SelectItem value="user">User</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
+              {/* Action Buttons Footer */}
+              <div className="bg-slate-50 px-4 py-2 border-t border-slate-100 flex items-center justify-between">
+                {/* Variable Placeholder Hints */}
+                <div className="text-[9px] text-slate-400 font-mono truncate max-w-[120px]" title="Supports template placeholders like {client_name}, {invoice_number}">
+                  Supports {`{...}`} tags
                 </div>
 
                 {/* Actions */}
                 <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => handleEditInit(u)}
-                    className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-                    title="Edit user details"
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleCopy(tmpl.content)}
+                    className="h-7 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-100 px-2 flex items-center gap-1"
+                    title="Copy to clipboard"
                   >
-                    <Edit className="w-3.5 h-3.5" />
-                  </button>
-
-                  {/* Toggle Status — cannot deactivate self */}
-                  {u.id !== currentUserId && (
-                    <button
-                      onClick={() => {
-                        const action = u.isActive ? 'Deactivate' : 'Activate'
-                        if (confirm(`${action} ${u.name || u.email}?`)) {
-                          toggleUserStatus.mutate({ id: u.id, isActive: !u.isActive })
-                        }
-                      }}
-                      className={`p-1.5 rounded-md transition-colors ${
-                        u.isActive 
-                          ? 'hover:bg-red-50 text-slate-300 hover:text-red-400' 
-                          : 'hover:bg-green-50 text-slate-300 hover:text-green-600'
-                      }`}
-                      title={u.isActive ? "Deactivate user" : "Activate user"}
-                    >
-                      {u.isActive ? <UserMinus className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
-                    </button>
-                  )}
+                    <Copy className="w-3 h-3" />
+                    Copy
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleEditInit(tmpl)}
+                    className="h-7 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-100 px-2 flex items-center gap-1"
+                  >
+                    <Edit className="w-3 h-3" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      if (confirm('Delete this template?')) {
+                        deleteTemplate.mutate(tmpl.id)
+                      }
+                    }}
+                    className="h-7 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 flex items-center gap-1"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-
-        {/* Role legend */}
-        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100">
-          <p className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Role permissions</p>
-          <div className="space-y-1 text-xs text-slate-500">
-            <p><span className="font-semibold text-red-600">Admin</span> — Full access, user management, all settings</p>
-            <p><span className="font-semibold text-amber-600">HR</span> — Standard access + Intake approvals + Activity Feed</p>
-            <p><span className="font-semibold text-slate-600">User</span> — CRM, Tasks, Invoices, personal Dashboard</p>
-          </div>
+            </div>
+          ))}
         </div>
-      </div>
+      )}
 
-      {/* Edit User Dialog */}
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="sm:max-w-md">
+      {/* Add/Edit Dialog */}
+      <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose() }}>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Edit className="w-4 h-4" /> Edit User Details
+              <MessageSquare className="w-4 h-4 text-[rgb(var(--ns-accent))]" />
+              {editingId ? 'Edit Message Template' : 'Create Message Template'}
             </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleEditSubmit} className="space-y-4 pt-1">
-            <div className="space-y-1.5">
-              <Label>Full Name</Label>
-              <input
-                type="text"
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                required
-                className={inputClass}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Email Address</Label>
-              <input
-                type="email"
-                value={editEmail}
-                onChange={(e) => setEditEmail(e.target.value)}
-                required
-                className={inputClass}
-              />
-            </div>
-            <div className="flex items-center gap-2 pt-1">
-              <Checkbox
-                id="edit-isActive"
-                checked={editIsActive}
-                onCheckedChange={(v) => setEditIsActive(v === true)}
-              />
-              <Label htmlFor="edit-isActive" className="text-sm font-medium text-slate-700">
-                Active — user can log in
-              </Label>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => setEditOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={updateUser.isPending}>
-                {updateUser.isPending ? 'Saving...' : 'Save Changes'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
 
-      {/* Add User Dialog */}
-      <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <UserPlus className="w-4 h-4" /> Add New User
-            </DialogTitle>
-          </DialogHeader>
-          <form
-            onSubmit={(e) => { e.preventDefault(); createUser.mutate() }}
-            className="space-y-4 pt-1"
-          >
+          <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+            {/* Title */}
             <div className="space-y-1.5">
-              <Label>Full Name *</Label>
+              <Label>Template Title *</Label>
               <input
                 type="text"
-                value={inviteName}
-                onChange={(e) => setInviteName(e.target.value)}
                 required
-                placeholder="Jane Smith"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. Invoice Overdue Follow-up"
                 className={inputClass}
               />
+              <p className="text-[10px] text-slate-400">Descriptive name for internal search/lookup.</p>
             </div>
-            <div className="space-y-1.5">
-              <Label>Email Address *</Label>
-              <input
-                type="email"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                required
-                placeholder="jane@company.com"
-                className={inputClass}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Temporary Password *</Label>
-              <div className="relative">
-                <input
-                  type={showInvitePassword ? 'text' : 'password'}
-                  value={invitePassword}
-                  onChange={(e) => setInvitePassword(e.target.value)}
-                  required
-                  placeholder="Min. 8 characters"
-                  minLength={8}
-                  className="w-full px-3.5 py-2.5 pr-10 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ns-accent))] focus:border-transparent bg-white placeholder-slate-400"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowInvitePassword(!showInvitePassword)}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-                  tabIndex={-1}
-                >
-                  {showInvitePassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+
+            <div className="grid grid-cols-2 gap-4">
+              {/* Category */}
+              <div className="space-y-1.5 col-span-2 sm:col-span-1">
+                <Label>Category *</Label>
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="email">Email</SelectItem>
+                    <SelectItem value="invoice_reminder">Invoice Reminder</SelectItem>
+                    <SelectItem value="proposal">Proposal</SelectItem>
+                    <SelectItem value="sms">SMS</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <p className="text-xs text-slate-400">Share this password with the user. They can change it in Settings.</p>
+
+              {/* Template Tags Hint */}
+              <div className="p-3 bg-slate-50 border border-slate-100 rounded-lg col-span-2 sm:col-span-1 flex flex-col justify-center">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Available Auto-tags:</span>
+                <span className="text-[9px] text-slate-500 font-mono leading-relaxed">
+                  {`{client_name}, {invoice_number}, {invoice_amount}, {due_date}, {sender_name}, {contact_name}, {company_name}, {deal_title}`}
+                </span>
+              </div>
             </div>
+
+            {/* Subject (Conditional) */}
+            {['email', 'invoice_reminder', 'proposal'].includes(category) && (
+              <div className="space-y-1.5">
+                <Label>Email Subject Line</Label>
+                <input
+                  type="text"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  placeholder="e.g. Reminder: Invoice {invoice_number} is past due"
+                  className={inputClass}
+                />
+              </div>
+            )}
+
+            {/* Message Body */}
             <div className="space-y-1.5">
-              <Label>Role</Label>
-              <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as any)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="user">User — Standard access</SelectItem>
-                  <SelectItem value="hr">HR — Standard + Intake approvals</SelectItem>
-                  <SelectItem value="admin">Admin — Full access</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Message Content *</Label>
+              <textarea
+                required
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="Write your canned message content here. Use {tags} to automatically inject client or invoice variables."
+                className={textareaClass}
+              />
             </div>
-            <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => setInviteOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={createUser.isPending}>
-                {createUser.isPending ? 'Creating...' : 'Create User'}
+
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="ghost" onClick={handleClose}>Cancel</Button>
+              <Button
+                type="submit"
+                disabled={createTemplate.isPending || updateTemplate.isPending}
+                className="bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white"
+              >
+                {editingId ? 'Save Changes' : 'Create Template'}
               </Button>
             </DialogFooter>
           </form>
@@ -779,8 +755,6 @@ function UsersTab({ currentUserId }: { currentUserId: string }) {
     </div>
   )
 }
-
-// ─── Data & Export Tab ────────────────────────────────────────────────────────
 
 function DataTab() {
   const [exporting, setExporting] = useState<string | null>(null)
@@ -956,15 +930,6 @@ function DataTab() {
       </div>
     </div>
   )
-}
-
-// ─── Webhooks Tab ────────────────────────────────────────────────────────────
-
-const EVENT_COLORS: Record<string, string> = {
-  'contact.created': 'bg-indigo-50 text-indigo-700 border-indigo-100',
-  'intake.approved': 'bg-purple-50 text-purple-700 border-purple-100',
-  'deal.won':        'bg-emerald-50 text-emerald-700 border-emerald-100',
-  'invoice.paid':    'bg-amber-50 text-amber-700 border-amber-100',
 }
 
 function WebhooksTab() {
@@ -1228,7 +1193,7 @@ function getSamplePayload(event: string) {
     case 'contact.created':
       return { id: 'test_contact_123', name: 'John Doe', email: 'john@example.com', phone: '+1234567890', title: 'Director', companyId: 'test_company_456' }
     case 'intake.approved':
-      return { id: 'test_intake_123', name: 'Sarah Smith', email: 'sarah@example.com', type: 'demo', source: 'landing_page', decidedAt: new Date().toISOString() }
+      return { id: 'test_intake_123', name: 'Sarah Smith', email: 'sarah@example.com', type: 'demo', some_data: 'test' }
     case 'deal.won':
       return { id: 'test_deal_123', title: 'Enterprise SLA Renewal', value: 25000, stage: 'won', contactId: 'test_contact_123' }
     case 'invoice.paid':
@@ -1237,393 +1202,3 @@ function getSamplePayload(event: string) {
       return { msg: 'Test payload' }
   }
 }
-
-// ─── Templates Tab ────────────────────────────────────────────────────────────
-
-function TemplatesTab() {
-  const queryClient = useQueryClient()
-  const [open, setOpen] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  
-  // Form states
-  const [title, setTitle] = useState('')
-  const [subject, setSubject] = useState('')
-  const [content, setContent] = useState('')
-  const [category, setCategory] = useState<string>('email')
-  
-  // Filter/Search states
-  const [search, setSearch] = useState('')
-  const [activeCategory, setActiveCategory] = useState<string>('all')
-
-  // Fetch templates
-  const { data: templates = [], isLoading } = useQuery({
-    queryKey: ['templates'],
-    queryFn: async () => {
-      return await pb.collection('templates').getFullList({
-        sort: '-created',
-      })
-    },
-  })
-
-  // Mutations
-  const createTemplate = useMutation({
-    mutationFn: async (data: any) => {
-      return await pb.collection('templates').create(data)
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['templates'] })
-      toast.success('Template created successfully')
-      handleClose()
-    },
-    onError: (err: any) => {
-      toast.error(err.message || 'Failed to create template')
-    }
-  })
-
-  const updateTemplate = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      return await pb.collection('templates').update(id, data)
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['templates'] })
-      toast.success('Template updated successfully')
-      handleClose()
-    },
-    onError: (err: any) => {
-      toast.error(err.message || 'Failed to update template')
-    }
-  })
-
-  const deleteTemplate = useMutation({
-    mutationFn: async (id: string) => {
-      return await pb.collection('templates').delete(id)
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['templates'] })
-      toast.success('Template deleted')
-    },
-    onError: (err: any) => {
-      toast.error(err.message || 'Failed to delete template')
-    }
-  })
-
-  const handleClose = () => {
-    setOpen(false)
-    setEditingId(null)
-    setTitle('')
-    setSubject('')
-    setContent('')
-    setCategory('email')
-  }
-
-  const handleEditInit = (tmpl: any) => {
-    setEditingId(tmpl.id)
-    setTitle(tmpl.title || '')
-    setSubject(tmpl.subject || '')
-    setContent(tmpl.content || '')
-    setCategory(tmpl.category || 'email')
-    setOpen(true)
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!title || !content || !category) {
-      toast.error('Title, Content, and Category are required')
-      return
-    }
-
-    const payload = {
-      title,
-      subject: ['email', 'invoice_reminder', 'proposal'].includes(category) ? subject : '',
-      content,
-      category,
-    }
-
-    if (editingId) {
-      updateTemplate.mutate({ id: editingId, data: payload })
-    } else {
-      createTemplate.mutate(payload)
-    }
-  }
-
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text)
-    toast.success('Template content copied to clipboard!')
-  }
-
-  // Filter templates
-  const filteredTemplates = templates.filter((tmpl: any) => {
-    const matchesSearch = 
-      tmpl.title?.toLowerCase().includes(search.toLowerCase()) ||
-      tmpl.subject?.toLowerCase().includes(search.toLowerCase()) ||
-      tmpl.content?.toLowerCase().includes(search.toLowerCase())
-    
-    const matchesCategory = activeCategory === 'all' || tmpl.category === activeCategory
-
-    return matchesSearch && matchesCategory
-  })
-
-  const categoryColors: Record<string, string> = {
-    email: 'bg-blue-50 text-blue-700 border-blue-100',
-    invoice_reminder: 'bg-orange-50 text-orange-700 border-orange-100',
-    proposal: 'bg-purple-50 text-purple-700 border-purple-100',
-    sms: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-    other: 'bg-slate-100 text-slate-600 border-slate-200',
-  }
-
-  const categoryLabels: Record<string, string> = {
-    email: 'Email',
-    invoice_reminder: 'Invoice Reminder',
-    proposal: 'Proposal',
-    sms: 'SMS',
-    other: 'Other',
-  }
-
-  const categories = ['all', 'email', 'invoice_reminder', 'proposal', 'sms', 'other']
-
-  const inputClass = 'w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ns-accent))] focus:border-transparent bg-white placeholder-slate-400 transition-shadow'
-  const textareaClass = 'w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ns-accent))] focus:border-transparent bg-white placeholder-slate-400 transition-shadow min-h-[140px] resize-y font-mono text-xs'
-
-  return (
-    <div className="space-y-4">
-      {/* Header and Add Button */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
-            <MessageSquare className="w-4 h-4 text-slate-500" />
-            Canned Responses & Templates
-          </h3>
-          <p className="text-xs text-slate-500 mt-0.5">Quickly copy canned messages or use them to send invoices.</p>
-        </div>
-        <Button onClick={() => setOpen(true)} className="flex items-center gap-1.5 self-start bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white text-xs font-semibold px-3 py-1.5 h-8">
-          <Plus className="w-3.5 h-3.5" />
-          Add Template
-        </Button>
-      </div>
-
-      {/* Filter and Search Bar */}
-      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between">
-        {/* Category Pills */}
-        <div className="flex flex-wrap gap-1 w-full md:w-auto">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setActiveCategory(cat)}
-              className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-all ${
-                activeCategory === cat
-                  ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
-                  : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-              }`}
-            >
-              {cat === 'all' ? 'All' : categoryLabels[cat] || cat}
-            </button>
-          ))}
-        </div>
-
-        {/* Search Input */}
-        <div className="relative w-full md:w-64">
-          <input
-            type="text"
-            placeholder="Search templates..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ns-accent))] focus:border-transparent bg-white placeholder-slate-400"
-          />
-          <span className="absolute left-2.5 top-2 text-slate-400">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </span>
-        </div>
-      </div>
-
-      {/* Templates List */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12 bg-white rounded-xl border border-slate-200 shadow-sm">
-          <Loader2 className="w-6 h-6 animate-spin text-slate-300" />
-        </div>
-      ) : filteredTemplates.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col items-center justify-center">
-          <FileText className="w-10 h-10 text-slate-200 mb-2" />
-          <p className="text-sm font-semibold text-slate-500">No templates found</p>
-          <p className="text-xs text-slate-400 max-w-xs mt-1">
-            {search || activeCategory !== 'all' 
-              ? 'No templates match your filters. Try clearing your search.' 
-              : 'Create your first canned response template to get started!'}
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredTemplates.map((tmpl: any) => (
-            <div key={tmpl.id} className="bg-white rounded-xl border border-slate-200 shadow-sm hover:border-slate-300 transition-all flex flex-col justify-between overflow-hidden group">
-              <div className="p-4 space-y-3">
-                {/* Card Title & Category */}
-                <div className="flex items-start justify-between gap-2">
-                  <h4 className="font-semibold text-slate-900 text-sm group-hover:text-[rgb(var(--ns-accent))] transition-colors truncate">
-                    {tmpl.title}
-                  </h4>
-                  <Badge className={`${categoryColors[tmpl.category] || categoryColors.other} text-[9px] px-1.5 py-0.5 whitespace-nowrap`}>
-                    {categoryLabels[tmpl.category] || tmpl.category}
-                  </Badge>
-                </div>
-
-                {/* Subject (if applicable) */}
-                {tmpl.subject && (
-                  <div className="text-[11px] bg-slate-50 border border-slate-100 p-2 rounded-lg text-slate-600 font-medium truncate">
-                    <span className="text-slate-400 font-semibold mr-1.5">Subject:</span>
-                    {tmpl.subject}
-                  </div>
-                )}
-
-                {/* Content Area */}
-                <div className="relative">
-                  <pre className="text-xs text-slate-500 font-mono whitespace-pre-wrap line-clamp-4 bg-slate-50/50 p-2.5 rounded-lg border border-slate-100/50 min-h-[80px] break-words">
-                    {tmpl.content}
-                  </pre>
-                  <div className="absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-white to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-              </div>
-
-              {/* Action Buttons Footer */}
-              <div className="bg-slate-50 px-4 py-2 border-t border-slate-100 flex items-center justify-between">
-                {/* Variable Placeholder Hints */}
-                <div className="text-[9px] text-slate-400 font-mono truncate max-w-[120px]" title="Supports template placeholders like {client_name}, {invoice_number}">
-                  Supports {`{...}`} tags
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleCopy(tmpl.content)}
-                    className="h-7 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-100 px-2 flex items-center gap-1"
-                    title="Copy to clipboard"
-                  >
-                    <Copy className="w-3 h-3" />
-                    Copy
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleEditInit(tmpl)}
-                    className="h-7 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-100 px-2 flex items-center gap-1"
-                  >
-                    <Edit className="w-3 h-3" />
-                    Edit
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      if (confirm('Delete this template?')) {
-                        deleteTemplate.mutate(tmpl.id)
-                      }
-                    }}
-                    className="h-7 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 flex items-center gap-1"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Add/Edit Dialog */}
-      <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose() }}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <MessageSquare className="w-4 h-4 text-[rgb(var(--ns-accent))]" />
-              {editingId ? 'Edit Message Template' : 'Create Message Template'}
-            </DialogTitle>
-          </DialogHeader>
-
-          <form onSubmit={handleSubmit} className="space-y-4 pt-2">
-            {/* Title */}
-            <div className="space-y-1.5">
-              <Label>Template Title *</Label>
-              <input
-                type="text"
-                required
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Invoice Overdue Follow-up"
-                className={inputClass}
-              />
-              <p className="text-[10px] text-slate-400">Descriptive name for internal search/lookup.</p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              {/* Category */}
-              <div className="space-y-1.5 col-span-2 sm:col-span-1">
-                <Label>Category *</Label>
-                <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="email">Email</SelectItem>
-                    <SelectItem value="invoice_reminder">Invoice Reminder</SelectItem>
-                    <SelectItem value="proposal">Proposal</SelectItem>
-                    <SelectItem value="sms">SMS</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Template Tags Hint */}
-              <div className="p-3 bg-slate-50 border border-slate-100 rounded-lg col-span-2 sm:col-span-1 flex flex-col justify-center">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Available Auto-tags:</span>
-                <span className="text-[9px] text-slate-500 font-mono leading-relaxed">
-                  {`{client_name}, {invoice_number}, {invoice_amount}, {due_date}, {sender_name}, {contact_name}, {company_name}, {deal_title}`}
-                </span>
-              </div>
-            </div>
-
-            {/* Subject (Conditional) */}
-            {['email', 'invoice_reminder', 'proposal'].includes(category) && (
-              <div className="space-y-1.5">
-                <Label>Email Subject Line</Label>
-                <input
-                  type="text"
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  placeholder="e.g. Reminder: Invoice {invoice_number} is past due"
-                  className={inputClass}
-                />
-              </div>
-            )}
-
-            {/* Message Body */}
-            <div className="space-y-1.5">
-              <Label>Message Content *</Label>
-              <textarea
-                required
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Write your canned message content here. Use {tags} to automatically inject client or invoice variables."
-                className={textareaClass}
-              />
-            </div>
-
-            <DialogFooter className="pt-2">
-              <Button type="button" variant="ghost" onClick={handleClose}>Cancel</Button>
-              <Button 
-                type="submit" 
-                disabled={createTemplate.isPending || updateTemplate.isPending}
-                className="bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white"
-              >
-                {editingId ? 'Save Changes' : 'Create Template'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </div>
-  )
-}
-
-

@@ -389,7 +389,7 @@ export function InvoicesPage() {
             Help
           </button>
           <Dialog open={creating} onOpenChange={setCreating}>
-          <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-1.5" />Add Invoice</Button></DialogTrigger>
+          <DialogTrigger asChild><Button className="flex-shrink-0 bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white shadow-sm font-bold"><Plus className="w-4 h-4 mr-1.5" />Add Invoice</Button></DialogTrigger>
           <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
             <DialogHeader className="px-6 py-4 border-b border-slate-100 flex-shrink-0"><DialogTitle>Add New Invoice</DialogTitle></DialogHeader>
             <form onSubmit={(e) => {

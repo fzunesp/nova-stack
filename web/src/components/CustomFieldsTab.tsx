@@ -15,6 +15,7 @@ const ENTITY_TYPES = [
   { id: 'tasks', label: 'Tasks' },
   { id: 'invoices', label: 'Invoices' },
   { id: 'products', label: 'Products' },
+  { id: 'employees', label: 'Employees' },
 ]
 
 const FIELD_TYPES = [

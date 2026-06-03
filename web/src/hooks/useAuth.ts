@@ -16,7 +16,7 @@ interface AuthState {
 export const useAuth = create<AuthState>((set) => {
   const user = pb.authStore.record as unknown as UserRecord | null
   const role = user?.role ?? 'user'
-  const isValid = pb.authStore.isValid && user?.isActive !== false
+  const isValid = pb.authStore.isValid && user?.isActive !== false && user?.access_desktop !== false
 
   return {
     isAuthenticated: isValid,
@@ -32,6 +32,11 @@ export const useAuth = create<AuthState>((set) => {
       if (r.isActive === false) {
         pb.authStore.clear()
         throw new Error('Your account is inactive. Please contact an administrator.')
+      }
+
+      if (r.access_desktop === false) {
+        pb.authStore.clear()
+        throw new Error('You do not have access to the Desktop application. Please contact an administrator.')
       }
 
       const role = r.role ?? 'user'
@@ -51,7 +56,7 @@ export const useAuth = create<AuthState>((set) => {
 
     checkAuth: () => {
       const r = pb.authStore.record as unknown as UserRecord | null
-      if (pb.authStore.isValid && r?.isActive !== false) {
+      if (pb.authStore.isValid && r?.isActive !== false && r?.access_desktop !== false) {
         const role = r?.role ?? 'user'
         set({
           isAuthenticated: true,

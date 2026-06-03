@@ -3,7 +3,7 @@ import { useAuth } from '@/hooks/useAuth'
 import {
   LayoutDashboard, CheckSquare, FileText, Inbox, Settings,
   LogOut, Menu, X, Users, Search, Bell, Plus, HelpCircle,
-  ChevronLeft, ChevronRight, ChevronDown, Briefcase, Package, Building2
+  ChevronLeft, ChevronRight, ChevronDown, Briefcase, Package, Building2, ClipboardList
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { useGlobalSearch } from '@/hooks/useGlobalSearch'
@@ -21,7 +21,8 @@ const navSections = [
       { to: '/invoices', icon: FileText, label: 'Invoices' },
       { to: '/products', icon: Package, label: 'Products' },
       { to: '/intake', icon: Inbox, label: 'Intake' },
-      { to: '/hr', icon: Briefcase, label: 'HR' },
+      { to: '/hr', icon: Users, label: 'HR' },
+      { to: '/requests', icon: ClipboardList, label: 'Requests' },
     ],
   },
   {
@@ -41,7 +42,7 @@ const quickCreateItems = [
   { label: 'Invoice', icon: FileText, path: '/invoices', iconBg: 'bg-violet-100', iconColor: 'text-violet-600' },
   { label: 'Product', icon: Package, path: '/products', iconBg: 'bg-amber-100', iconColor: 'text-amber-600' },
   { label: 'Intake', icon: Inbox, path: '/intake', iconBg: 'bg-pink-100', iconColor: 'text-pink-600' },
-  { label: 'HR Request', icon: Briefcase, path: '/hr', iconBg: 'bg-slate-100', iconColor: 'text-slate-600' },
+  { label: 'Request', icon: ClipboardList, path: '/requests', iconBg: 'bg-slate-100', iconColor: 'text-slate-600' },
 ]
 
 const Logo = () => (

@@ -11,6 +11,7 @@ import { ProductsPage } from '@/pages/ProductsPage'
 import { IntakePage } from '@/pages/IntakePage'
 import { HrPage } from '@/pages/HrPage'
 import { HrSubmissionPage } from '@/pages/HrSubmissionPage'
+import { EmployeesPage } from '@/pages/EmployeesPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { HelpPage } from '@/pages/HelpPage'
@@ -61,8 +62,9 @@ export function AppRouter() {
             <Route path="invoices/:id" element={<InvoicesPage />} />
             <Route path="products" element={<ProductsPage />} />
             <Route path="intake" element={<IntakePage />} />
-            <Route path="hr" element={<HrPage />} />
-            <Route path="hr/:id" element={<HrSubmissionPage />} />
+            <Route path="hr" element={<EmployeesPage />} />
+            <Route path="requests" element={<HrPage />} />
+            <Route path="requests/:id" element={<HrSubmissionPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="help" element={<HelpPage />} />
           </Route>

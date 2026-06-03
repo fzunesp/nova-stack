@@ -95,12 +95,12 @@ export function HrSubmissionPage() {
     <div className="px-6 py-8 max-w-5xl mx-auto space-y-6">
       {/* Breadcrumb + Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/hr')} className="text-slate-400 hover:text-slate-600">
+        <Button variant="ghost" size="icon" onClick={() => navigate('/requests')} className="text-slate-400 hover:text-slate-600">
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
-            <button onClick={() => navigate('/hr')} className="hover:text-indigo-600 transition-colors">HR</button>
+            <button onClick={() => navigate('/requests')} className="hover:text-indigo-600 transition-colors">Requests</button>
             <ChevronRight className="w-3 h-3" />
             <span className="text-slate-600">{formDef?.name || submission.type}</span>
           </div>

@@ -1,9 +1,9 @@
 import { useCustomFieldDefinitions } from '@/hooks/useCustomFields'
 import { Badge } from '@/components/ui/badge'
 
-interface DynamicCustomFieldsViewerProps {
-  entityType: 'companies' | 'contacts' | 'deals' | 'tasks' | 'invoices' | 'products'
-  values?: Record<string, any>
+export interface DynamicCustomFieldsViewerProps {
+  entityType: 'companies' | 'contacts' | 'deals' | 'tasks' | 'invoices' | 'products' | 'employees'
+  values: Record<string, any>
   layout?: 'grid' | 'list'
 }
 

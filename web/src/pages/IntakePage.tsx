@@ -131,7 +131,7 @@ export function IntakePage() {
             Help
           </button>
           <Dialog open={creating} onOpenChange={setCreating}>
-          <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-1.5" />Add Submission</Button></DialogTrigger>
+          <DialogTrigger asChild><Button className="flex-shrink-0 bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white shadow-sm font-bold"><Plus className="w-4 h-4 mr-1.5" />Add Submission</Button></DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>Add Intake Submission</DialogTitle></DialogHeader>
             <form onSubmit={(e) => { e.preventDefault(); createSub.mutate(formData as any) }} className="space-y-4">

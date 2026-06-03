@@ -226,7 +226,7 @@ export function CompaniesPage() {
               setFormErrors({})
             }
           }}>
-            <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-1.5" />Add Company</Button></DialogTrigger>
+            <DialogTrigger asChild><Button className="flex-shrink-0 bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white shadow-sm font-bold"><Plus className="w-4 h-4 mr-1.5" />Add Company</Button></DialogTrigger>
             <DialogContent className="sm:max-w-lg">
               <DialogHeader><DialogTitle>Add New Company</DialogTitle></DialogHeader>
               <CompanyForm data={formData} onChange={setFormData} onSubmit={handleCreateSubmit} isPending={createCompany.isPending} label="Add Company" errors={formErrors} />

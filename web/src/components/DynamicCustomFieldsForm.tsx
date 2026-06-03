@@ -4,8 +4,8 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 
-interface DynamicCustomFieldsFormProps {
-  entityType: 'companies' | 'contacts' | 'deals' | 'tasks' | 'invoices' | 'products'
+export interface DynamicCustomFieldsFormProps {
+  entityType: 'companies' | 'contacts' | 'deals' | 'tasks' | 'invoices' | 'products' | 'employees'
   values: Record<string, any>
   onChange: (values: Record<string, any>) => void
   errors?: Record<string, string>

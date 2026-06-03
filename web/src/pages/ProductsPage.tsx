@@ -121,7 +121,7 @@ export function ProductsPage() {
             <HelpCircle className="w-3.5 h-3.5" />
             Help
           </button>
-          <Button onClick={() => setCreating(true)} className="flex-shrink-0 bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white shadow-sm">
+          <Button onClick={() => setCreating(true)} className="flex-shrink-0 bg-[rgb(var(--ns-accent))] hover:bg-[rgb(var(--ns-accent-dk))] text-white shadow-sm font-bold">
             <Plus className="w-4 h-4 mr-1.5" /> Add Product
           </Button>
         </div>

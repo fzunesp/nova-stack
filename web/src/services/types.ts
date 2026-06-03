@@ -7,6 +7,8 @@ export interface UserRecord {
   role: 'admin' | 'hr' | 'user'
   companyName?: string
   isActive: boolean
+  access_desktop: boolean
+  access_mobile: boolean
   mustChangePassword?: boolean
   created?: string
   updated?: string
@@ -179,6 +181,27 @@ export interface AuditLogRecord {
   created?: string
 }
 
+export interface EmployeeRecord {
+  id: string
+  name: string
+  employee_id?: string
+  work_email?: string
+  personal_email?: string
+  phone?: string
+  dob?: string
+  job_title?: string
+  department?: 'HR' | 'Sales' | 'Engineering' | 'Admin' | 'Operations'
+  rol_type: 'employee' | 'manager' | 'contractor' | 'executive'
+  status: 'active' | 'onboarding' | 'terminated' | 'on_leave'
+  hire_date?: string
+  userId?: string
+  managerId?: string
+  customFields?: Record<string, any>
+  created_by: string
+  created?: string
+  updated?: string
+}
+
 export interface ListParams {
   page?: number
   perPage?: number
@@ -200,7 +223,7 @@ export interface CustomFieldDefinition {
   id: string
   name: string
   key: string
-  entityType: 'companies' | 'contacts' | 'deals' | 'tasks' | 'invoices' | 'products'
+  entityType: 'companies' | 'contacts' | 'deals' | 'tasks' | 'invoices' | 'products' | 'employees'
   type: 'text' | 'number' | 'select' | 'checkbox' | 'date'
   options?: string[]
   required?: boolean

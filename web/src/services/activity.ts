@@ -76,13 +76,13 @@ export async function getActivityFeed(): Promise<ActivityEvent[]> {
       try {
         const records = await pb.collection(collection).getList(1, ids.length, {
           filter,
-          fields: `items.id,items.${titleField}`,
         })
         titleMap[collection] = {}
         records.items.forEach((r: any) => {
-          titleMap[collection][r.id] = r[titleField] || `(Untitled)`
+          titleMap[collection][r.id] = r[titleField] || `Untitled ${COLLECTION_MAP[collection] || 'Item'}`
         })
-      } catch {
+      } catch (err) {
+        console.warn(`Failed to fetch titles for ${collection}:`, err)
         titleMap[collection] = {}
       }
     })
