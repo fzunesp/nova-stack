@@ -18,6 +18,14 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Show Email Being Used
+        env:
+          PB_ADMIN_EMAIL: ${{ secrets.PB_ADMIN_EMAIL }}
+          PB_URL: ${{ secrets.PB_URL }}
+        run: |
+          echo "PB_ADMIN_EMAIL=$PB_ADMIN_EMAIL"
+          echo "PB_URL=$PB_URL"
+
       - name: Run Reseed Script
         env:
           PB_URL: ${{ secrets.PB_URL }}
