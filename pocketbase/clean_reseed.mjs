@@ -18,6 +18,7 @@
  */
 
 const base = process.env.PB_URL || 'http://localhost:8090/api';
+console.log(`PB_URL = [${base}]`);
 
 async function api(method, path, body = null, token) {
   const opts = {
