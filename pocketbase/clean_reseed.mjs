@@ -40,18 +40,29 @@ async function api(method, path, body = null, token) {
 }
 
 async function seed() {
+  // Verify required environment variables exist
+  if (!process.env.PB_ADMIN_EMAIL || !process.env.PB_ADMIN_PASSWORD) {
+    console.error('Missing PB_ADMIN_EMAIL or PB_ADMIN_PASSWORD environment variables');
+    process.exit(1);
+  }
+
   // Authenticate as app admin user (users collection)
   const auth = await api('POST', '/collections/users/auth-with-password', {
-    identity: process.env.PB_ADMIN_EMAIL || 'admin@nova-stack.local',
-    password: process.env.PB_ADMIN_PASSWORD || 'password123'
+    identity: process.env.PB_ADMIN_EMAIL,
+    password: process.env.PB_ADMIN_PASSWORD
   });
-  if (!auth?.token) { console.error('Auth failed'); return; }
+
+  if (!auth?.token) {
+    console.error('Auth failed');
+    return;
+  }
+
   const token = auth.token;
   const adminId = auth.record.id;
 
   console.log('--- Starting Full Reseed ---');
   console.log(`  Admin ID: ${adminId}`);
-
+  
   // 1. Clear all business collections
   const collectionsToClear = [
     'invoices', 'deals', 'contacts', 'companies', 'products',
