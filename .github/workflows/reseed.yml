@@ -29,8 +29,8 @@ jobs:
       - name: Run Reseed Script
         env:
           PB_URL: ${{ secrets.PB_URL }}
-          PB_ADMIN_EMAIL: ${{ secrets.PB_ADMIN_EMAIL }}
-          PB_ADMIN_PASSWORD: ${{ secrets.PB_ADMIN_PASSWORD }}
+          PB_ADMIN_EMAIL: admin@nova-stack.local
+          PB_ADMIN_PASSWORD: password123
         run: node pocketbase/clean_reseed.mjs
 
 # trigger scan
