@@ -18,13 +18,9 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Show Email Being Used
-        env:
-          PB_ADMIN_EMAIL: ${{ secrets.PB_ADMIN_EMAIL }}
-          PB_URL: ${{ secrets.PB_URL }}
+      - name: Test PocketBase Connectivity
         run: |
-          echo "PB_ADMIN_EMAIL=$PB_ADMIN_EMAIL"
-          echo "PB_URL=$PB_URL"
+          curl -v https://pb-ns.flowmatica.ca/api/health
 
       - name: Run Reseed Script
         env:
