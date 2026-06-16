@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Package, Search, Plus, Pencil, Trash2, HelpCircle, ArrowUpDown } from 'lucide-react'
+import { Package, Search, Plus, Pencil, Trash2, HelpCircle, ArrowUpDown, Hash } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,6 +12,7 @@ import { DataTablePagination } from '@/components/DataTablePagination'
 import { TableRowSkeleton } from '@/components/ui/skeleton'
 import pb from '@/lib/pocketbase'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useEntityNumberingPreview } from '@/hooks/useEntityNumberingPreview'
 import { toast } from 'sonner'
 import { useLocation } from 'react-router'
 import type { Status } from '@/services'
@@ -34,15 +35,22 @@ export function ProductsPage() {
   const [formData, setFormData] = useState({ name: '', description: '', price: '', sku: '', status: 'active' as Status, customFields: {} as Record<string, any> })
   const [creating, setCreating] = useState(location.state?.openCreate === true)
   const [editing, setEditing] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState({ name: '', description: '', price: '', sku: '', status: 'active' as Status, customFields: {} as Record<string, any> })
+  const [editForm, setEditForm] = useState({ name: '', description: '', price: '', sku: '', status: 'active' as Status, customFields: {} as Record<string, any>, entity_numbering: '' })
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const { data: customFieldDefs = [] } = useCustomFieldDefinitions('products')
 
+  const { preview: productPreview, isEnabled: showAutoNumber } = useEntityNumberingPreview('products')
+
   const standardColumns: ColumnDef[] = [
-    { key: 'name', label: 'Name & Description', flex: true, minWidth: 200, sortField: 'name' },
-    { key: 'sku', label: 'SKU', width: 130, sortField: 'sku' },
-    { key: 'price', label: 'Price', width: 130, sortField: 'price' },
-    { key: 'status', label: 'Status', width: 120 },
+    { key: 'name', label: 'Product Name', flex: true, minWidth: 200, sortField: 'name' },
+    { key: 'description', label: 'Description', width: 200, defaultHidden: true },
+    { key: 'sku', label: 'SKU / Code', width: 130, sortField: 'sku' },
+    { key: 'price', label: 'Unit Price', width: 130, sortField: 'price' },
+    { key: 'category', label: 'Category', width: 130, defaultHidden: true, sortField: 'category' },
+    { key: 'stock', label: 'Stock Quantity', width: 130, defaultHidden: true, sortField: 'stock' },
+    { key: 'status', label: 'Status', width: 120, sortField: 'status' },
+    { key: 'created', label: 'Created At', width: 150, defaultHidden: true, sortField: 'created', readOnly: true },
+    { key: 'updated', label: 'Updated At', width: 150, defaultHidden: true, sortField: 'updated', readOnly: true },
     { key: 'actions', label: 'Actions', width: 100, alwaysVisible: true, stickyRight: true }
   ]
 
@@ -53,10 +61,14 @@ export function ProductsPage() {
     isCustom: true
   }))
 
-  const standardData = standardColumns.filter(c => !c.stickyRight)
-  const stickyActions = standardColumns.filter(c => c.stickyRight)
-  const allColumns = [...standardData, ...customColumns, ...stickyActions]
-  const { visibleKeys, visibleColumns, toggleColumn } = useColumnPicker('products', allColumns)
+  const {
+    visibleKeys,
+    visibleColumns,
+    orderedAllColumns,
+    toggleColumn,
+    moveColumn,
+    resetColumns
+  } = useColumnPicker('products', [...standardColumns, ...customColumns])
 
   const createMutation = useMutation({
     mutationFn: (data: typeof formData) =>
@@ -137,7 +149,13 @@ export function ProductsPage() {
             className="pl-10"
           />
         </div>
-        <ColumnPicker allColumns={allColumns} visibleKeys={visibleKeys} onToggle={toggleColumn} />
+        <ColumnPicker
+          orderedAllColumns={orderedAllColumns}
+          visibleKeys={visibleKeys}
+          onToggle={toggleColumn}
+          onMove={moveColumn}
+          onReset={resetColumns}
+        />
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
@@ -216,7 +234,7 @@ export function ProductsPage() {
                               <div className="flex items-center justify-end gap-1 transition-opacity">
                                 <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => {
                                   setFormErrors({})
-                                  setEditForm({ name: item.name, description: item.description, price: item.price.toString(), sku: item.sku, status: item.status, customFields: item.customFields || {} })
+                                  setEditForm({ name: item.name, description: item.description, price: item.price.toString(), sku: item.sku, status: item.status, customFields: item.customFields || {}, entity_numbering: item.entity_numbering || '' })
                                   setEditing(item.id)
                                 }}>
                                   <Pencil className="w-3.5 h-3.5" />
@@ -229,6 +247,22 @@ export function ProductsPage() {
                               </div>
                             </td>
                           )
+                        }
+
+                        // Standard field fallback
+                        if (!col.isCustom) {
+                          let displayVal: string = '—'
+                          if (col.key === 'description') {
+                            displayVal = item.description || '—'
+                          } else if (col.key === 'category') {
+                            displayVal = item.category || '—'
+                          } else if (col.key === 'stock') {
+                            displayVal = item.stock != null ? String(item.stock) : '—'
+                          } else if (col.key === 'created' || col.key === 'updated') {
+                            const d = item[col.key]
+                            displayVal = d ? new Date(d).toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' }) : '—'
+                          }
+                          return <td key={col.key} className="px-4 py-3 text-sm text-slate-500 truncate">{displayVal}</td>
                         }
 
                         // Render custom fields
@@ -283,8 +317,17 @@ export function ProductsPage() {
           <form onSubmit={handleCreate} className="flex flex-col flex-1 min-h-0">
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
               <div className="grid grid-cols-2 gap-4">
+                {showAutoNumber && (
+                  <div className="col-span-2 space-y-2">
+                    <Label>Product Number <span className="text-slate-400 font-normal">(auto-generated)</span></Label>
+                    <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                      <Hash className="w-4 h-4 text-slate-400" />
+                      <span className="font-mono text-sm text-slate-700">{productPreview || 'PRO-0001'}</span>
+                    </div>
+                  </div>
+                )}
                 <div className="col-span-2 space-y-2">
-                  <Label>Name</Label>
+                  <Label>Name *</Label>
                   <Input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="New Product Name" />
                 </div>
                 <div className="space-y-2">
@@ -320,8 +363,17 @@ export function ProductsPage() {
           <form onSubmit={handleEdit} className="flex flex-col min-h-0">
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
               <div className="grid grid-cols-2 gap-4">
+                {showAutoNumber && (
+                  <div className="col-span-2 space-y-2">
+                    <Label>Product Number</Label>
+                    <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                      <Hash className="w-4 h-4 text-slate-400" />
+                      <span className="font-mono text-sm text-slate-700">{editForm.entity_numbering || '—'}</span>
+                    </div>
+                  </div>
+                )}
                 <div className="col-span-2 space-y-2">
-                  <Label>Name</Label>
+                  <Label>Name *</Label>
                   <Input required value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} placeholder="Edit Product Name" />
                 </div>
                 <div className="space-y-2">

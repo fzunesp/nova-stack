@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Building2, Search, Trash2, Pencil, ArrowUpDown, Plus, Users, Briefcase, FileText, Globe, Phone, MapPin, Activity, HelpCircle } from 'lucide-react'
+import { Building2, Search, Trash2, Pencil, ArrowUpDown, Plus, Users, Briefcase, FileText, Globe, Phone, MapPin, Activity, HelpCircle, Hash } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -11,6 +11,7 @@ import { DataTablePagination } from '@/components/DataTablePagination'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import pb from '@/lib/pocketbase'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
+import { useEntityNumberingPreview } from '@/hooks/useEntityNumberingPreview'
 import { toast } from 'sonner'
 import { useNavigate, useParams } from 'react-router'
 import { DynamicCustomFieldsForm, validateCustomFields } from '@/components/DynamicCustomFieldsForm'
@@ -54,7 +55,7 @@ export function CompaniesPage() {
     enabled: !!id,
   })
 
-  const emptyForm = { name: '', industry: '', website: '', phone: '', address: '', city: '', country: '', notes: '', status: 'active' as CompanyStatus, customFields: {} as Record<string, any> }
+  const emptyForm = { name: '', industry: '', website: '', phone: '', address: '', city: '', country: '', notes: '', status: 'active' as CompanyStatus, customFields: {} as Record<string, any>, entity_numbering: '' }
   const [formData, setFormData] = useState(emptyForm)
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
@@ -64,11 +65,21 @@ export function CompaniesPage() {
   const { data: customFieldDefs = [] } = useCustomFieldDefinitions('companies')
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
+  const { preview: companyPreview, isEnabled: showAutoNumber } = useEntityNumberingPreview('companies')
+
   const standardColumns: ColumnDef[] = [
-    { key: 'name', label: 'Company', flex: true, minWidth: 200, sortField: 'name' },
-    { key: 'industry', label: 'Industry', width: 150 },
+    { key: 'name', label: 'Company Name', flex: true, minWidth: 200, sortField: 'name' },
+    { key: 'industry', label: 'Industry', width: 150, sortField: 'industry' },
     { key: 'location', label: 'Location', width: 140 },
-    { key: 'status', label: 'Status', width: 100 },
+    { key: 'website', label: 'Website', width: 150, defaultHidden: true, sortField: 'website' },
+    { key: 'phone', label: 'Phone Number', width: 130, defaultHidden: true, sortField: 'phone' },
+    { key: 'address', label: 'Address', width: 180, defaultHidden: true },
+    { key: 'city', label: 'City', width: 120, defaultHidden: true, sortField: 'city' },
+    { key: 'country', label: 'Country', width: 120, defaultHidden: true, sortField: 'country' },
+    { key: 'notes', label: 'Notes', width: 200, defaultHidden: true },
+    { key: 'status', label: 'Status', width: 100, sortField: 'status' },
+    { key: 'created', label: 'Created At', width: 150, defaultHidden: true, sortField: 'created', readOnly: true },
+    { key: 'updated', label: 'Updated At', width: 150, defaultHidden: true, sortField: 'updated', readOnly: true },
     { key: 'actions', label: 'Actions', width: 100, alwaysVisible: true, stickyRight: true }
   ]
 
@@ -79,11 +90,14 @@ export function CompaniesPage() {
     isCustom: true
   }))
 
-  // Custom fields go BEFORE the sticky actions column
-  const standardData = standardColumns.filter(c => !c.stickyRight)
-  const stickyActions = standardColumns.filter(c => c.stickyRight)
-  const allColumns = [...standardData, ...customColumns, ...stickyActions]
-  const { visibleKeys, visibleColumns, toggleColumn } = useColumnPicker('companies', allColumns)
+  const { 
+    visibleKeys, 
+    visibleColumns, 
+    orderedAllColumns, 
+    toggleColumn, 
+    moveColumn, 
+    resetColumns 
+  } = useColumnPicker('companies', [...standardColumns, ...customColumns])
 
   const createCompany = useMutation({
     mutationFn: (data: typeof formData) =>
@@ -138,6 +152,7 @@ export function CompaniesPage() {
       notes: company.notes || '',
       status: company.status || 'active',
       customFields: company.customFields || {},
+      entity_numbering: company.entity_numbering || '',
     })
     setEditing(company.id)
   }
@@ -166,7 +181,21 @@ export function CompaniesPage() {
     <form onSubmit={(e) => { e.preventDefault(); onSubmit() }} className="flex flex-col max-h-[85vh]">
       <div className="flex-1 overflow-y-auto px-1 pr-2 space-y-4 py-2">
         <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2 space-y-1"><Label>Company Name *</Label><Input placeholder="Acme Corp" value={data.name} onChange={(e) => onChange({ ...data, name: e.target.value })} required /></div>
+          {showAutoNumber && (
+            <div className="col-span-2 space-y-1">
+              <Label>Company Number <span className="text-slate-400 font-normal">(auto-generated)</span></Label>
+              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                <Hash className="w-4 h-4 text-slate-400" />
+                <span className="font-mono text-sm text-slate-700">
+                  {data.entity_numbering || companyPreview || 'COM-0001'}
+                </span>
+              </div>
+            </div>
+          )}
+          <div className="col-span-2 space-y-1">
+            <Label>Company Name *</Label>
+            <Input placeholder="Acme Corp" value={data.name} onChange={(e) => onChange({ ...data, name: e.target.value })} required />
+          </div>
           <div className="space-y-1"><Label>Industry</Label>
             <Select value={data.industry || 'none'} onValueChange={(v) => onChange({ ...data, industry: v === 'none' ? '' : v })}>
               <SelectTrigger><SelectValue placeholder="Select industry" /></SelectTrigger>
@@ -240,7 +269,13 @@ export function CompaniesPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input value={search} onChange={(e) => updateSearch(e.target.value)} placeholder="Search companies..." className="pl-10" />
         </div>
-        <ColumnPicker allColumns={allColumns} visibleKeys={visibleKeys} onToggle={toggleColumn} />
+        <ColumnPicker 
+          orderedAllColumns={orderedAllColumns} 
+          visibleKeys={visibleKeys} 
+          onToggle={toggleColumn}
+          onMove={moveColumn}
+          onReset={resetColumns}
+        />
       </div>
 
       {isLoading ? <TableSkeleton rows={5} /> : (
@@ -288,7 +323,7 @@ export function CompaniesPage() {
                         return (
                           <div 
                             key={col.key} 
-                            style={{ flex: 1, minWidth: col.minWidth }} 
+                            style={col.flex ? { flex: 1, minWidth: col.minWidth } : { width: col.width }} 
                             className="cursor-pointer min-w-0" 
                             onClick={() => navigate(`/companies/${company.id}`)}
                           >
@@ -301,20 +336,6 @@ export function CompaniesPage() {
                                 {company.website && <span className="text-xs text-slate-400 truncate block">{company.website.replace(/^https?:\/\//, '')}</span>}
                               </div>
                             </div>
-                          </div>
-                        )
-                      }
-                      if (col.key === 'industry') {
-                        return (
-                          <div key={col.key} style={{ width: col.width }} className="text-sm text-slate-500 truncate flex-shrink-0">
-                            {company.industry || '—'}
-                          </div>
-                        )
-                      }
-                      if (col.key === 'location') {
-                        return (
-                          <div key={col.key} style={{ width: col.width }} className="text-sm text-slate-400 truncate flex-shrink-0">
-                            {[company.city, company.country].filter(Boolean).join(', ') || '—'}
                           </div>
                         )
                       }
@@ -349,6 +370,38 @@ export function CompaniesPage() {
                           </div>
                         )
                       }
+                      
+                      // Render other standard attributes
+                      if (!col.isCustom) {
+                        let displayVal = '—'
+                        if (col.key === 'location') {
+                          displayVal = [company.city, company.country].filter(Boolean).join(', ') || '—'
+                        } else if (col.key === 'created' || col.key === 'updated') {
+                          const dateVal = company[col.key]
+                          if (dateVal) {
+                            try {
+                              displayVal = new Date(dateVal).toLocaleDateString(undefined, {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })
+                            } catch {
+                              displayVal = String(dateVal)
+                            }
+                          }
+                        } else {
+                          displayVal = String(company[col.key] || '') || '—'
+                        }
+
+                        return (
+                          <div key={col.key} style={col.flex ? { flex: 1, minWidth: col.minWidth } : { width: col.width }} className="text-sm text-slate-500 truncate flex-shrink-0">
+                            {displayVal}
+                          </div>
+                        )
+                      }
+
                       // Render custom attributes dynamically
                       const rawVal = company.customFields?.[col.key]
                       const fieldDef = customFieldDefs.find((f: any) => f.key === col.key)

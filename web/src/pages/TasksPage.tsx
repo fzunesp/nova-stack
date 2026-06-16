@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { CheckSquare, Search, Trash2, Pencil, ArrowUpDown, HelpCircle, Kanban, List, Plus } from 'lucide-react'
+import { CheckSquare, Search, Trash2, Pencil, ArrowUpDown, HelpCircle, Kanban, List, Plus, Hash } from 'lucide-react'
 import { useNavigate, useLocation } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,6 +12,7 @@ import { DataTablePagination } from '@/components/DataTablePagination'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import pb from '@/lib/pocketbase'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
+import { useEntityNumberingPreview } from '@/hooks/useEntityNumberingPreview'
 import { toast } from 'sonner'
 import type { Status } from '@/services'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
@@ -109,12 +110,20 @@ export function TasksPage() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const { data: customFieldDefs = [] } = useCustomFieldDefinitions('tasks')
 
+  const { preview: taskPreview, isEnabled: showAutoNumber } = useEntityNumberingPreview('tasks')
+
   const standardColumns: ColumnDef[] = [
     { key: 'checkbox', label: '', width: 40, alwaysVisible: true },
-    { key: 'task', label: 'Task', flex: true, minWidth: 200, sortField: 'title' },
+    { key: 'task', label: 'Task Title', flex: true, minWidth: 200, sortField: 'title' },
+    { key: 'description', label: 'Description', width: 180, defaultHidden: true },
     { key: 'assignee', label: 'Assignee', width: 150 },
     { key: 'status', label: 'Status', width: 130, sortField: 'status' },
-    { key: 'due', label: 'Due', width: 130 },
+    { key: 'priority', label: 'Priority', width: 110, defaultHidden: true, sortField: 'priority' },
+    { key: 'due', label: 'Due Date', width: 130, sortField: 'dueDate' },
+    { key: 'contact', label: 'Linked Contact', width: 150, defaultHidden: true },
+    { key: 'deal', label: 'Linked Deal', width: 150, defaultHidden: true },
+    { key: 'created', label: 'Created At', width: 150, defaultHidden: true, sortField: 'created', readOnly: true },
+    { key: 'updated', label: 'Updated At', width: 150, defaultHidden: true, sortField: 'updated', readOnly: true },
     { key: 'actions', label: 'Actions', width: 80, alwaysVisible: true, stickyRight: true }
   ]
 
@@ -125,10 +134,14 @@ export function TasksPage() {
     isCustom: true
   }))
 
-  const standardData = standardColumns.filter(c => !c.stickyRight)
-  const stickyActions = standardColumns.filter(c => c.stickyRight)
-  const allColumns = [...standardData, ...customColumns, ...stickyActions]
-  const { visibleKeys, visibleColumns, toggleColumn } = useColumnPicker('tasks', allColumns)
+  const { 
+    visibleKeys, 
+    visibleColumns, 
+    orderedAllColumns, 
+    toggleColumn, 
+    moveColumn, 
+    resetColumns 
+  } = useColumnPicker('tasks', [...standardColumns, ...customColumns])
 
   const { data: contacts } = useQuery({
     queryKey: ['allContacts'],
@@ -269,8 +282,17 @@ export function TasksPage() {
             <DialogHeader className="px-6 py-4 border-b border-slate-100 flex-shrink-0"><DialogTitle>Add New Task</DialogTitle></DialogHeader>
             <form onSubmit={handleCreateSubmit} className="flex flex-col min-h-0">
               <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
+                {showAutoNumber && (
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Task Number <span className="font-normal normal-case text-slate-400">(auto-generated)</span></Label>
+                    <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200 h-10">
+                      <Hash className="w-4 h-4 text-slate-400" />
+                      <span className="font-mono text-sm text-slate-700">{taskPreview || 'TSK-0001'}</span>
+                    </div>
+                  </div>
+                )}
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Title</Label>
+                  <Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Title *</Label>
                   <Input placeholder="What needs to be done?" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} required className="h-10" />
                 </div>
                 
@@ -371,7 +393,13 @@ export function TasksPage() {
             </button>
           </div>
         </div>
-        <ColumnPicker allColumns={allColumns} visibleKeys={visibleKeys} onToggle={toggleColumn} />
+        <ColumnPicker 
+          orderedAllColumns={orderedAllColumns} 
+          visibleKeys={visibleKeys} 
+          onToggle={toggleColumn}
+          onMove={moveColumn}
+          onReset={resetColumns}
+        />
       </div>
 
       {viewMode === 'board' ? (
@@ -457,7 +485,16 @@ export function TasksPage() {
                                           <DialogHeader className="px-6 py-4 border-b border-slate-100 flex-shrink-0"><DialogTitle>Edit Task</DialogTitle></DialogHeader>
                                           <form onSubmit={handleEditSubmit} className="flex flex-col min-h-0">
                                             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
-                                              <div className="space-y-2"><Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Title</Label><Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required className="h-10" /></div>
+                                              {showAutoNumber && (
+                                                <div className="space-y-2">
+                                                  <Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Task Number</Label>
+                                                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200 h-10">
+                                                    <Hash className="w-4 h-4 text-slate-400" />
+                                                    <span className="font-mono text-sm text-slate-700">{task.entity_numbering || '—'}</span>
+                                                  </div>
+                                                </div>
+                                              )}
+                                              <div className="space-y-2"><Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Title *</Label><Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required className="h-10" /></div>
                                               
                                               <div className="grid grid-cols-2 gap-4">
                                                 <div className="space-y-2">
@@ -592,8 +629,7 @@ export function TasksPage() {
                   </div>
                 ) : (
                   items.map((task: any) => (
-                    <div key={task.id} className="group flex items-center px-4 py-3 border-b border-slate-50 last:border-0 hover:bg-slate-50/80 transition-colors">
-                      {visibleColumns.map(col => {
+                    <div key={task.id} className="group flex items-center px-4 py-3 border-b border-slate-50 last:border-0 hover:bg-slate-50/80 transition-colors">                      {visibleColumns.map(col => {
                         const stickyClass = col.stickyRight ? 'sticky right-0 bg-white group-hover:bg-slate-50 z-10 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.04)] pl-4' : ''
                         
                         if (col.key === 'checkbox') {
@@ -665,7 +701,7 @@ export function TasksPage() {
                         }
                         if (col.key === 'due') {
                           return (
-                            <div key={col.key} style={{ width: col.width }} className="text-xs text-slate-500 flex-shrink-0">
+                            <div key={col.key} style={{ width: col.width }} className="text-xs text-slate-500 flex-shrink-0 pr-4">
                               {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : '—'}
                             </div>
                           )
@@ -697,7 +733,16 @@ export function TasksPage() {
                                   <DialogHeader className="px-6 py-4 border-b border-slate-100 flex-shrink-0"><DialogTitle>Edit Task</DialogTitle></DialogHeader>
                                   <form onSubmit={handleEditSubmit} className="flex flex-col min-h-0">
                                     <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
-                                      <div className="space-y-2"><Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Title</Label><Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required className="h-10" /></div>
+                                      {showAutoNumber && (
+                                        <div className="space-y-2">
+                                          <Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Task Number</Label>
+                                          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200 h-10">
+                                            <Hash className="w-4 h-4 text-slate-400" />
+                                            <span className="font-mono text-sm text-slate-700">{task.entity_numbering || '—'}</span>
+                                          </div>
+                                        </div>
+                                      )}
+                                      <div className="space-y-2"><Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Title *</Label><Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required className="h-10" /></div>
                                       
                                       <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-2">
@@ -763,6 +808,41 @@ export function TasksPage() {
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500" onClick={() => { if (confirm('Delete this task?')) deleteTask.mutate(task.id) }}>
                                 <Trash2 className="w-3.5 h-3.5" />
                               </Button>
+                            </div>
+                          )
+                        }
+
+                        // Render other standard attributes
+                        if (!col.isCustom) {
+                          let displayVal = '—'
+                          if (col.key === 'description') {
+                            displayVal = task.description || '—'
+                          } else if (col.key === 'priority') {
+                            displayVal = task.priority ? task.priority.charAt(0).toUpperCase() + task.priority.slice(1) : '—'
+                          } else if (col.key === 'contact') {
+                            displayVal = task.expand?.contactId?.name || '—'
+                          } else if (col.key === 'deal') {
+                            displayVal = task.expand?.dealId?.title || '—'
+                          } else if (col.key === 'created' || col.key === 'updated') {
+                            const dateVal = task[col.key]
+                            if (dateVal) {
+                              try {
+                                displayVal = new Date(dateVal).toLocaleDateString(undefined, {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })
+                              } catch {
+                                displayVal = String(dateVal)
+                              }
+                            }
+                          }
+
+                          return (
+                            <div key={col.key} style={col.flex ? { flex: 1, minWidth: col.minWidth } : { width: col.width }} className="text-sm text-slate-500 truncate flex-shrink-0 pr-4">
+                              {displayVal}
                             </div>
                           )
                         }

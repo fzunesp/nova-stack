@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { FileText, Search, Trash2, Pencil, ArrowUpDown, Plus, X, ChevronDown, ChevronRight, Download, Send, Copy, HelpCircle } from 'lucide-react'
+import { FileText, Search, Trash2, Pencil, ArrowUpDown, Plus, X, ChevronDown, ChevronRight, Download, Send, Copy, HelpCircle, Hash } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -11,6 +11,7 @@ import { DataTablePagination } from '@/components/DataTablePagination'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import pb from '@/lib/pocketbase'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
+import { useEntityNumberingPreview } from '@/hooks/useEntityNumberingPreview'
 import { toast } from 'sonner'
 import { useLocation, useNavigate, useParams } from 'react-router'
 import type { Status } from '@/services'
@@ -84,11 +85,18 @@ export function InvoicesPage() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const { data: customFieldDefs = [] } = useCustomFieldDefinitions('invoices')
 
+  const { preview: invoicePreview, isEnabled: showAutoNumber } = useEntityNumberingPreview('invoices')
+
   const standardColumns: ColumnDef[] = [
     { key: 'expand', label: '', width: 40, alwaysVisible: true },
+    { key: 'invoiceNumber', label: 'Invoice Number', width: 130, sortField: 'invoiceNumber' },
     { key: 'title', label: 'Title', flex: true, minWidth: 200, sortField: 'title' },
+    { key: 'deal', label: 'Linked Deal', width: 160 },
+    { key: 'dueDate', label: 'Due Date', width: 130, sortField: 'dueDate' },
     { key: 'amount', label: 'Amount', width: 130, sortField: 'amount' },
-    { key: 'status', label: 'Status', width: 150 },
+    { key: 'status', label: 'Status', width: 150, sortField: 'status' },
+    { key: 'created', label: 'Created At', width: 150, defaultHidden: true, sortField: 'created', readOnly: true },
+    { key: 'updated', label: 'Updated At', width: 150, defaultHidden: true, sortField: 'updated', readOnly: true },
     { key: 'actions', label: 'Actions', width: 130, alwaysVisible: true, stickyRight: true }
   ]
 
@@ -99,10 +107,14 @@ export function InvoicesPage() {
     isCustom: true
   }))
 
-  const standardData = standardColumns.filter(c => !c.stickyRight)
-  const stickyActions = standardColumns.filter(c => c.stickyRight)
-  const allColumns = [...standardData, ...customColumns, ...stickyActions]
-  const { visibleKeys, visibleColumns, toggleColumn } = useColumnPicker('invoices', allColumns)
+  const {
+    visibleKeys,
+    visibleColumns,
+    orderedAllColumns,
+    toggleColumn,
+    moveColumn,
+    resetColumns
+  } = useColumnPicker('invoices', [...standardColumns, ...customColumns])
 
   useEffect(() => {
     if (id) {
@@ -400,6 +412,15 @@ export function InvoicesPage() {
             }} className="flex flex-col min-h-0">
               <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
                 <div className="grid grid-cols-2 gap-4">
+                  {showAutoNumber && (
+                    <div className="col-span-2 space-y-1.5">
+                      <Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Invoice Number <span className="font-normal normal-case text-slate-400">(auto-generated)</span></Label>
+                      <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200 h-10">
+                        <Hash className="w-4 h-4 text-slate-400" />
+                        <span className="font-mono text-sm text-slate-700">{invoicePreview || 'INV-0001'}</span>
+                      </div>
+                    </div>
+                  )}
                   <div className="col-span-2 space-y-1"><Label>Title</Label><Input placeholder="Invoice title" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} required /></div>
                   
                   <div className="col-span-2 space-y-1">
@@ -507,7 +528,13 @@ export function InvoicesPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input value={search} onChange={(e) => updateSearch(e.target.value)} placeholder="Search invoices..." className="pl-10" />
         </div>
-        <ColumnPicker allColumns={allColumns} visibleKeys={visibleKeys} onToggle={toggleColumn} />
+        <ColumnPicker 
+          orderedAllColumns={orderedAllColumns} 
+          visibleKeys={visibleKeys} 
+          onToggle={toggleColumn}
+          onMove={moveColumn}
+          onReset={resetColumns}
+        />
       </div>
 
       {isLoading ? <TableSkeleton rows={5} /> : (
@@ -571,12 +598,19 @@ export function InvoicesPage() {
                         if (col.key === 'title') {
                           return (
                             <div key={col.key} style={{ flex: 1, minWidth: col.minWidth }} className="min-w-0 pr-4">
-                              <span 
-                                onClick={() => toggleExpand(invoice.id)}
-                                className="font-medium text-slate-900 cursor-pointer hover:text-[rgb(var(--ns-accent))] transition-colors block truncate"
-                              >
-                                {invoice.title}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                {invoice.invoiceNumber && (
+                                  <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-100 px-1 rounded flex-shrink-0">
+                                    {invoice.invoiceNumber}
+                                  </span>
+                                )}
+                                <span 
+                                  onClick={() => toggleExpand(invoice.id)}
+                                  className="font-medium text-slate-900 cursor-pointer hover:text-[rgb(var(--ns-accent))] transition-colors truncate"
+                                >
+                                  {invoice.title}
+                                </span>
+                              </div>
                               {invoice.expand?.dealId && (
                                 <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5 font-medium truncate">
                                   <span>Project:</span>
@@ -746,6 +780,53 @@ export function InvoicesPage() {
                           )
                         }
 
+                        if (col.key === 'invoiceNumber') {
+                          return (
+                            <div key={col.key} style={{ width: col.width }} className="text-xs font-mono font-bold text-slate-400 bg-slate-50 px-2 py-1 border border-slate-200 rounded flex-shrink-0 mr-4">
+                              {invoice.invoiceNumber || '—'}
+                            </div>
+                          )
+                        }
+                        if (col.key === 'dueDate') {
+                          return (
+                            <div key={col.key} style={{ width: col.width }} className="text-sm text-slate-500 flex-shrink-0 pr-4">
+                              {invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : '—'}
+                            </div>
+                          )
+                        }
+                        if (col.key === 'deal') {
+                          return (
+                            <div key={col.key} style={{ width: col.width }} className="text-sm text-slate-500 truncate flex-shrink-0 pr-4">
+                              {invoice.expand?.dealId?.title || '—'}
+                            </div>
+                          )
+                        }
+
+                        // Render other standard attributes
+                        if (!col.isCustom) {
+                          let displayVal = '—'
+                          if (col.key === 'created' || col.key === 'updated') {
+                            const dateVal = invoice[col.key]
+                            if (dateVal) {
+                              try {
+                                displayVal = new Date(dateVal).toLocaleDateString(undefined, {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric'
+                                })
+                              } catch {
+                                displayVal = String(dateVal)
+                              }
+                            }
+                          }
+
+                          return (
+                            <div key={col.key} style={col.flex ? { flex: 1, minWidth: col.minWidth } : { width: col.width }} className="text-sm text-slate-500 truncate flex-shrink-0 pr-4">
+                              {displayVal}
+                            </div>
+                          )
+                        }
+
                         // Render custom fields dynamically
                         const rawVal = invoice.customFields?.[col.key]
                         const fieldDef = customFieldDefs.find((f: any) => f.key === col.key)
@@ -769,7 +850,7 @@ export function InvoicesPage() {
                         }
 
                         return (
-                          <div key={col.key} style={{ width: col.width }} className="text-sm text-slate-500 truncate flex-shrink-0">
+                          <div key={col.key} style={{ width: col.width }} className="text-sm text-slate-500 truncate flex-shrink-0 pr-4">
                             {fieldDef?.type === 'checkbox' && (rawVal !== undefined && rawVal !== null && rawVal !== '') ? (
                               <Badge className="bg-slate-200 text-slate-700 border-none text-[10px] px-1.5 py-0.5 font-bold">
                                 {displayVal}

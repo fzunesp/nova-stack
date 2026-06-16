@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Users, Search, Trash2, Pencil, ArrowUpDown, Briefcase, FileText, CheckSquare, User, Activity, Phone, Mail, Building, Loader2, Kanban, List, Plus, X, Check, MessageCircle, MessageSquare, StickyNote, HelpCircle } from 'lucide-react'
+import { Users, Search, Trash2, Pencil, ArrowUpDown, Briefcase, FileText, CheckSquare, User, Activity, Phone, Mail, Building, Loader2, Kanban, List, Plus, X, Check, MessageCircle, MessageSquare, StickyNote, HelpCircle, Hash } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -13,6 +13,7 @@ import { DataTablePagination } from '@/components/DataTablePagination'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import pb from '@/lib/pocketbase'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
+import { useEntityNumberingPreview } from '@/hooks/useEntityNumberingPreview'
 import { toast } from 'sonner'
 import {
   useCreateInteraction,
@@ -147,12 +148,18 @@ function ContactsTab({ autoOpen = false }: { autoOpen?: boolean }) {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [apiError, setApiError] = useState<string | null>(null)
 
+  const { preview: contactPreview, isEnabled: showContactAutoNumber } = useEntityNumberingPreview('contacts')
+
   const standardColumns: ColumnDef[] = [
     { key: 'company', label: 'Company', width: 160, sortField: 'companyId' },
-    { key: 'name', label: 'Name', flex: true, minWidth: 180, sortField: 'name' },
+    { key: 'name', label: 'Contact Name', flex: true, minWidth: 180, sortField: 'name' },
     { key: 'email', label: 'Email', width: 200, sortField: 'email' },
     { key: 'phone', label: 'Phone', width: 130, defaultHidden: true },
-    { key: 'status', label: 'Status', width: 90, defaultHidden: true },
+    { key: 'title', label: 'Job Title', width: 130, defaultHidden: true, sortField: 'title' },
+    { key: 'notes', label: 'Notes', width: 160, defaultHidden: true },
+    { key: 'status', label: 'Status', width: 90, defaultHidden: true, sortField: 'status' },
+    { key: 'created', label: 'Created At', width: 150, defaultHidden: true, sortField: 'created', readOnly: true },
+    { key: 'updated', label: 'Updated At', width: 150, defaultHidden: true, sortField: 'updated', readOnly: true },
     { key: 'actions', label: 'Actions', width: 80, alwaysVisible: true, stickyRight: true }
   ]
 
@@ -163,10 +170,14 @@ function ContactsTab({ autoOpen = false }: { autoOpen?: boolean }) {
     isCustom: true
   }))
 
-  const standardData = standardColumns.filter(c => !c.stickyRight)
-  const stickyActions = standardColumns.filter(c => c.stickyRight)
-  const allColumns = [...standardData, ...customColumns, ...stickyActions]
-  const { visibleKeys, visibleColumns, toggleColumn } = useColumnPicker('contacts', allColumns)
+  const {
+    visibleKeys,
+    visibleColumns,
+    orderedAllColumns,
+    toggleColumn,
+    moveColumn,
+    resetColumns
+  } = useColumnPicker('contacts', [...standardColumns, ...customColumns])
 
   const { data: companiesList } = useQuery({
     queryKey: ['companies-all'],
@@ -287,7 +298,13 @@ function ContactsTab({ autoOpen = false }: { autoOpen?: boolean }) {
         </div>
         
         <div className="flex items-center gap-2">
-          <ColumnPicker allColumns={allColumns} visibleKeys={visibleKeys} onToggle={toggleColumn} />
+          <ColumnPicker 
+            orderedAllColumns={orderedAllColumns} 
+            visibleKeys={visibleKeys} 
+            onToggle={toggleColumn}
+            onMove={moveColumn}
+            onReset={resetColumns}
+          />
         </div>
       </div>
 
@@ -295,12 +312,21 @@ function ContactsTab({ autoOpen = false }: { autoOpen?: boolean }) {
         <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col p-0 overflow-hidden">
           <DialogHeader className="px-6 py-4 border-b border-slate-100 flex-shrink-0"><DialogTitle>Add New Contact</DialogTitle></DialogHeader>
           <form onSubmit={(e) => { e.preventDefault(); handleCreateContactSubmit() }} className="flex flex-col min-h-0">
-            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
-              <div className="grid grid-cols-2 gap-x-4 gap-y-4">
-                <div className="col-span-2 space-y-1.5">
-                  <Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Full Name *</Label>
-                  <Input placeholder="Full name" value={formData.name} onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))} required className="h-10" />
-                </div>
+             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
+               <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+                 {showContactAutoNumber && (
+                   <div className="col-span-2 space-y-1.5">
+                     <Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Contact Number <span className="font-normal normal-case text-slate-400">(auto-generated)</span></Label>
+                     <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200 h-10">
+                       <Hash className="w-4 h-4 text-slate-400" />
+                       <span className="font-mono text-sm text-slate-700">{contactPreview || 'CON-0001'}</span>
+                     </div>
+                   </div>
+                 )}
+                 <div className="col-span-2 space-y-1.5">
+                   <Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Full Name *</Label>
+                   <Input placeholder="Full name" value={formData.name} onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))} required className="h-10" />
+                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Email *</Label>
                   <Input type="email" placeholder="Email" value={formData.email} onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))} required className="h-10" />
@@ -448,6 +474,15 @@ function ContactsTab({ autoOpen = false }: { autoOpen?: boolean }) {
                                   <form onSubmit={(e) => { e.preventDefault(); handleEditContactSubmit() }} className="flex flex-col min-h-0">
                                     <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
                                       <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+                                        {showContactAutoNumber && (
+                                          <div className="col-span-2 space-y-1.5">
+                                            <Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Contact Number</Label>
+                                            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200 h-10">
+                                              <Hash className="w-4 h-4 text-slate-400" />
+                                              <span className="font-mono text-sm text-slate-700">{contact.entity_numbering || '—'}</span>
+                                            </div>
+                                          </div>
+                                        )}
                                         <div className="col-span-2 space-y-1.5"><Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Full Name *</Label><Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required className="h-10" /></div>
                                         <div className="space-y-1.5"><Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Email *</Label><Input type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} required className="h-10" /></div>
                                         <div className="space-y-1.5"><Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Phone</Label><Input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} className="h-10" /></div>
@@ -477,6 +512,29 @@ function ContactsTab({ autoOpen = false }: { autoOpen?: boolean }) {
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500" onClick={() => { if (confirm('Delete this contact?')) deleteContact.mutate(contact.id) }}>
                                 <Trash2 className="w-3.5 h-3.5" />
                               </Button>
+                            </div>
+                          )
+                        }
+
+                        // Render standard attributes fallback
+                        if (!col.isCustom && col.key !== 'company' && col.key !== 'name' && col.key !== 'email' && col.key !== 'phone' && col.key !== 'status' && col.key !== 'actions') {
+                          let displayVal = '—'
+                          if (col.key === 'created' || col.key === 'updated') {
+                            const dateVal = contact[col.key]
+                            if (dateVal) {
+                              try {
+                                displayVal = new Date(dateVal).toLocaleDateString()
+                              } catch {
+                                displayVal = String(dateVal)
+                              }
+                            }
+                          } else {
+                            displayVal = String(contact[col.key] || '—')
+                          }
+
+                          return (
+                            <div key={col.key} style={{ width: col.width }} className="text-sm text-slate-500 truncate flex-shrink-0 pr-4">
+                              {displayVal}
                             </div>
                           )
                         }
@@ -586,6 +644,8 @@ function DealsTab({ autoOpen = false }: { autoOpen?: boolean }) {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const { data: dealCustomFieldDefs = [] } = useCustomFieldDefinitions('deals')
 
+  const { preview: dealPreview, isEnabled: showDealAutoNumber } = useEntityNumberingPreview('deals')
+
   const { data: employees } = useQuery({
     queryKey: ['employees-all-crm'],
     queryFn: () => pb.collection('employees').getFullList({ sort: 'name' })
@@ -593,10 +653,14 @@ function DealsTab({ autoOpen = false }: { autoOpen?: boolean }) {
 
   const dealStandardColumns: ColumnDef[] = [
     { key: 'title', label: 'Title', flex: true, minWidth: 200, sortField: 'title' },
-    { key: 'contact', label: 'Contact', width: 160 },
+    { key: 'contact', label: 'Linked Contact', width: 160 },
+    { key: 'company', label: 'Linked Company', width: 160, defaultHidden: true },
     { key: 'owner', label: 'Owner', width: 150 },
     { key: 'value', label: 'Value', width: 130, sortField: 'value' },
-    { key: 'stage', label: 'Stage', width: 150 },
+    { key: 'stage', label: 'Stage', width: 150, sortField: 'stage' },
+    { key: 'status', label: 'Status', width: 120, defaultHidden: true, sortField: 'status' },
+    { key: 'created', label: 'Created At', width: 150, defaultHidden: true, sortField: 'created', readOnly: true },
+    { key: 'updated', label: 'Updated At', width: 150, defaultHidden: true, sortField: 'updated', readOnly: true },
     { key: 'actions', label: 'Actions', width: 100, alwaysVisible: true, stickyRight: true }
   ]
 
@@ -607,10 +671,14 @@ function DealsTab({ autoOpen = false }: { autoOpen?: boolean }) {
     isCustom: true
   }))
 
-  const dealStandardData = dealStandardColumns.filter(c => !c.stickyRight)
-  const dealStickyActions = dealStandardColumns.filter(c => c.stickyRight)
-  const dealAllColumns = [...dealStandardData, ...dealCustomColumns, ...dealStickyActions]
-  const { visibleKeys: dealVisibleKeys, visibleColumns: dealVisibleColumns, toggleColumn: dealToggleColumn } = useColumnPicker('deals', dealAllColumns)
+  const {
+    visibleKeys: dealVisibleKeys,
+    visibleColumns: dealVisibleColumns,
+    orderedAllColumns: dealOrderedAllColumns,
+    toggleColumn: dealToggleColumn,
+    moveColumn: dealMoveColumn,
+    resetColumns: dealResetColumns
+  } = useColumnPicker('deals', [...dealStandardColumns, ...dealCustomColumns])
 
   const { data: routeDeal } = useQuery({
     queryKey: ['deal', id],
@@ -798,7 +866,15 @@ function DealsTab({ autoOpen = false }: { autoOpen?: boolean }) {
         </div>
 
         <div className="flex items-center gap-2">
-          {viewMode === 'list' && <ColumnPicker allColumns={dealAllColumns} visibleKeys={dealVisibleKeys} onToggle={dealToggleColumn} />}
+          {viewMode === 'list' && (
+            <ColumnPicker 
+              orderedAllColumns={dealOrderedAllColumns} 
+              visibleKeys={dealVisibleKeys} 
+              onToggle={dealToggleColumn}
+              onMove={dealMoveColumn}
+              onReset={dealResetColumns}
+            />
+          )}
         </div>
       </div>
 
@@ -806,8 +882,17 @@ function DealsTab({ autoOpen = false }: { autoOpen?: boolean }) {
         <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col p-0 overflow-hidden">
           <DialogHeader className="px-6 py-4 border-b border-slate-100 flex-shrink-0"><DialogTitle>Add New Deal</DialogTitle></DialogHeader>
           <form onSubmit={(e) => { e.preventDefault(); handleCreateDealSubmit() }} className="flex flex-col min-h-0">
-            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
-              <div className="space-y-2"><Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Title</Label><Input placeholder="Deal title" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} required className="h-10" /></div>
+             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
+               {showDealAutoNumber && (
+                 <div className="space-y-2">
+                   <Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Deal Number <span className="font-normal normal-case text-slate-400">(auto-generated)</span></Label>
+                   <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200 h-10">
+                     <Hash className="w-4 h-4 text-slate-400" />
+                     <span className="font-mono text-sm text-slate-700">{dealPreview || 'DEA-0001'}</span>
+                   </div>
+                 </div>
+               )}
+               <div className="space-y-2"><Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Title *</Label><Input placeholder="Deal title" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} required className="h-10" /></div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2"><Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Value ($)</Label><Input type="number" placeholder="Value" value={formData.value} onChange={(e) => setFormData({ ...formData, value: e.target.value })} className="h-10" /></div>
@@ -984,7 +1069,16 @@ function DealsTab({ autoOpen = false }: { autoOpen?: boolean }) {
                                   <DialogHeader className="px-6 py-4 border-b border-slate-100 flex-shrink-0"><DialogTitle>Edit Deal</DialogTitle></DialogHeader>
                                   <form onSubmit={(e) => { e.preventDefault(); handleEditDealSubmit(deal.id) }} className="flex flex-col min-h-0">
                                     <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
-                                      <div className="space-y-2"><Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Title</Label><Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required className="h-10" /></div>
+                                      {showDealAutoNumber && (
+                                        <div className="space-y-2">
+                                          <Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Deal Number</Label>
+                                          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200 h-10">
+                                            <Hash className="w-4 h-4 text-slate-400" />
+                                            <span className="font-mono text-sm text-slate-700">{deal.entity_numbering || '—'}</span>
+                                          </div>
+                                        </div>
+                                      )}
+                                      <div className="space-y-2"><Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Title *</Label><Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required className="h-10" /></div>
                                       
                                       <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-2"><Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Value ($)</Label><Input type="number" value={editForm.value} onChange={(e) => setEditForm({ ...editForm, value: e.target.value })} className="h-10" /></div>
@@ -1056,6 +1150,41 @@ function DealsTab({ autoOpen = false }: { autoOpen?: boolean }) {
                           )
                         }
 
+                        if (col.key === 'company') {
+                          return (
+                            <div key={col.key} style={{ width: col.width }} className="truncate flex-shrink-0 pr-4 text-xs text-slate-500">
+                              {deal.expand?.companyId?.name || '—'}
+                            </div>
+                          )
+                        }
+
+                        if (col.key === 'status') {
+                          return (
+                            <div key={col.key} style={{ width: col.width }} className="flex-shrink-0 pr-4">
+                              <Badge className={cn("text-[10px] font-bold px-2 py-0.5 border-none capitalize", deal.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500')}>
+                                {deal.status || 'active'}
+                              </Badge>
+                            </div>
+                          )
+                        }
+
+                        if (col.key === 'created' || col.key === 'updated') {
+                          const dateVal = deal[col.key]
+                          return (
+                            <div key={col.key} style={{ width: col.width }} className="text-sm text-slate-500 truncate flex-shrink-0 pr-4">
+                              {dateVal ? new Date(dateVal).toLocaleDateString() : '—'}
+                            </div>
+                          )
+                        }
+
+                        if (!col.isCustom && col.key !== 'title' && col.key !== 'contact' && col.key !== 'owner' && col.key !== 'value' && col.key !== 'stage' && col.key !== 'actions') {
+                          return (
+                            <div key={col.key} style={{ width: col.width }} className="text-sm text-slate-500 truncate flex-shrink-0 pr-4">
+                              {String(deal[col.key] || '—')}
+                            </div>
+                          )
+                        }
+
                         // Render custom attributes dynamically
                         const rawVal = deal.customFields?.[col.key]
                         const fieldDef = dealCustomFieldDefs.find((f: any) => f.key === col.key)
@@ -1119,7 +1248,16 @@ function DealsTab({ autoOpen = false }: { autoOpen?: boolean }) {
                                         <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col p-0 overflow-hidden"><DialogHeader className="px-6 py-4 border-b border-slate-100 flex-shrink-0"><DialogTitle>Edit Deal</DialogTitle></DialogHeader>
                                           <form onSubmit={(e) => { e.preventDefault(); handleEditDealSubmit(deal.id) }} className="flex flex-col min-h-0">
                                             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
-                                              <div className="space-y-2"><Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Title</Label><Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required className="h-10" /></div>
+                                              {showDealAutoNumber && (
+                                                <div className="space-y-2">
+                                                  <Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Deal Number</Label>
+                                                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200 h-10">
+                                                    <Hash className="w-4 h-4 text-slate-400" />
+                                                    <span className="font-mono text-sm text-slate-700">{deal.entity_numbering || '—'}</span>
+                                                  </div>
+                                                </div>
+                                              )}
+                                              <div className="space-y-2"><Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Title *</Label><Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required className="h-10" /></div>
                                               <div className="grid grid-cols-2 gap-4">
                                                 <div className="space-y-2"><Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Value ($)</Label><Input type="number" value={editForm.value} onChange={(e) => setEditForm({ ...editForm, value: e.target.value })} className="h-10" /></div>
                                                 <div className="space-y-2"><Label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Owner</Label>

@@ -4,7 +4,7 @@ import {
   LayoutList, LayoutGrid, Building2,
   Mail, ShieldCheck, UserPlus,
   Loader2, Laptop, Smartphone, Key, RefreshCw, Lock, Shield,
-  CheckCircle2, Save, Info
+  CheckCircle2, Save, Info, Hash
 } from 'lucide-react'
 import { useLocation } from 'react-router'
 import { Button } from '@/components/ui/button'
@@ -18,10 +18,12 @@ import { DataTablePagination } from '@/components/DataTablePagination'
 import { TableRowSkeleton } from '@/components/ui/skeleton'
 import pb from '@/lib/pocketbase'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
+import { useEntityNumberingPreview } from '@/hooks/useEntityNumberingPreview'
 import { toast } from 'sonner'
 import { DynamicCustomFieldsForm, validateCustomFields } from '@/components/DynamicCustomFieldsForm'
 import { useCustomFieldDefinitions } from '@/hooks/useCustomFields'
 import { useColumnPicker, type ColumnDef } from '@/hooks/useColumnPicker'
+import { ColumnPicker } from '@/components/ColumnPicker'
 import { cn } from '@/lib/utils'
 import { Checkbox } from '@/components/ui/checkbox'
 import type { EmployeeRecord } from '@/services/types'
@@ -66,6 +68,9 @@ export function EmployeesPage() {
 
   const { data: customFieldDefs = [] } = useCustomFieldDefinitions('employees')
 
+  const { preview: employeePreview, isEnabled: showAutoNumber } = useEntityNumberingPreview('employees')
+
+
   // Fetch linked user data when editing
   const { data: linkedUser, isLoading: userLoading } = useQuery({
     queryKey: ['user', formData.userId],
@@ -74,11 +79,15 @@ export function EmployeesPage() {
   })
 
   const standardColumns: ColumnDef[] = [
-    { key: 'name', label: 'Employee', flex: true, minWidth: 220, sortField: 'name' },
-    { key: 'employee_id', label: 'ID', width: 100, sortField: 'employee_id' },
-    { key: 'job_title', label: 'Title', width: 150, sortField: 'job_title' },
+    { key: 'name', label: 'Employee Name', flex: true, minWidth: 220, sortField: 'name' },
+    { key: 'employee_id', label: 'Employee ID', width: 120, sortField: 'employee_id' },
+    { key: 'work_email', label: 'Work Email', width: 180, sortField: 'work_email' },
+    { key: 'job_title', label: 'Job Title', width: 150, sortField: 'job_title' },
     { key: 'department', label: 'Department', width: 130, sortField: 'department' },
+    { key: 'rol_type', label: 'Role Type', width: 120, defaultHidden: true, sortField: 'rol_type' },
     { key: 'status', label: 'Status', width: 120, sortField: 'status' },
+    { key: 'created', label: 'Created At', width: 150, defaultHidden: true, sortField: 'created', readOnly: true },
+    { key: 'updated', label: 'Updated At', width: 150, defaultHidden: true, sortField: 'updated', readOnly: true },
     { key: 'actions', label: 'Actions', width: 120, alwaysVisible: true, stickyRight: true }
   ]
 
@@ -89,8 +98,14 @@ export function EmployeesPage() {
     isCustom: true
   }))
 
-  const allColumns = [...standardColumns.filter(c => !c.stickyRight), ...customColumns, ...standardColumns.filter(c => c.stickyRight)]
-  const { visibleColumns } = useColumnPicker('employees', allColumns)
+  const {
+    visibleKeys,
+    visibleColumns,
+    orderedAllColumns,
+    toggleColumn,
+    moveColumn,
+    resetColumns
+  } = useColumnPicker('employees', [...standardColumns, ...customColumns])
 
   // --- ACCESS MUTATIONS ---
   const grantAccess = useMutation({
@@ -161,12 +176,6 @@ export function EmployeesPage() {
   // --- EMPLOYEE MUTATIONS ---
   const createMutation = useMutation({
     mutationFn: async (data: Partial<EmployeeRecord>) => {
-      // Client-side fallback for ID if server hook is failing
-      if (!data.employee_id) {
-          const count = await pb.collection('employees').getList(1, 1).then(r => r.totalItems + 1001)
-          data.employee_id = `EMP-${count}`
-      }
-      
       const record = await pb.collection('employees').create(data)
       
       if (autoAccess && data.work_email) {
@@ -224,15 +233,25 @@ export function EmployeesPage() {
         </Button>
       </div>
       
-      {/* Filter bar */}
       <div className="flex items-center justify-between mb-4 gap-4">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input placeholder="Search..." value={search} onChange={(e) => updateSearch(e.target.value)} className="pl-10 h-10" />
         </div>
-        <div className="flex items-center border rounded-lg p-1 bg-white">
-          <button onClick={() => setViewMode('list')} className={cn("p-1.5 rounded-md", viewMode === 'list' ? "bg-slate-100 text-indigo-600" : "text-slate-400")}><LayoutList className="w-4 h-4" /></button>
-          <button onClick={() => setViewMode('card')} className={cn("p-1.5 rounded-md", viewMode === 'card' ? "bg-slate-100 text-indigo-600" : "text-slate-400")}><LayoutGrid className="w-4 h-4" /></button>
+        <div className="flex items-center gap-2">
+          {viewMode === 'list' && (
+            <ColumnPicker
+              orderedAllColumns={orderedAllColumns}
+              visibleKeys={visibleKeys}
+              onToggle={toggleColumn}
+              onMove={moveColumn}
+              onReset={resetColumns}
+            />
+          )}
+          <div className="flex items-center border rounded-lg p-1 bg-white shadow-sm flex-shrink-0">
+            <button onClick={() => setViewMode('list')} className={cn("p-1.5 rounded-md", viewMode === 'list' ? "bg-slate-100 text-indigo-600" : "text-slate-400")}><LayoutList className="w-4 h-4" /></button>
+            <button onClick={() => setViewMode('card')} className={cn("p-1.5 rounded-md", viewMode === 'card' ? "bg-slate-100 text-indigo-600" : "text-slate-400")}><LayoutGrid className="w-4 h-4" /></button>
+          </div>
         </div>
       </div>
 
@@ -270,7 +289,62 @@ export function EmployeesPage() {
                           </div>
                         </td>
                       )
-                      return <td key={col.key} className={cellClass}>{String(item[col.key] || item.customFields?.[col.key] || '—')}</td>
+
+                      if (col.key === 'status') {
+                        return (
+                          <td key={col.key} className={cellClass}>
+                            <Badge className={`${item.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'} inline-flex items-center gap-1.5 text-xs`}>
+                              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${item.status === 'active' ? 'bg-green-500' : 'bg-slate-400'}`} />
+                              {item.status === 'active' ? 'Active' : 'Inactive'}
+                            </Badge>
+                          </td>
+                        )
+                      }
+
+                      if (col.key === 'created' || col.key === 'updated') {
+                        const d = item[col.key]
+                        return (
+                          <td key={col.key} className={cellClass}>
+                            <span className="text-sm text-slate-500">
+                              {d ? new Date(d).toLocaleDateString() : '—'}
+                            </span>
+                          </td>
+                        )
+                      }
+
+                      // Dynamic standard & custom field mapping
+                      const rawVal = item[col.key] !== undefined ? item[col.key] : item.customFields?.[col.key]
+                      const fieldDef = customFieldDefs.find((f: any) => f.key === col.key)
+                      let displayVal = '—'
+                      if (rawVal !== undefined && rawVal !== null && rawVal !== '') {
+                        if (fieldDef?.type === 'checkbox') {
+                          displayVal = rawVal ? 'Yes' : 'No'
+                        } else if (fieldDef?.type === 'date') {
+                          try {
+                            displayVal = new Date(rawVal).toLocaleDateString()
+                          } catch {
+                            displayVal = String(rawVal)
+                          }
+                        } else {
+                          displayVal = String(rawVal)
+                        }
+                      } else if (rawVal === undefined) {
+                        displayVal = '—'
+                      } else {
+                        displayVal = String(rawVal)
+                      }
+
+                      return (
+                        <td key={col.key} className={cellClass}>
+                          {fieldDef?.type === 'checkbox' && (rawVal !== undefined && rawVal !== null && rawVal !== '') ? (
+                            <Badge className="bg-slate-200 text-slate-700 border-none text-[10px] px-1.5 py-0.5 font-bold">
+                              {displayVal}
+                            </Badge>
+                          ) : (
+                            displayVal
+                          )}
+                        </td>
+                      )
                     })}
                   </tr>
                 ))}
@@ -317,7 +391,16 @@ export function EmployeesPage() {
                       </div>
                       <div className="space-y-1.5">
                         <Label className="text-xs font-bold text-slate-600">Employee ID</Label>
-                        <Input value={formData.employee_id} placeholder="Automatic Generation" disabled className="h-11 bg-slate-50 italic font-mono text-xs" />
+                        {showAutoNumber ? (
+                          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200 h-11">
+                            <Hash className="w-4 h-4 text-slate-400" />
+                            <span className="font-mono text-sm text-slate-700">
+                              {formData.employee_id || employeePreview || 'EMP-0001'}
+                            </span>
+                          </div>
+                        ) : (
+                          <Input value={formData.employee_id} onChange={e => setFormData({ ...formData, employee_id: e.target.value })} className="h-11 font-mono text-xs" placeholder="e.g. EMP-001" />
+                        )}
                       </div>
                       <div className="space-y-1.5">
                         <Label className="text-xs font-bold text-slate-600">Department</Label>
