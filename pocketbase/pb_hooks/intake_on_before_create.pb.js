@@ -1,8 +1,8 @@
 console.log("[HR-HOOK-BOOT] intake_on_before_create.pb.js loaded successfully")
 
-onModelCreate(function(e) {
+onRecordCreate(function(e) {
   // Only process if this is an HR form submission (i.e. has a formId)
-  var formId = e.model.getString('formId')
+  var formId = e.record.getString('formId')
   if (!formId) {
     return e.next()
   }
@@ -45,7 +45,7 @@ onModelCreate(function(e) {
     }
     var formattedId = yearPrefix + seqStr
     
-    e.model.set('formattedId', formattedId)
+    e.record.set('formattedId', formattedId)
     console.log('[HR-HOOK] Generated formattedId ' + formattedId + ' for new intake submission')
   } catch (err) {
     console.error("Error generating formattedId in hook: " + err)

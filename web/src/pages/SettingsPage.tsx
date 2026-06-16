@@ -3,7 +3,7 @@ import { useAuth } from '@/hooks/useAuth'
 import pb from '@/lib/pocketbase'
 import { 
   User, Users, Mail, Building2, Lock, Save, Palette, Check, 
-  Loader2, FileText, Briefcase, Database, Webhook, Layers,
+  Loader2, FileText, Briefcase, Database, Webhook, Layers, DollarSign,
   Plus, Shield, HelpCircle, MessageSquare, Copy, Edit, Trash2,
   Download, Play
 } from 'lucide-react'
@@ -14,6 +14,7 @@ import { useTheme, type ThemeName } from '@/contexts/ThemeContext'
 import { Label } from '@/components/ui/label'
 import { CustomFieldsTab } from '@/components/CustomFieldsTab'
 import { UsersTab } from '@/components/UsersTab'
+import { EntityNumberingTab } from '@/components/EntityNumberingTab'
 import { useEmployee } from '@/hooks/useEmployee'
 import { useNavigate } from 'react-router'
 import { cn } from '@/lib/utils'
@@ -48,6 +49,7 @@ export function SettingsPage() {
 
   const systemTabs = isAdmin ? [
     { id: 'custom-fields', label: 'Custom Fields', icon: Layers },
+    { id: 'entity-numbering', label: 'Entity Numbering', icon: DollarSign },
     { id: 'canned-responses', label: 'Canned Responses', icon: FileText },
     { id: 'data', label: 'Data & Export', icon: Database },
     { id: 'webhooks', label: 'Webhooks', icon: Webhook }
@@ -56,7 +58,7 @@ export function SettingsPage() {
   ]
   
   const allTabs = [...personalTabs, ...teamTabs, ...systemTabs]
-  type TabId = 'work' | 'security' | 'appearance' | 'canned-responses' | 'custom-fields' | 'users' | 'data' | 'webhooks'
+  type TabId = 'work' | 'security' | 'appearance' | 'canned-responses' | 'custom-fields' | 'entity-numbering' | 'users' | 'data' | 'webhooks'
   const [activeTab, setActiveTab] = useState<TabId>('appearance')
   
   // Profile state
@@ -363,6 +365,8 @@ export function SettingsPage() {
               <TemplatesTab />
             </div>
           )}
+
+          {activeTab === 'entity-numbering' && isAdmin && <div id="entity-numbering-tab"><EntityNumberingTab /></div>}
         </div>
       </main>
     </div>

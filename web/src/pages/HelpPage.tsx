@@ -41,7 +41,7 @@ const sectionHeadings: Record<string, string[]> = {
   intake: ['What is Intake?', 'Intake Statuses', 'Decision Workflow', 'Converting to a Deal'],
   hr: ['Employee Directory', 'List & Card Views', 'Onboarding New Staff', 'App Access Control', 'Device Entitlements', 'Password Management', 'Private Employee Data'],
   requests: ['What are Requests?', 'Submitting a Request', 'My Request History', 'Approvals Queue', 'Form Builder', 'HR Analytics'],
-  settings: ['Work Profile', 'Security', 'Appearance (Themes)', 'Users & Roles', 'Custom Fields', 'Canned Responses', 'Data & Export', 'Webhooks'],
+  settings: ['Work Profile', 'Security', 'Appearance (Themes)', 'Users & Roles', 'Custom Fields', 'Entity Numbering', 'Canned Responses', 'Data & Export', 'Webhooks'],
   tips: ['Keyboard Shortcuts', 'Column Picker', 'View Persistence', 'Common Workflows', 'Pro Tips'],
 }
 
@@ -1029,6 +1029,37 @@ const content: Record<string, React.ReactNode> = {
           <li><strong>Checkbox</strong> — Yes/No toggle</li>
         </ul>
         <p>Custom fields appear on Add/Edit forms and as columns in tables for: Companies, Contacts, Deals, Tasks, Invoices, Products, and Employees.</p>
+      </Section>
+
+      <Section title="Entity Numbering" id="entity-numbering">
+        <p>
+          <strong>(Admin only)</strong> Automatically generate unique identifiers for every record across all entities. Each entity has its own independent numbering sequence with customizable prefix, digit padding, and suffix.
+        </p>
+        <p className="font-semibold mt-3 mb-1">Supported Entities:</p>
+        <ul className="list-disc pl-5 space-y-1">
+          <li><strong>Companies</strong> — e.g., COM-0001</li>
+          <li><strong>Contacts</strong> — e.g., CON-0001</li>
+          <li><strong>Deals</strong> — e.g., DEA-0001</li>
+          <li><strong>Tasks</strong> — e.g., TSK-0001</li>
+          <li><strong>Invoices</strong> — e.g., INV-00001</li>
+          <li><strong>Products</strong> — e.g., PRD-0001</li>
+          <li><strong>Intakes</strong> — e.g., INT-0001</li>
+          <li><strong>Employees</strong> — e.g., EMP-0001</li>
+        </ul>
+        <p className="font-semibold mt-3 mb-1">How It Works:</p>
+        <ul className="list-disc pl-5 space-y-1.5">
+          <li><strong>Enable per entity</strong> — Each entity has its own checkbox toggle. Auto-numbering is <em>off by default</em>; check the box to enable it for that specific entity.</li>
+          <li><strong>Prefix</strong> — A short code that appears before the number (e.g., "INV" for invoices). Enter up to 6 characters.</li>
+          <li><strong>Padding</strong> — The number of digits in the sequence (3–6 digits). A 4-digit padding produces 0001, 0002, etc. A 5-digit padding produces 00001, 00002, etc.</li>
+          <li><strong>Suffix</strong> — An optional code that appears after the number (e.g., "2026" for year-based suffixes).</li>
+          <li><strong>Next #</strong> — Manually set the starting number or reset the counter to 1 at any time.</li>
+          <li><strong>Preview</strong> — Shows exactly what the next generated number will look like based on your current settings.</li>
+        </ul>
+        <Callout variant="tip">
+          <p><strong>When enabled:</strong> The Add/Edit forms for that entity will show a read-only auto-generated number field. The name/title field becomes optional since the system provides the identifier automatically.</p>
+          <p className="mt-1"><strong>When disabled:</strong> You manually enter the name/title as usual, and no automatic numbering is applied.</p>
+        </Callout>
+        <p className="mt-3">Each entity's numbering is completely independent — enabling it for Invoices has no effect on Companies, Contacts, or any other entity. The sequence is determined by scanning existing records for the highest number, so there are no gaps or conflicts even if you manually create records with custom numbers.</p>
       </Section>
 
       <Section title="Canned Responses" id="canned-responses">

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Inbox, Search, Trash2, Pencil, ArrowUpDown, CheckCircle2, XCircle, Clock, User, MessageSquare, TrendingUp, HelpCircle, Plus } from 'lucide-react'
+import { Inbox, Search, Trash2, Pencil, ArrowUpDown, CheckCircle2, XCircle, Clock, User, MessageSquare, TrendingUp, HelpCircle, Plus, Hash } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,6 +12,7 @@ import { DataTablePagination } from '@/components/DataTablePagination'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import pb from '@/lib/pocketbase'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useEntityNumberingPreview } from '@/hooks/useEntityNumberingPreview'
 import { toast } from 'sonner'
 import { useLocation } from 'react-router'
 import type { Status } from '@/services'
@@ -81,7 +82,10 @@ export function IntakePage() {
     type: '' as '' | 'general' | 'vacation' | 'reimbursement' | 'hardware',
     source: '' as '' | 'external' | 'internal',
     status: '' as '' | Status,
+    entity_numbering: '',
   })
+
+  const { preview: intakePreview, isEnabled: showAutoNumber } = useEntityNumberingPreview('intakes')
 
   const createSub = useMutation({
     mutationFn: (data: typeof formData) =>
@@ -135,6 +139,15 @@ export function IntakePage() {
           <DialogContent>
             <DialogHeader><DialogTitle>Add Intake Submission</DialogTitle></DialogHeader>
             <form onSubmit={(e) => { e.preventDefault(); createSub.mutate(formData as any) }} className="space-y-4">
+              {showAutoNumber && (
+                <div className="space-y-2">
+                  <Label>Intake Number <span className="text-slate-400 font-normal">(auto-generated)</span></Label>
+                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                    <Hash className="w-4 h-4 text-slate-400" />
+                    <span className="font-mono text-sm text-slate-700">{intakePreview || 'INT-0001'}</span>
+                  </div>
+                </div>
+              )}
               <div className="space-y-2"><Label>Name *</Label><Input placeholder="Client name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required /></div>
               <div className="space-y-2"><Label>Email *</Label><Input type="email" placeholder="client@email.com" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required /></div>
               <div className="space-y-2"><Label>Message</Label><Input placeholder="Their message or notes" value={formData.message} onChange={(e) => setFormData({ ...formData, message: e.target.value })} /></div>
@@ -216,14 +229,23 @@ export function IntakePage() {
                   onClick={(e) => e.stopPropagation()}
                 >
                   <Dialog open={editing === sub.id} onOpenChange={(open) => {
-                    if (open) { setEditing(sub.id); setEditForm({ name: sub.name || '', email: sub.email || '', message: sub.message || '', type: sub.type || 'general', source: sub.source || 'external', status: sub.status || 'draft' }) }
+                    if (open) { setEditing(sub.id); setEditForm({ name: sub.name || '', email: sub.email || '', message: sub.message || '', type: sub.type || 'general', source: sub.source || 'external', status: sub.status || 'draft', entity_numbering: sub.entity_numbering || '' }) }
                     else setEditing(null)
                   }}>
                     <DialogTrigger asChild><Button variant="ghost" size="icon"><Pencil className="w-3.5 h-3.5" /></Button></DialogTrigger>
                     <DialogContent onClick={(e) => e.stopPropagation()}>
                       <DialogHeader><DialogTitle>Edit Submission</DialogTitle></DialogHeader>
-                      <form onSubmit={(e) => { e.preventDefault(); updateSub.mutate({ id: sub.id, data: editForm }) }} className="space-y-4">
-                        <div className="space-y-2"><Label>Name</Label><Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required /></div>
+                       <form onSubmit={(e) => { e.preventDefault(); updateSub.mutate({ id: sub.id, data: editForm }) }} className="space-y-4">
+                         {showAutoNumber && (
+                           <div className="space-y-2">
+                             <Label>Intake Number</Label>
+                             <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                               <Hash className="w-4 h-4 text-slate-400" />
+                               <span className="font-mono text-sm text-slate-700">{sub.entity_numbering || '—'}</span>
+                             </div>
+                           </div>
+                         )}
+                         <div className="space-y-2"><Label>Name *</Label><Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required /></div>
                         <div className="space-y-2"><Label>Email</Label><Input type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} required /></div>
                         <div className="space-y-2"><Label>Message</Label><Input value={editForm.message} onChange={(e) => setEditForm({ ...editForm, message: e.target.value })} /></div>
                         <div className="space-y-2"><Label>Type</Label>
